@@ -5,6 +5,9 @@
 discussion. It runs alongside the P-series data plan (`Baloo_Phase3_ProductOffer_Reconciliation.md`);
 where they overlap, **this ordering wins for launch**. Working board: the `Baloo_Project_Hub` Notion page.
 
+> **Everything owed by a human (dashboards, DNS, spend, decisions) is consolidated in one ordered,
+> checkable runbook: [`docs/PRE_LAUNCH.md`](docs/PRE_LAUNCH.md).**
+
 ## Decisions locked this session (Jitain + strategy discussion)
 - **Design direction: V3** (warm boutique — cream + Playfair Display). Resolves the V1/V2/V3 blocker.
   The port starts with Mobbin references + the app shell.
