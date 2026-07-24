@@ -6,6 +6,21 @@
 > [`ARCHITECTURE.md`](ARCHITECTURE.md); what's *planned* lives in `Baloo_Launch_Plan.md`.
 
 ## Unreleased / in progress
+- **S7c — Password reset UI:** `AuthModal` had sign in / sign up / upgrade but **no "forgot
+  password"**, so the Supabase reset-email template (which S3 configures) had nothing to trigger it —
+  a gap that would have surfaced the moment SMTP went live. Added a **reset** mode to the modal
+  (a "Forgot password?" link in sign-in → email-only form → `resetPasswordForEmail` with a neutral
+  "if that email has an account…" notice that never reveals whether an address is registered), and a
+  new **`/auth/reset`** page to set the new password. The reset link routes through the existing
+  `/auth/callback?next=/auth/reset` — the callback now honours a **same-origin `next`** (root-relative
+  only, so it can't become an open redirect), exchanging the PKCE code into a short-lived recovery
+  session before landing on the form. `/auth/reset` **guards the session**: no recovery session → an
+  "invalid or expired" card instead of a form that can't work. Same `emailRedirectTo`/allowlist
+  dependency as S3. Verified live: the sign-in modal shows Forgot password; reset mode hides the
+  password field + Google/guest and shows "Send reset link" + "Back to sign in"; the round-trip
+  restores; `/auth/reset` signed-out shows the invalid-session guard; console clean, build green.
+  *The actual email + the recovery `updateUser` can only be exercised once SMTP (S3) is configured —
+  same limitation as S3 itself.*
 - **S7a — Account deletion (GDPR right to erasure):** there was **no delete-account flow at all**, and
   the schema made adding one dangerous: every FK from `profiles` was `ON DELETE CASCADE`, so deleting
   an account would have **hard-deleted every public list that person curated** (404ing every shared

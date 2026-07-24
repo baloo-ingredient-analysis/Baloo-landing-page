@@ -123,8 +123,9 @@ Three holes the audit found in shipped code:
   `emailRedirectTo`, so confirmation links fell back to the Site URL — i.e. a production signup could
   mail someone a **localhost** link. Both signup and the guest→account upgrade now pin
   `${origin}/auth/callback`; this needs the matching **Redirect URLs** allowlist entries to work.
-  **Also found:** there is **no password-reset UI** (`AuthModal` has no "forgot password"), so the
-  reset email template has nothing to trigger it — worth adding before launch. — **CC done / M owed**
+  **Password-reset UI (was "also found"): ✅ shipped (S7c).** `AuthModal` "Forgot password?" → reset
+  mode + a `/auth/reset` page; the callback now honours a same-origin `next`. The email itself only
+  works once the SMTP setup above is done. — **CC done / M owed**
 - **S4** write rate limits/caps · **S5** ✅ security headers shipped (enforcing safe set + report-only
   CSP); remaining: M flips leaked-password + Vercel WAF toggles, later flip CSP to enforcing · **S6**
   error monitoring (Sentry) · **S7a ✅ account deletion shipped** (GDPR erasure): migration `0008` made

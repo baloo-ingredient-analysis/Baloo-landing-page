@@ -7,7 +7,7 @@ import { useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { Modal } from "@/components/Modal";
 
-export type AuthMode = "signin" | "signup" | "upgrade";
+export type AuthMode = "signin" | "signup" | "upgrade" | "reset";
 
 function friendly(message: string | undefined, mode: AuthMode): string {
   const m = message ?? "";
@@ -47,6 +47,18 @@ export function AuthModal({
     setError(null);
     setNotice(null);
     try {
+      if (mode === "reset") {
+        // Send the reset email. Route it through /auth/callback (which exchanges the PKCE code and
+        // establishes a recovery session) then on to /auth/reset to set the new password. Same
+        // emailRedirectTo reasoning as signup — the origin must also be on Supabase's Redirect URLs.
+        const { error } = await sb.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+        });
+        if (error) return setError(friendly(error.message, mode));
+        // Neutral message either way — never reveal whether an email is registered.
+        setNotice("If that email has an account, a reset link is on its way.");
+        return;
+      }
       if (mode === "signin") {
         const { error } = await sb.auth.signInWithPassword({ email, password });
         if (error) return setError(friendly(error.message, mode));
@@ -107,7 +119,14 @@ export function AuthModal({
   }
 
   const title =
-    mode === "signin" ? "Sign in" : mode === "signup" ? "Create your account" : "Save your account";
+    mode === "signin"
+      ? "Sign in"
+      : mode === "signup"
+        ? "Create your account"
+        : mode === "reset"
+          ? "Reset your password"
+          : "Save your account";
+  const cta = mode === "reset" ? "Send reset link" : title;
 
   return (
     <Modal onClose={onClose} labelledBy="auth-modal-title" panelClassName="max-w-sm p-6">
@@ -119,33 +138,56 @@ export function AuthModal({
             Keep everything you&apos;ve made as a guest — just add an email and password.
           </p>
         )}
+        {mode === "reset" && (
+          <p className="mt-1 text-sm text-muted">
+            Enter your email and we&apos;ll send a link to set a new password.
+          </p>
+        )}
 
         <div className="mt-4 flex flex-col gap-2">
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && mode === "reset") submit();
+            }}
             placeholder="you@email.com"
             aria-label="Email"
             className="rounded-lg border border-line bg-canvas px-4 py-2.5 text-ink outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20"
           />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-            }}
-            placeholder="Password"
-            aria-label="Password"
-            className="rounded-lg border border-line bg-canvas px-4 py-2.5 text-ink outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20"
-          />
+          {mode !== "reset" && (
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submit();
+              }}
+              placeholder="Password"
+              aria-label="Password"
+              className="rounded-lg border border-line bg-canvas px-4 py-2.5 text-ink outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20"
+            />
+          )}
+          {mode === "signin" && (
+            <button
+              type="button"
+              onClick={() => {
+                setMode("reset");
+                setError(null);
+                setNotice(null);
+              }}
+              className="self-start text-sm text-muted underline decoration-line underline-offset-2 hover:text-ink"
+            >
+              Forgot password?
+            </button>
+          )}
           <button
             onClick={submit}
-            disabled={busy || !email || !password}
+            disabled={busy || !email || (mode !== "reset" && !password)}
             className="mt-1 rounded-lg bg-ink px-5 py-2.5 font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
           >
-            {busy ? "One moment…" : title}
+            {busy ? "One moment…" : cta}
           </button>
         </div>
 
@@ -156,7 +198,21 @@ export function AuthModal({
         )}
         {notice && <p className="mt-3 text-sm text-natural">{notice}</p>}
 
-        {mode !== "upgrade" && (
+        {mode === "reset" && (
+          <button
+            type="button"
+            onClick={() => {
+              setMode("signin");
+              setError(null);
+              setNotice(null);
+            }}
+            className="mt-4 text-sm text-muted underline decoration-line underline-offset-2 hover:text-ink"
+          >
+            Back to sign in
+          </button>
+        )}
+
+        {(mode === "signin" || mode === "signup") && (
           <>
             <button
               onClick={google}

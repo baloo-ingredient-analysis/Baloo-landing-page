@@ -90,7 +90,9 @@
   - [ ] Supabase custom SMTP fields + raise the auth email rate limit — **M**
   - [ ] Supabase **Site URL** + **Redirect URLs** allowlist (prod, `*.vercel.app`, localhost) — **M**
   - [ ] End-to-end test: real inbox + Gmail, SPF/DKIM/DMARC all PASS, link lands signed in — **M**
-  - [ ] *Found during S3:* **no password-reset UI** exists (`AuthModal` has no "forgot password") — **CC**
+  - [x] **S7c — Password-reset UI** ✅ shipped (found during S3): `AuthModal` "Forgot password?" →
+        reset mode + `/auth/reset` page; callback honours a same-origin `next`. Verified live (states
+        + invalid-session guard). Email path testable once SMTP (S3) is live. — **CC**
       Supabase's built-in mailer is dev-only + rate-limited → **confirmation emails silently stop
       arriving at launch**. — **M/CC**
 - [ ] **S4 — Write rate limits + volume caps** (lists/day, items/list, comments/min, follows/min) — **CC**
