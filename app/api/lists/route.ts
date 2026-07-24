@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser, requireVerifiedUser } from "@/lib/auth";
+import { checkLimit, tooMany } from "@/lib/ratelimit";
 import { db } from "@/lib/db";
 import { getProfileById } from "@/lib/db/queries/profiles";
 import { createList, getListsByOwnerWithCounts } from "@/lib/db/queries/lists";
@@ -18,6 +19,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const gate = await requireVerifiedUser();
   if ("error" in gate) return gate.error;
+  const rl = await checkLimit("writeList", gate.user.id); // S4: lists/day
+  if (!rl.ok) return tooMany(rl.reset);
   const dbi = db();
   if (!dbi) return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
 

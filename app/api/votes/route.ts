@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireVerifiedUser } from "@/lib/auth";
+import { checkLimit, tooMany } from "@/lib/ratelimit";
 import { db } from "@/lib/db";
 import { toggleVote, type VotableType } from "@/lib/db/queries/votes";
 
@@ -12,6 +13,8 @@ const VOTABLE: VotableType[] = ["comment"];
 export async function POST(req: Request) {
   const gate = await requireVerifiedUser();
   if ("error" in gate) return gate.error;
+  const rl = await checkLimit("vote", gate.user.id); // S4: votes/minute
+  if (!rl.ok) return tooMany(rl.reset);
   const dbi = db();
   if (!dbi) return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
 

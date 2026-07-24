@@ -95,7 +95,11 @@
         + invalid-session guard). Email path testable once SMTP (S3) is live. — **CC**
       Supabase's built-in mailer is dev-only + rate-limited → **confirmation emails silently stop
       arriving at launch**. — **M/CC**
-- [ ] **S4 — Write rate limits + volume caps** (lists/day, items/list, comments/min, follows/min) — **CC**
+- [x] **S4 — Write rate limits + volume caps** ✅ shipped: per-user limits on every community write
+      (writeList 30/day · listItem 120/min · comment 8/min · follow 30/min · save 40/min · vote 60/min ·
+      report 8/5-min) via the S1 limiter, + a hard `MAX_ITEMS_PER_LIST=250` (always-on count, 409
+      `list_full`). Fail-open + **inert until the Upstash vars are set** (same as S1). Verified
+      fail-open + count; 429 needs Upstash. — **CC** *(depends on M's Upstash env vars)*
 - [x] **S5 (headers) — Security headers** ✅ shipped (`next.config.mjs`): HSTS · X-Frame-Options DENY
       · nosniff · Referrer-Policy · Permissions-Policy (enforcing) + **report-only CSP** (Supabase
       origin in `connect-src`). Verified: present + zero CSP violations + sign-in works. — **CC done**

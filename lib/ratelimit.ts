@@ -17,12 +17,26 @@ import { ipAddress } from "@vercel/functions";
 // Values are (requests, per window). A normal human analysing products stays well under these;
 // a scripted for-loop hits them fast.
 const LIMITS = {
+  // Paid routes (Order S1) — keyed by IP.
   extract: { tokens: 15, window: "60 s" },
   analyse: { tokens: 15, window: "60 s" },
   nutritionContext: { tokens: 30, window: "60 s" },
   explain: { tokens: 20, window: "60 s" },
   productsAnalyze: { tokens: 10, window: "60 s" },
+  // Community writes (Order S4) — keyed by USER id. Generous enough that a normal person never
+  // notices; a spam flood hits them fast. Deletes/edits/unfollows are intentionally uncapped.
+  writeList: { tokens: 30, window: "1 d" }, // new lists per day
+  listItem: { tokens: 120, window: "60 s" }, // add-to-list (bulk building a list is fine)
+  comment: { tokens: 8, window: "60 s" },
+  follow: { tokens: 30, window: "60 s" },
+  save: { tokens: 40, window: "60 s" },
+  vote: { tokens: 60, window: "60 s" },
+  report: { tokens: 8, window: "300 s" },
 } as const;
+
+// A hard maximum, enforced in code regardless of Upstash (unlike the rate limits, this is a
+// correctness bound, not a burst guard — a list of 250 products is already enormous).
+export const MAX_ITEMS_PER_LIST = 250;
 
 export type LimiterName = keyof typeof LIMITS;
 

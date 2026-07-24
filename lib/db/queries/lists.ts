@@ -79,6 +79,15 @@ export async function addListItem(
   return row ?? null;
 }
 
+// Current item count for a list — used by the S4 per-list hard cap before an add.
+export async function countListItems(dbi: Db, listId: string): Promise<number> {
+  const [{ n }] = await dbi
+    .select({ n: sql<number>`count(*)::int` })
+    .from(listItems)
+    .where(eq(listItems.listId, listId));
+  return n ?? 0;
+}
+
 export async function removeListItem(dbi: Db, listId: string, productId: string): Promise<void> {
   await dbi
     .delete(listItems)

@@ -6,6 +6,18 @@
 > [`ARCHITECTURE.md`](ARCHITECTURE.md); what's *planned* lives in `Baloo_Launch_Plan.md`.
 
 ## Unreleased / in progress
+- **S4 — Write rate limits + volume caps:** the S1 limiter (`lib/ratelimit.ts`) now also guards every
+  per-user community write — `writeList` (30/day), `listItem` (120/min), `comment` (8/min), `follow`
+  (30/min), `save` (40/min), `vote` (60/min), `report` (8/5-min) — each one line after the existing
+  `requireVerifiedUser` gate, keyed by **user id** (the paid routes are keyed by IP). Deletes, edits
+  and unfollows are deliberately uncapped. Plus a **hard cap** `MAX_ITEMS_PER_LIST = 250`, enforced by
+  a real count (`countListItems`) **independent of Upstash** — a correctness bound, not a burst guard —
+  returning a friendly 409 `list_full`. Like S1 the rate limits are **fail-open and inert until the
+  Upstash vars are set** (so they're off locally and until M adds the Vercel env vars), while the
+  250-item cap is always on. Verified: `checkLimit` fail-opens (allows) with no Upstash so writes are
+  never blocked by the absent dep; `countListItems` returns the true count (2 on the seed list);
+  typecheck + build green. *429 enforcement itself can only be exercised once Upstash is configured —
+  the same reused, already-shipped S1 sliding-window mechanism.*
 - **S7c — Password reset UI:** `AuthModal` had sign in / sign up / upgrade but **no "forgot
   password"**, so the Supabase reset-email template (which S3 configures) had nothing to trigger it —
   a gap that would have surfaced the moment SMTP went live. Added a **reset** mode to the modal

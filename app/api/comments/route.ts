@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser, requireVerifiedUser, getSessionUser } from "@/lib/auth";
+import { checkLimit, tooMany } from "@/lib/ratelimit";
 import { db } from "@/lib/db";
 import { addComment, deleteOwnComment, getThread, type ThreadSort } from "@/lib/db/queries/comments";
 import { recordActivity } from "@/lib/db/queries/activity";
@@ -22,6 +23,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const gate = await requireVerifiedUser();
   if ("error" in gate) return gate.error;
+  const rl = await checkLimit("comment", gate.user.id); // S4: comments/minute
+  if (!rl.ok) return tooMany(rl.reset);
   const dbi = db();
   if (!dbi) return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
 

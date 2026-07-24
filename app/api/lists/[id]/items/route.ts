@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { requireVerifiedUser } from "@/lib/auth";
+import { checkLimit, tooMany, MAX_ITEMS_PER_LIST } from "@/lib/ratelimit";
 import { db, type Db } from "@/lib/db";
 import {
   addListItem,
+  countListItems,
   getListById,
   removeListItem,
   reorderListItems,
@@ -33,6 +35,15 @@ async function guard(
 export async function POST(req: Request, { params }: Params) {
   const g = await guard(params);
   if ("error" in g) return g.error;
+  const rl = await checkLimit("listItem", g.user.id); // S4: add-to-list rate
+  if (!rl.ok) return tooMany(rl.reset);
+  // S4 hard cap (always on, not Upstash-dependent): a list can't grow past MAX_ITEMS_PER_LIST.
+  if ((await countListItems(g.dbi, g.listId)) >= MAX_ITEMS_PER_LIST) {
+    return NextResponse.json(
+      { error: "list_full", message: `A list can hold up to ${MAX_ITEMS_PER_LIST} products.` },
+      { status: 409 },
+    );
+  }
   let body: { productId?: string; note?: string };
   try {
     body = await req.json();

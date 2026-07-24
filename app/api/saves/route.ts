@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser, requireVerifiedUser } from "@/lib/auth";
+import { checkLimit, tooMany } from "@/lib/ratelimit";
 import { db } from "@/lib/db";
 import { getListById } from "@/lib/db/queries/lists";
 import { saveList, unsaveList } from "@/lib/db/queries/saves";
@@ -8,6 +9,8 @@ import { saveList, unsaveList } from "@/lib/db/queries/saves";
 export async function POST(req: Request) {
   const gate = await requireVerifiedUser();
   if ("error" in gate) return gate.error;
+  const rl = await checkLimit("save", gate.user.id); // S4: saves/minute
+  if (!rl.ok) return tooMany(rl.reset);
   const dbi = db();
   if (!dbi) return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
 
