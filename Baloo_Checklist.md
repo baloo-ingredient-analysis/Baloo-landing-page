@@ -109,7 +109,11 @@
         endpoint) — **CC**
   - [ ] *(dropped from S5)* "zod on every body" — free-text routes already cap server-side; fold any
         standardization into S4 — **CC**
-- [ ] **S6 — Error monitoring** (Sentry) — "stable from the get-go" = knowing prod broke first — **CC**
+- [~] **S6 — Error monitoring** (Sentry) — "stable from the get-go" = knowing prod broke first
+  - [x] **Wiring** ✅ `@sentry/nextjs` guarded across server/edge/client; inert without a DSN; CSP
+        `connect-src` derives the ingest origin. Verified build green with no DSN. — **CC**
+  - [ ] Create a Sentry project + set `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` on Vercel — **M**
+  - [ ] *(later)* source-map upload for readable stack traces (needs a `SENTRY_AUTH_TOKEN`) — **CC/M**
 - [~] **S7 — "Dar de baja"** — **CC**
   - [x] **S7a — Account deletion** ✅ shipped (right to erasure). Migration `0008` flips
         `lists.owner_id` + `comments.user_id` to nullable/`SET NULL` — previously **every** FK cascaded,

@@ -6,6 +6,19 @@
 > [`ARCHITECTURE.md`](ARCHITECTURE.md); what's *planned* lives in `Baloo_Launch_Plan.md`.
 
 ## Unreleased / in progress
+- **S6 — Error monitoring (Sentry), wired + inert until a DSN:** so we learn a production break from
+  the tool, not from a user. `@sentry/nextjs` with guarded instrumentation across all three runtimes —
+  `sentry.server.config.ts`, `sentry.edge.config.ts` (middleware), and `instrumentation-client.ts`
+  (browser) — each `Sentry.init` wrapped in an `if (DSN)` check, so **with no `SENTRY_DSN` it's a
+  complete no-op** (same optional-infra rule as Redis/DB/email); it switches on the moment M adds the
+  DSN on Vercel, no code change. `instrumentation.ts` loads the right runtime config and exports
+  `onRequestError` (Server Components / route handlers / middleware); the client file exports
+  `onRouterTransitionStart` (navigation errors). Session Replay off by default, `sendDefaultPii: false`
+  (matches the never-leak-user-data contract). The CSP `connect-src` now derives Sentry's ingest origin
+  from the public DSN (mirroring the Supabase-origin logic), so error reporting keeps working when the
+  CSP flips to enforcing — and adds nothing while Sentry is off. Verified: typecheck + build green with
+  no DSN set (fully inert). *Not exercised: live error capture needs a real DSN. Source-map upload
+  (readable stack traces) is a later add — needs a Sentry auth token.*
 - **S4 — Write rate limits + volume caps:** the S1 limiter (`lib/ratelimit.ts`) now also guards every
   per-user community write — `writeList` (30/day), `listItem` (120/min), `comment` (8/min), `follow`
   (30/min), `save` (40/min), `vote` (60/min), `report` (8/5-min) — each one line after the existing

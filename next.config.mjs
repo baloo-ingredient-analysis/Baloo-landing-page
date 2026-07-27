@@ -18,6 +18,19 @@ function supabaseOrigins() {
   }
 }
 
+// Sentry (Order S6): the browser SDK POSTs errors to the DSN's ingest host. Derive that origin from
+// the public DSN so connect-src stays correct once the CSP flips to enforcing; empty when Sentry is
+// off, so it adds nothing until a DSN is set.
+function sentryOrigin() {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (!dsn) return "";
+  try {
+    return ` ${new URL(dsn).origin}`;
+  } catch {
+    return "";
+  }
+}
+
 const csp = [
   "default-src 'self'",
   // Next injects inline hydration scripts (no nonce here); 'unsafe-eval' covers dev HMR. Report-only.
@@ -25,7 +38,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'", // Tailwind + framework-injected styles
   "img-src 'self' data: blob:",
   "font-src 'self'", // fonts are self-hosted via next/font
-  `connect-src 'self'${supabaseOrigins()}`,
+  `connect-src 'self'${supabaseOrigins()}${sentryOrigin()}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

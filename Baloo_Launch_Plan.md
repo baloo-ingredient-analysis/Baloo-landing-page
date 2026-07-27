@@ -132,7 +132,9 @@ Three holes the audit found in shipped code:
 - **S4 ✅ write rate limits/caps shipped** (per-user limits on every community write + a 250-item
   hard cap; fail-open, inert until M's Upstash vars land — same as S1) · **S5** ✅ security headers shipped (enforcing safe set + report-only
   CSP); remaining: M flips leaked-password + Vercel WAF toggles, later flip CSP to enforcing · **S6**
-  error monitoring (Sentry) · **S7a ✅ account deletion shipped** (GDPR erasure): migration `0008` made
+  **S6 ✅ error monitoring (Sentry) shipped** — guarded across server/edge/client, inert until M
+  sets `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` on Vercel (source-map upload later, needs a Sentry auth
+  token) · **S7a ✅ account deletion shipped** (GDPR erasure): migration `0008` made
   `lists.owner_id` + `comments.user_id` nullable/`SET NULL` — **every FK used to cascade**, so a
   deletion would have destroyed the person's public lists *and* other people's replies. Policy: erase
   the person, keep the community. `DELETE /api/account` + `/settings` typed-handle confirm; 13/13 E2E
