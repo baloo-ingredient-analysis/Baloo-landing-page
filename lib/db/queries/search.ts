@@ -8,7 +8,7 @@
 
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import type { Db } from "../index";
-import { listItems, lists, profiles, products, saves, type Product } from "../schema";
+import { listItems, lists, profiles, products, saves, votes, type Product } from "../schema";
 import { sql } from "drizzle-orm";
 import type { ListWithCountsAndOwner } from "./lists";
 
@@ -34,6 +34,7 @@ export async function searchAll(dbi: Db, q: string, limitEach = 10): Promise<Sea
       list: lists,
       itemCount: sql<number>`count(distinct ${listItems.id})::int`,
       saveCount: sql<number>`count(distinct ${saves.userId})::int`,
+      likeCount: sql<number>`(select count(*)::int from ${votes} v where v.target_type = 'list' and v.target_id = ${lists.id})`,
       ownerHandle: profiles.handle,
     })
     .from(lists)
@@ -53,6 +54,7 @@ export async function searchAll(dbi: Db, q: string, limitEach = 10): Promise<Sea
       ...r.list,
       itemCount: r.itemCount,
       saveCount: r.saveCount,
+      likeCount: r.likeCount,
       ownerHandle: r.ownerHandle,
     })),
   };

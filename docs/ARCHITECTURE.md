@@ -96,10 +96,13 @@ without `DATABASE_URL`. Connects as `postgres` (via the transaction pooler, `pre
 **Identity & social**
 - `profiles` — `id` is a **FK to `auth.users.id`** (Supabase Auth). Handle, display name, `is_admin`.
 - `lists` / `list_items` — user-curated collections; `slug`, public/private, ordered items.
-- `follows` · `saves` · `votes` — the social graph and signals. **Save is the ONE signal on lists
-  and products (Order L6)**; votes survive only as comment agreement (the thread's "Top" sort), and
-  "Popular this week" ranks by saves alone. Historical product/list vote rows remain but are never
-  written or shown.
+- `follows` · `saves` · `votes` — the social graph and signals. Lists carry **two** signals
+  (Order L8): a **Like** (public — a `votes` row with `target_type = 'list'`; count shown, feeds
+  Popular/Explore ranking) and a **Save** (private — a `saves` row; goes to the owner's library, count
+  NEVER shown publicly, used only as an internal ranking signal). **Products carry no like/save** —
+  their one action is "Add to my list". Comment votes remain agreement (the thread's "Top" sort).
+  "Popular this week" ranks by likes; Discover/Explore blends likes + saves(internal) + recency +
+  regional availability (L7). Likes deliberately write no feed activity.
 - `comments` — threaded; soft-hidden via `hidden_at`/`hidden_by` (moderation tombstones).
 
 **Account deletion — "erase the person, keep the community" (Order S7a).** Everything hanging off
@@ -130,7 +133,7 @@ FKs to `CASCADE`** without re-reading that file.
 |---|---|
 | `/` | The tool — paste → extract → stream; idle homepage board |
 | `/p/[slug]` | Canonical product page (stored analysis, reuses `ResultsView`) |
-| `/discover` | Discovery + search |
+| `/discover` | Explore — ranked public lists from people you don't follow (Following lives at `/feed`) + search |
 | `/u/[handle]` | Public profile (curator landing page) |
 | `/list/[slug]` · `/list/[slug]/edit` | Public list · list editor |
 | `/lists` · `/lists/new` | My lists · create |

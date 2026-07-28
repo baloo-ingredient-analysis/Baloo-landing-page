@@ -4,11 +4,11 @@ import { checkLimit, tooMany } from "@/lib/ratelimit";
 import { db } from "@/lib/db";
 import { toggleVote, type VotableType } from "@/lib/db/queries/votes";
 
-// Save-only (Order L6): lists and products carry ONE social signal — Save. Upvotes survive only
-// as comment agreement (they drive the thread's "Top" sort); product/list votes are rejected.
-// Single direction — there is no downvote, by design. Comment votes are too light for the feed,
-// so this route writes no activity.
-const VOTABLE: VotableType[] = ["comment"];
+// Votes power two signals (Order L8 re-widens the L6 chokepoint): a LIST vote is a public Like
+// (feeds "Popular"/Explore ranking), a COMMENT vote is agreement (drives the thread's "Top" sort).
+// PRODUCTS still carry no vote — their one action is "Add to my list". Single direction — no
+// downvote, by design. Both are too light for the feed, so this route writes no activity.
+const VOTABLE: VotableType[] = ["comment", "list"];
 
 export async function POST(req: Request) {
   const gate = await requireVerifiedUser();

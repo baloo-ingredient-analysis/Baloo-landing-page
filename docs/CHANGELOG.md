@@ -6,6 +6,28 @@
 > [`ARCHITECTURE.md`](ARCHITECTURE.md); what's *planned* lives in `Baloo_Launch_Plan.md`.
 
 ## Unreleased / in progress
+- **L9 — Discover becomes Explore:** Discover is now the **Explore** surface — one ranked grid of
+  public lists from people you *don't* follow (your Following lists already live at `/feed`), plus the
+  "Recently analysed" product rows. The old three-section layout (Popular / Recently added / Recently
+  analysed) is gone. New `getExploreLists` blends the public + internal engagement signals
+  (`likeCount + saveCount`) with a recency decay, then the L7 region soft-rank re-orders by "what you
+  can actually buy" — and when you're signed in it **excludes your own lists and everyone you follow**
+  (reusing `getFollowingIds`), so Explore is genuinely *new* people. Search/category relevance is still
+  deferred (no taxonomy yet — the SearchBox stays the finder). Verified in-browser against the dev DB:
+  Explore renders ranked, the region toggle re-ranks, console clean.
+- **L8 — Lists gain a public Like (Save goes private); product CTA "Add to my list":** reverses the
+  L6 "Save is the one signal" decision for **lists**. A list now carries **two** signals — a **Like**
+  (public, count shown, feeds Popular/Explore ranking) and a **Save** (private, into your library,
+  count never shown publicly, an internal ranking signal only); you can both like and save the same
+  list. **No migration** — likes reuse the already-polymorphic `votes` table (`target_type = 'list'`),
+  so L8 just re-widens the two boundaries L6 narrowed (the `VOTABLE` whitelist and a hard-typed pill).
+  New `LikePill` (a coloured **rose-red heart**, the one social accent — reserved off all
+  ingredient/nutrition UI, see the DESIGN.md colour-rule reframe), mounted beside `SavePill` on the
+  list page; `ListCard` now shows "N liked" and never a public save count; `/api/search` exposes
+  `likeCount`, not the private `saveCount`; "Popular this week" ranks by likes. **Products** get no
+  like/save — their one action is the renamed **"Add to my list"** CTA (`AddToList`, otherwise
+  unchanged). Verified end-to-end in-browser: signed-out Like → auth gate; signed-in Like → heart fills
+  `#C24C4C`, count 0→1, toggles back clean; typecheck + build green; **no schema change**.
 - **S6 — Error monitoring (Sentry), wired + inert until a DSN:** so we learn a production break from
   the tool, not from a user. `@sentry/nextjs` with guarded instrumentation across all three runtimes —
   `sentry.server.config.ts`, `sentry.edge.config.ts` (middleware), and `instrumentation-client.ts`

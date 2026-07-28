@@ -9,8 +9,10 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { ListCover } from "@/components/lists/ListCover";
 import { ShareButton } from "@/components/lists/ShareButton";
 import { SavePill } from "@/components/engagement/SavePill";
+import { LikePill } from "@/components/engagement/LikePill";
 import { ReportControl } from "@/components/ReportControl";
 import { isSaved } from "@/lib/db/queries/saves";
+import { getVoteCount, hasVoted } from "@/lib/db/queries/votes";
 
 // Public list page (Order G4) — the shareable growth surface. SSR from Postgres. A private list
 // is visible only to its owner; everyone else gets a 404 (no existence leak).
@@ -54,9 +56,13 @@ export default async function ListPage({ params }: Params) {
   const isOwner = !!viewer && viewer.id === list.ownerId;
   if (!list.isPublic && !isOwner) notFound(); // private → owner only
 
-  // Engagement state (Order G7; Save-only since L6), SSR-hydrated.
+  // Engagement state (Order G7; L8 adds the public Like alongside the private Save), SSR-hydrated.
   const dbi = db()!;
-  const viewerSaved = viewer ? await isSaved(dbi, viewer.id, list.id) : false;
+  const [viewerSaved, viewerLiked, likeCount] = await Promise.all([
+    viewer ? isSaved(dbi, viewer.id, list.id) : Promise.resolve(false),
+    viewer ? hasVoted(dbi, viewer.id, "list", list.id) : Promise.resolve(false),
+    getVoteCount(dbi, "list", list.id),
+  ]);
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -110,8 +116,12 @@ export default async function ListPage({ params }: Params) {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              {/* Save is the ONE social signal on a list (L6) — no upvote. You don't save your own
-                  list, so it's hidden for the owner (V3 own-list cleanup); Share stays (growth loop). */}
+              {/* Two signals since L8: Like (public, feeds ranking) + Save (private library). You
+                  don't like or save your own list, so both are hidden for the owner (V3 own-list
+                  cleanup); Share stays (growth loop). */}
+              {!isOwner && (
+                <LikePill listId={list.id} initialLiked={viewerLiked} initialCount={likeCount} />
+              )}
               {!isOwner && <SavePill listId={list.id} initialSaved={viewerSaved} />}
               <ShareButton
                 path={`/list/${list.slug}`}

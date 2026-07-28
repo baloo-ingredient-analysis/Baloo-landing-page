@@ -130,12 +130,19 @@
 - [ ] **N2 — Email notifications** *(needs S3)* — same events, **digest-batched**, prefs + opt-out;
       default digest-only, never per-event blasting — **CC**
 - [ ] **L3 — AI semantic search over public lists** (search-as-homepage; pgvector vs LLM-rerank TBD) — **CC**
-- [x] **L6 (upvote removal) — Save-only** ✅ shipped: votes API = comments only (product/list → 400),
-      UpvotePill mounts gone from list + product pages, Popular = saves alone, feed drops "upvoted"
-      stories. Comment upvotes kept (Top sort). Non-destructive, no migration. Verified E2E. — **CC**
-- [ ] **L6 (remainder) — scanned-product organisation**: save product as favourite ·
-      add-to-multiple-lists · keep-for-later. Needs schema (saves are list-scoped today); rides with
-      P3 / the V3 port. — **CC**
+- [x] **L6 (upvote removal) — Save-only** ✅ shipped, then **partly reversed by L8** (Like is back on
+      lists). Comment upvotes unchanged. — **CC**
+- [x] **L8 — Lists: public Like + private Save; product "Add to my list"** ✅ shipped: Like reuses the
+      polymorphic `votes` table (`target_type='list'`, **no migration**), `LikePill` (rose-red heart —
+      the one social accent) beside `SavePill`; `ListCard` shows "N liked", never a public save count;
+      Popular ranks by likes; `/api/search` exposes likeCount not saveCount; product CTA = "Add to my
+      list". Canon reframed (DESIGN.md/design.json). Verified E2E (heart fills, count 0→1, toggles clean;
+      typecheck+build green). — **CC**
+- [x] **L9 — Discover → Explore** ✅ shipped: `getExploreLists` (blended likes+saves+recency, excludes
+      self + followed authors when signed in), region soft-rank, `/discover` restructured to Explore +
+      Recently analysed; Following stays `/feed`. Verified in-browser. — **CC**
+- [ ] **L8 (remainder) — scanned-product organisation** beyond add-to-list (keep-for-later, etc.; needs
+      schema; rides with P3/the port) **+ name the saved-lists library** (shelf/pantry/library) — Jitain. — **CC**
 - [ ] **L5a/b — Identity**: `baloo.life/@username` URL + username change with permanent redirect — **CC**
 - [x] **L7 — Region prioritisation** ✅ shipped: retailer→region map (`lib/config.ts`/`retailers.ts`),
       availability math (`lib/region.ts`), `getListsRetailers` + `withRegionAvailability`, the "Shopping

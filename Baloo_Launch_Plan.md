@@ -11,9 +11,11 @@ where they overlap, **this ordering wins for launch**. Working board: the `Baloo
 ## Decisions locked this session (Jitain + strategy discussion)
 - **Design direction: V3** (warm boutique — cream + Playfair Display). Resolves the V1/V2/V3 blocker.
   The port starts with Mobbin references + the app shell.
-- **Save, not Like.** A list carries ONE social signal: **Save**. "Saved by N people" is the
-  popularity + trust metric (a save = "I'll keep this", stronger than a casual heart). Products are
-  **saved as favourites** too. No upvote/like. → this contradicts shipped code (see Open decisions).
+- ~~**Save, not Like.** A list carries ONE social signal: **Save**…~~ **SUPERSEDED by L8 (Jitain,
+  this session).** A list now carries **two** signals: a **public Like** (count shown, feeds
+  popularity/Explore ranking) **and** a **private Save** (into your library; count never shown, an
+  internal ranking signal). You can both like and save the same list. **Products** get no like/save —
+  their one action is **"Add to my list"** (Pinterest-board model). Shipped in L8/L9.
 - **Real numbers only.** Solve cold-start by seeding **supply** (great lists + official accounts),
   never by faking demand — 3 saves shows "3".
 - **Search is the homepage.** One box, two intents: a URL → ingredient analysis; natural language
@@ -149,11 +151,20 @@ Three holes the audit found in shipped code:
   community lever. Approach decided at plan time (pgvector embeddings on Supabase vs LLM-rerank over
   pg_trgm candidates). Semantic, not keyword — "cereals my 5-year-old can eat" must match
   "low-sugar kids cereals".
-- **L6 — Save-only reconciliation.** ✅ **Upvote removal shipped**: votes API narrowed to comments
-  (product/list → 400), mounts gone from the list + product pages, Popular ranks by saves alone, the
-  feed drops "upvoted" stories; comment upvotes stay (Top sort). Non-destructive (historical rows
-  kept). **Remainder open:** scanned-product organisation — save product as favourite,
-  add-to-multiple-lists, keep-for-later (needs schema; rides with P3/the port).
+- **L6 — Save-only reconciliation.** ✅ Shipped, then **partly reversed by L8** (see below). L6
+  removed the list/product Upvote and made Save the one signal; L8 re-introduces a **public Like on
+  lists** (Save becomes the *private* signal). Comment upvotes are unchanged (Top sort).
+- **L8 — Lists: Like + Save; product "Add to my list".** ✅ **shipped.** Public Like (reuses the
+  polymorphic `votes` table, `target_type='list'` — no migration) + private Save; `LikePill`
+  (rose-red heart, the one social accent) beside `SavePill`; `ListCard` shows "N liked", never a
+  public save count; Popular ranks by likes; product CTA renamed **"Add to my list"**. Canon reframed
+  (DESIGN.md/design.json colour rule). — **CC**
+- **L9 — Discover → Explore.** ✅ **shipped.** Discover is one ranked grid of public lists from people
+  you don't follow (Following stays `/feed`), blended likes+saves+recency then L7 region soft-rank,
+  excluding self + followed authors when signed in. — **CC**
+- **L8 remainder (open):** scanned-product organisation beyond add-to-list — keep-for-later, etc.
+  (rides with P3/the port); and the saved-lists library **name** ("shelf" / "pantry" / "library") —
+  Jitain to decide.
 - **L5a/b — Identity for distribution.** `baloo.life/@username` URL (profile at `/@handle`, redirect
   the current `/u/[handle]`); username change + permanent redirect.
 - **L7 — Region prioritisation** ✅ **shipped.** Discover's "Recently added" grid soft-ranks by "% of a
@@ -181,9 +192,10 @@ Design's updated files:
   Jitain leans shrink); the board's real-imagery treatment; the 2nd "create a list with THIS product" CTA.
 
 ## Open decisions still owed (recorded for Jitain)
-- **Upvote vs Save.** Shipped code (G7) has BOTH an Upvote and a Save. "Save-only" implies
-  **removing the Upvote entirely** and ranking Popular by saves. *Recommend: yes — Save-only
-  everywhere, products are "favourited" (= saved).* Confirm before L6.
+- ~~**Upvote vs Save.**~~ ✅ **Resolved twice.** L6 went Save-only; then L8 (Jitain, this session)
+  landed the final model: **lists carry a public Like + a private Save; products carry neither (their
+  action is "Add to my list")**. Shipped in L8/L9. Remaining sub-decision: the name of the saved-lists
+  library ("shelf"/"pantry"/"library").
 - **Comments / feed / moderation at launch?** Built (G8/G6/G9) but beyond the stated community
   priority ranking. *Recommend: keep comments + moderation ON (safety net); keep the feed but
   de-emphasise it — search is the front door.* Confirm.

@@ -3,12 +3,10 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import { db } from "@/lib/db";
-import {
-  getPopularListsThisWeek,
-  getPublicListsRecent,
-  withRegionAvailability,
-} from "@/lib/db/queries/lists";
+import { getExploreLists, withRegionAvailability } from "@/lib/db/queries/lists";
 import { getRecentProducts } from "@/lib/db/queries/products";
+import { getFollowingIds } from "@/lib/db/queries/follows";
+import { getSessionUser } from "@/lib/auth";
 import { REGIONS, countryToRegion, type Region } from "@/lib/retailers";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ListCard } from "@/components/lists/ListCard";
@@ -20,28 +18,36 @@ export const metadata: Metadata = {
   description: "Find lists and products the Baloo community is putting together.",
 };
 
-// Browse + search (Order G5). "Popular" arrives with G7's vote signal; category landings arrive
-// with H1's catalog taxonomy — until then: search, recent lists, and new products.
+// Explore (Order L9). Discover is now the EXPLORE surface: ranked public lists from people you
+// don't already follow (your Following surface is /feed). Ranking blends likes + saves + recency,
+// then a regional soft-rank (L7). Category landings arrive with H1's taxonomy; until then the
+// SearchBox is the finder.
 export default async function DiscoverPage({
   searchParams,
 }: {
   searchParams: Promise<{ region?: string }>;
 }) {
   const dbi = db();
-  const [lists, products, popular] = dbi
+
+  // Exclude what already lives in Following (/feed): your own lists + everyone you follow. Signed
+  // out → no exclusions (rank everyone).
+  const viewer = dbi ? await getSessionUser() : null;
+  const excludeOwnerIds =
+    dbi && viewer ? [viewer.id, ...(await getFollowingIds(dbi, viewer.id))] : [];
+
+  const [lists, products] = dbi
     ? await Promise.all([
-        getPublicListsRecent(dbi, 12),
+        getExploreLists(dbi, { limit: 24, excludeOwnerIds }),
         getRecentProducts(dbi, 8),
-        getPopularListsThisWeek(dbi, 8),
       ])
-    : [[], [], []];
+    : [[], []];
 
   // Viewer region (Order L7): an explicit ?region wins, else Vercel geo, else US. Country-level
-  // only — no PII, same privacy posture as the scan board. Recently-added is soft-ranked by it.
+  // only — no PII, same privacy posture as the scan board. Explore is soft-ranked by it.
   const sp = await searchParams;
   const geoRegion = countryToRegion((await headers()).get("x-vercel-ip-country"));
   const region: Region = sp.region === "US" || sp.region === "UK" ? sp.region : geoRegion ?? "US";
-  const recent = dbi ? await withRegionAvailability(dbi, lists, region) : [];
+  const explore = dbi ? await withRegionAvailability(dbi, lists, region) : [];
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -66,21 +72,9 @@ export default async function DiscoverPage({
           </div>
         </section>
 
-        {/* Only rendered when real signal exists — never a fake ranking (Order G7). */}
-        {popular.length > 0 && (
-          <section className="mt-12">
-            <h2 className="font-display text-[23px] text-ink">Popular this week</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {popular.map((l) => (
-                <ListCard key={l.id} list={l} handle={l.ownerHandle} />
-              ))}
-            </div>
-          </section>
-        )}
-
         <section className="mt-12">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-[23px] text-ink">Recently added</h2>
+            <h2 className="font-display text-[23px] text-ink">Explore</h2>
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
                 Shopping in
@@ -104,18 +98,20 @@ export default async function DiscoverPage({
               </div>
             </div>
           </div>
-          {recent.length === 0 ? (
+          {explore.length === 0 ? (
             <p className="mt-3 text-sm text-muted">
-              No public lists yet. Paste a product link on the home tool to analyse a product,
-              then save it to your first list.
+              {viewer
+                ? "You're following everyone with a public list right now — check your feed, or paste a product link on the home tool to start a list of your own."
+                : "No public lists yet. Paste a product link on the home tool to analyse a product, then add it to your first list."}
             </p>
           ) : (
             <>
               <p className="mt-2 text-xs text-muted">
-                Sorted by what you can actually buy in the {region} — nothing is hidden.
+                Lists from across the community, ranked by what people are keeping — and by what you
+                can actually buy in the {region}.
               </p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {recent.map((l) => (
+                {explore.map((l) => (
                   <ListCard
                     key={l.id}
                     list={l}

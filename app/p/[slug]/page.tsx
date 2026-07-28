@@ -37,7 +37,8 @@ export default async function ProductPage({ params }: Params) {
   const data = await load(slug);
   if (!data) notFound();
 
-  // Discussion state (Order G8; the product upvote left with L6 — Save-only), SSR-hydrated.
+  // Discussion state (Order G8). Products still carry no like/save — L8 added Likes to LISTS only;
+  // a product's one action is "Add to my list". SSR-hydrated.
   const dbi = db()!; // load() already proved it exists
   const viewer = await getSessionUser();
   const thread = await getThread(dbi, data.product.id, { sort: "top", viewerId: viewer?.id ?? null });

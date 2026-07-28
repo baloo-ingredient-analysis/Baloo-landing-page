@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getPopularListsThisWeek } from "@/lib/db/queries/lists";
 
-// Order L1b: feeds the homepage "Popular lists this week" strip. Saves-only signal (L6). Returns
+// Order L1b: feeds the homepage "Popular lists this week" strip. Ranked by Likes since L8 (the
+// public signal — saves went private). Returns
 // { lists: [] } without a DB or without signal — real numbers only, so the strip hides rather than
 // faking a ranking. Load-time only, briefly cached (mirrors /api/board).
 export async function GET() {

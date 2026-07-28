@@ -11,6 +11,7 @@
       "canvas": { "role": "neutral", "displayName": "Cream Canvas", "canonical": "#F4EDE3", "tonalRamp": ["#DDD2C0", "#E2D8C8", "#E7DECF", "#ECE3D6", "#F0E8DC", "#F4EDE3", "#F8F2EA", "#FBF7F1"] },
       "natural": { "role": "secondary", "displayName": "Field Green", "canonical": "#2E7D52", "tonalRamp": ["#12331F", "#194429", "#215736", "#2E7D52", "#4A9A6E", "#79B995", "#AED8C1", "#E7F1EB"] },
       "processed": { "role": "secondary", "displayName": "Ochre", "canonical": "#B5701F", "tonalRamp": ["#3C2408", "#5A360D", "#7C4B14", "#B5701F", "#CE8B3D", "#E0AC72", "#EED2A9", "#F6ECDD"] },
+      "like": { "role": "accent", "displayName": "Rose-Red (Like)", "canonical": "#C24C4C", "tonalRamp": ["#4E1414", "#6B1D1D", "#8F2E2E", "#C24C4C", "#D47575", "#E4A3A3", "#F0CBCB", "#F7E8E6"], "note": "Order L8. The one social accent — the Like heart on lists only. Never on ingredient/nutrition UI; never a general control colour." },
       "cover": { "role": "neutral", "displayName": "Flat Cover Tints", "canonical": "#DCE6D5", "tonalRamp": ["#DCE6D5", "#EADFC9", "#E7D8CE", "#DFE4DE", "#E3E7D9", "#EFE4D0", "#F4EDE3", "#FDFAF6"] }
     },
     "typographyMeta": {
@@ -75,9 +76,17 @@
       "name": "Engagement Pill (Save, active)",
       "kind": "chip",
       "refersTo": "button-ghost",
-      "description": "Neutral, ink-tinted engagement control -- NEVER green/amber. Active = ink border + ink/5% fill. Save is the one social signal (L6).",
+      "description": "Neutral, ink-tinted engagement control -- NEVER green/amber, never the Like colour. Active = ink border + ink/5% fill. Save is the private library signal (L8); Follow is the same neutral treatment.",
       "html": "<button class=\"ds-pill-active\" aria-pressed=\"true\"><span>Saved</span></button>",
       "css": ".ds-pill-active { display: inline-flex; align-items: center; gap: 6px; background: rgba(45,36,23,.05); color: #2D2417; border: 1px solid #2D2417; border-radius: 9999px; padding: 4px 12px; font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .2s ease-out, border-color .2s ease-out; } .ds-pill-active span { font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Like Pill (lists only, active)",
+      "kind": "chip",
+      "refersTo": "button-ghost",
+      "description": "Order L8: the ONE coloured social control. Public signal on a list (feeds Popular/Explore ranking). At rest it is neutral like Save; when liked it takes the reserved rose-red `like` colour + a filled heart + the count. The like colour is reserved to this control and must never appear on ingredient/nutrition UI.",
+      "html": "<button class=\"ds-like-active\" aria-pressed=\"true\"><svg viewBox=\"0 0 14 13\" width=\"13\" height=\"13\" fill=\"#C24C4C\" stroke=\"#C24C4C\" stroke-width=\"1.4\" stroke-linejoin=\"round\"><path d=\"M7 12.1 1.6 6.9a3.2 3.2 0 0 1 4.5-4.5l.9.9.9-.9a3.2 3.2 0 1 1 4.5 4.5L7 12.1z\"/></svg><span>1</span></button>",
+      "css": ".ds-like-active { display: inline-flex; align-items: center; gap: 6px; background: #F7E8E6; color: #C24C4C; border: 1px solid rgba(194,76,76,.4); border-radius: 9999px; padding: 4px 12px; font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .2s ease-out, border-color .2s ease-out; } .ds-like-active span { font-variant-numeric: tabular-nums; }"
     },
     {
       "name": "Card",
@@ -110,12 +119,12 @@
     "keyCharacteristics": [
       "Brown-black ink on cream paper; warm hairlines and whitespace over boxes and shadows.",
       "Playfair Display serif for the calm editorial voice; Inter sans for all the working UI.",
-      "One meaningful colour (green/amber = Natural/Processed), everything else warm neutral.",
+      "One meaningful colour on the food (green/amber = Natural/Processed) plus one reserved social colour (rose-red = the Like heart); everything else warm neutral.",
       "Flat at rest -- flat cover tints, no gradients; motion and shadow appear only as a response to state.",
       "No score, no rating, no traffic-light verdict -- anywhere, ever."
     ],
     "rules": [
-      { "name": "The One Meaningful Colour Rule", "body": "Green and amber appear only as the Natural/Processed ingredient tags. Every interactive state is ink-tinted neutral, never green or amber.", "section": "colors" },
+      { "name": "The One Meaningful Colour Rule", "body": "On the food (ingredient + nutrition UI), green and amber appear only as the Natural/Processed tags and nothing there is any other colour. Interactive states are ink-tinted neutral. The single exception is the social Like heart (Order L8): a reserved rose-red used ONLY on the list Like pill — never on food UI, never as a general control colour.", "section": "colors" },
       { "name": "The Ink-Not-Black Rule", "body": "Text is ink (#2D2417), never #000000. Pure black on cream is harsh and clinical.", "section": "colors" },
       { "name": "The Two-Voice Rule", "body": "Playfair Display speaks (headings, wordmark, the AI answer); Inter works (everything you operate).", "section": "typography" },
       { "name": "The Hairline-First Rule", "body": "Reach for a 1px line border before a shadow. A surface with both a heavy shadow and a border is over-built.", "section": "elevation" },
@@ -132,6 +141,7 @@
     "donts": [
       "Don't add a score, rating, 0-100 number, or red/amber/green traffic-light verdict anywhere.",
       "Don't let green or amber appear outside the Natural/Processed tags.",
+      "Don't use the Like rose-red (#C24C4C) anywhere but the list Like pill — never on ingredient/nutrition UI, never as a button/link colour.",
       "Don't use gradients -- covers, tiles, buttons and text are all flat.",
       "Don't make it feel clinical or medical: no chart-grid dashboards, warning banners, or sterile health-record chrome.",
       "Don't use alarmist 'toxic ingredient' fear language, red danger states, or scare imagery.",

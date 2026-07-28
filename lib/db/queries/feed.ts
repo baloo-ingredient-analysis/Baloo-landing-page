@@ -26,8 +26,8 @@ export type FeedArticle =
       products: FeedProductRef[]; // may be empty for pre-G6 rows (meta-less) → count-only copy
       count: number;
     };
-// (The "voted" article kind left with L6 — Save-only. Historical voted activity rows remain in
-// the table but are no longer queried or rendered.)
+// (No "voted" article kind: it left with L6, and L8's list Likes deliberately stay OUT of the feed
+// too — a like is too light to be news. Historical voted rows remain but are never rendered.)
 
 export type FeedPage = { articles: FeedArticle[]; nextBefore: string | null };
 

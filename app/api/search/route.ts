@@ -17,7 +17,7 @@ export async function GET(req: Request) {
       title: l.title,
       isPublic: l.isPublic,
       itemCount: l.itemCount,
-      saveCount: l.saveCount,
+      likeCount: l.likeCount, // L8: likes are public; saveCount stays server-side (private signal)
       ownerHandle: l.ownerHandle,
     })),
   });

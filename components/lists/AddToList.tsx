@@ -110,7 +110,7 @@ export function AddToList({ productId }: { productId: string }) {
         onClick={openPicker}
         className="rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-paper transition hover:bg-ink/85"
       >
-        + Add to list
+        Add to my list
       </button>
 
       {open && user && (

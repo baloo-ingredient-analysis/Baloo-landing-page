@@ -3,7 +3,7 @@
 
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "../index";
-import { listItems, lists, profiles, saves } from "../schema";
+import { listItems, lists, profiles, saves, votes } from "../schema";
 import type { ListWithCountsAndOwner } from "./lists";
 
 export async function saveList(dbi: Db, userId: string, listId: string): Promise<void> {
@@ -36,6 +36,7 @@ export async function getSavedListsWithCounts(
       savedAt: saves.createdAt,
       itemCount: sql<number>`(select count(*)::int from ${listItems} li where li.list_id = ${lists.id})`,
       saveCount: sql<number>`(select count(*)::int from ${saves} s2 where s2.list_id = ${lists.id})`,
+      likeCount: sql<number>`(select count(*)::int from ${votes} v where v.target_type = 'list' and v.target_id = ${lists.id})`,
       ownerHandle: profiles.handle,
     })
     .from(saves)
@@ -51,6 +52,7 @@ export async function getSavedListsWithCounts(
     ...r.list,
     itemCount: r.itemCount,
     saveCount: r.saveCount,
+    likeCount: r.likeCount,
     ownerHandle: r.ownerHandle,
   }));
 }

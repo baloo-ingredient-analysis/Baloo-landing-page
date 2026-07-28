@@ -11,6 +11,8 @@ colors:
   natural-soft: "#E7F1EB"
   processed: "#B5701F"
   processed-soft: "#F6ECDD"
+  like: "#C24C4C"        # Order L8 — the one social colour; lists' Like heart only, never on food UI
+  like-soft: "#F7E8E6"
 typography:
   display:
     fontFamily: "Playfair Display, Georgia, serif"
@@ -96,20 +98,20 @@ components:
 
 Baloo looks like a clear, plain-language reference you already trust — a warm field guide to the supermarket aisle, not a lab report and not an alarm. The surface is cream (`canvas` #F4EDE3) with brown-black ink (`ink` #2D2417); structure comes from thin warm `line` hairlines and generous whitespace, never from heavy chrome. An editorial serif (Playfair Display) carries the headings and the wordmark so the voice reads *considered and human*; a clean sans (Inter) does all the work of labels, controls, and data. Everything is unhurried and legible: the reader is here to understand, and the interface's whole job is to get out of the way of that.
 
-The system is deliberately **restrained**. There is exactly one place colour means anything — the small green/amber Natural/Processed tags — and everywhere else is a disciplined warm neutral. That scarcity is the point: because nothing else shouts, the one meaningful signal is instantly legible. Depth is flat-by-default: cards sit on the canvas inside a 1px hairline, and the faint card shadow only appears as a response to hover. Generated covers and tiles are **flat tints, never gradients**. Reading columns are capped narrow (640px) so prose stays comfortable.
+The system is deliberately **restrained**. On the food itself — every ingredient and nutrition surface — colour means exactly one thing: the small green/amber Natural/Processed tags, and nothing else. That scarcity is the point: because nothing else shouts, the one meaningful signal is instantly legible, and no colour there can be mistaken for a health verdict. The social layer adds exactly one more reserved colour — the warm rose-red **Like** heart (Order L8) — kept entirely off ingredient/nutrition UI so the two meanings never blur. Everywhere else is a disciplined warm neutral. Depth is flat-by-default: cards sit on the canvas inside a 1px hairline, and the faint card shadow only appears as a response to hover. Generated covers and tiles are **flat tints, never gradients**. Reading columns are capped narrow (640px) so prose stays comfortable.
 
 This system explicitly rejects two moods. It is **never clinical or medical** — no sterile chart-grids, no warning banners, no health-record chill. And it is **never alarmist** — no scare language, no red "danger" states, no "toxic ingredient" theatre. Baloo explains; it does not diagnose and it does not frighten.
 
 **Key Characteristics:**
 - Brown-black ink on cream paper; warm hairlines and whitespace over boxes and shadows.
 - Playfair Display serif for the calm editorial voice; Inter sans for all the working UI.
-- One meaningful colour (green/amber = Natural/Processed), everything else warm neutral.
+- One meaningful colour on the food (green/amber = Natural/Processed); one reserved social colour (rose-red = Like); everything else warm neutral.
 - Flat at rest — flat cover tints, no gradients; motion and shadow appear only as a response to state.
 - No score, no rating, no traffic-light verdict — anywhere, ever.
 
 ## 2. Colors
 
-A near-monochrome ink-on-cream palette with a single two-tone semantic accent that never leaves its lane.
+A near-monochrome ink-on-cream palette with two reserved accents that never leave their lanes: the two-tone green/amber classification accent (on the food) and a single rose-red social accent (the Like heart).
 
 ### Primary
 - **Brown-Black Ink** (#2D2417): The primary "colour" of the whole product — all body and heading text, and the fill for primary/active controls (buttons, the active Save state at 5% tint). Warm brown-black, not pure #000, so it sits kindly on cream.
@@ -117,6 +119,9 @@ A near-monochrome ink-on-cream palette with a single two-tone semantic accent th
 ### Secondary (semantic — classification only)
 - **Field Green** (#2E7D52) on **Soft Sage** (#E7F1EB): The **Natural** ingredient tag. Used *only* to classify an ingredient as natural — never for buttons, links, or decoration.
 - **Ochre** (#B5701F) on **Soft Ochre** (#F6ECDD): The **Processed** ingredient tag. The amber counterpart, again *only* as classification.
+
+### Social accent (Order L8 — Like only)
+- **Rose-Red** (#C24C4C) on **Soft Rose** (#F7E8E6): The **Like** heart on lists, active state. The one coloured social control, chosen to be unmistakably distinct from green/amber so a like never reads as a health verdict. Reserved to the Like pill — it must never appear on ingredient or nutrition UI, nor as a general button/link colour. (Save and Follow stay neutral ink; Save is private.)
 
 ### Neutral
 - **Warm Paper** (#FDFAF6): Card, panel, and composer surfaces — the raised reading planes that sit on the canvas.
@@ -173,8 +178,9 @@ Flat by default. Depth is carried by **1px `line` hairlines and paper-on-canvas 
 - **Focus:** Visible focus is required on every control; inputs use a `natural` border + 2px `natural`/20% ring.
 
 ### Chips / Tags
-- **Natural/Processed pill:** `natural-soft`/`processed-soft` background, `natural`/`processed` text, full-round, ~10px uppercase-ish label. This is the *only* coloured component; it is classification, never a control.
-- **Engagement pills (Save / Follow):** Neutral. At rest: `paper` + `line` border + `muted`. Active: `ink` border + `ink`/5% fill + `ink` text. Never green/amber. (Save is the ONE social signal — Order L6.)
+- **Natural/Processed pill:** `natural-soft`/`processed-soft` background, `natural`/`processed` text, full-round, ~10px uppercase-ish label. The only coloured component *on the food*; it is classification, never a control, and its colours never appear elsewhere.
+- **Engagement pills (Save / Follow):** Neutral. At rest: `paper` + `line` border + `muted`. Active: `ink` border + `ink`/5% fill + `ink` text. Never green/amber, never the Like colour. (Save is private — the personal library signal.)
+- **Like pill (lists only, Order L8):** The one coloured social control. At rest neutral (like Save). Active: `like`/40% border + `like-soft` fill + `like` text (rose-red #C24C4C) + a filled heart, count shown. Public signal — feeds Popular/Explore ranking. The `like` colour is reserved to this control and must never touch ingredient or nutrition UI.
 - **"Soon" / deferred chip:** `paper` + `line`, `muted`, with a tiny uppercase "Soon" rubric.
 
 ### Cards / Containers

@@ -2,7 +2,7 @@
 // consumes these; callers own the db() null-guard and, from G2 onward, the auth check that the
 // acting user owns the list.
 
-import { and, asc, desc, eq, inArray, max, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, max, notInArray, sql } from "drizzle-orm";
 import type { Db } from "../index";
 import {
   listItems,
@@ -10,6 +10,7 @@ import {
   offers,
   profiles,
   saves,
+  votes,
   products,
   type List,
   type ListItem,
@@ -151,23 +152,28 @@ export async function getListById(dbi: Db, id: string): Promise<List | null> {
   return row ?? null;
 }
 
-export type ListWithCounts = List & { itemCount: number; saveCount: number };
+// Two list signals since L8: likeCount is PUBLIC (shown on cards, ranks Popular/Explore); saveCount
+// is INTERNAL (never shown publicly — feeds ranking only, and the owner's own "Saved" library).
+export type ListWithCounts = List & { itemCount: number; saveCount: number; likeCount: number };
 
 // leftJoin + groupBy aggregate (one round-trip). count(distinct …) so the two joins don't
 // multiply each other; ::int because count() is a bigint (returned as a string otherwise).
 const itemCountExpr = sql<number>`count(distinct ${listItems.id})::int`;
 const saveCountExpr = sql<number>`count(distinct ${saves.userId})::int`;
+// Likes live in the polymorphic votes table (targetType 'list'). A correlated subquery so it never
+// participates in the joins/groupBy above — drop it into any list select unchanged.
+const likeCountExpr = sql<number>`(select count(*)::int from ${votes} v where v.target_type = 'list' and v.target_id = ${lists.id})`;
 
 export async function getListsByOwnerWithCounts(dbi: Db, ownerId: string): Promise<ListWithCounts[]> {
   const rows = await dbi
-    .select({ list: lists, itemCount: itemCountExpr, saveCount: saveCountExpr })
+    .select({ list: lists, itemCount: itemCountExpr, saveCount: saveCountExpr, likeCount: likeCountExpr })
     .from(lists)
     .leftJoin(listItems, eq(listItems.listId, lists.id))
     .leftJoin(saves, eq(saves.listId, lists.id))
     .where(eq(lists.ownerId, ownerId))
     .groupBy(lists.id)
     .orderBy(desc(lists.updatedAt));
-  return rows.map((r) => ({ ...r.list, itemCount: r.itemCount, saveCount: r.saveCount }));
+  return rows.map((r) => ({ ...r.list, itemCount: r.itemCount, saveCount: r.saveCount, likeCount: r.likeCount }));
 }
 
 // The profile page's read: PUBLIC lists only — private lists never appear on a profile, the
@@ -177,20 +183,20 @@ export async function getPublicListsByOwnerWithCounts(
   ownerId: string,
 ): Promise<ListWithCounts[]> {
   const rows = await dbi
-    .select({ list: lists, itemCount: itemCountExpr, saveCount: saveCountExpr })
+    .select({ list: lists, itemCount: itemCountExpr, saveCount: saveCountExpr, likeCount: likeCountExpr })
     .from(lists)
     .leftJoin(listItems, eq(listItems.listId, lists.id))
     .leftJoin(saves, eq(saves.listId, lists.id))
     .where(and(eq(lists.ownerId, ownerId), eq(lists.isPublic, true)))
     .groupBy(lists.id)
     .orderBy(desc(lists.updatedAt));
-  return rows.map((r) => ({ ...r.list, itemCount: r.itemCount, saveCount: r.saveCount }));
+  return rows.map((r) => ({ ...r.list, itemCount: r.itemCount, saveCount: r.saveCount, likeCount: r.likeCount }));
 }
 
 export type ListWithCountsAndOwner = ListWithCounts & { ownerHandle: string | null };
 
-// "Popular this week" (Order G7; Save-only since L6): public lists ranked by SAVES created in
-// the last 7 days — Save is the one social signal on a list, so it's also the one ranking
+// "Popular this week" (Order G7; ranks by LIKES since L8): public lists ranked by Likes created
+// in the last 7 days — Like is the PUBLIC signal (saves are private), so it's the honest ranking
 // signal. Recency tie-break. Returns [] when there's no signal — the section hides rather than
 // faking a ranking.
 export async function getPopularListsThisWeek(
@@ -199,13 +205,14 @@ export async function getPopularListsThisWeek(
 ): Promise<(ListWithCountsAndOwner & { signal: number })[]> {
   const weekAgo = sql`now() - interval '7 days'`;
   const signalExpr = sql<number>`(
-    (select count(*)::int from ${saves} s where s.list_id = ${lists.id} and s.created_at > ${weekAgo})
+    (select count(*)::int from ${votes} v where v.target_type = 'list' and v.target_id = ${lists.id} and v.created_at > ${weekAgo})
   )`;
   const rows = await dbi
     .select({
       list: lists,
       itemCount: sql<number>`(select count(*)::int from ${listItems} li where li.list_id = ${lists.id})`,
       saveCount: sql<number>`(select count(*)::int from ${saves} s3 where s3.list_id = ${lists.id})`,
+      likeCount: likeCountExpr,
       ownerHandle: profiles.handle,
       signal: signalExpr,
     })
@@ -220,6 +227,7 @@ export async function getPopularListsThisWeek(
       ...r.list,
       itemCount: r.itemCount,
       saveCount: r.saveCount,
+      likeCount: r.likeCount,
       ownerHandle: r.ownerHandle,
       signal: r.signal,
     }));
@@ -232,6 +240,7 @@ export async function getPublicListsRecent(dbi: Db, limit = 12): Promise<ListWit
       list: lists,
       itemCount: itemCountExpr,
       saveCount: saveCountExpr,
+      likeCount: likeCountExpr,
       ownerHandle: profiles.handle,
     })
     .from(lists)
@@ -246,6 +255,50 @@ export async function getPublicListsRecent(dbi: Db, limit = 12): Promise<ListWit
     ...r.list,
     itemCount: r.itemCount,
     saveCount: r.saveCount,
+    likeCount: r.likeCount,
+    ownerHandle: r.ownerHandle,
+  }));
+}
+
+// Explore (Order L9) — the Discover surface: public lists ranked by a blended engagement + recency
+// score. Likes are public, saves are the internal signal; both feed the score, then a gentle recency
+// decay keeps fresh lists visible. When a viewer is known we EXCLUDE what already lives in their
+// Following surface (/feed): their own lists and anyone they follow. Signed-out ranks everyone.
+// Region soft-rank (L7) is applied by the caller via withRegionAvailability. No "search/category
+// relevance" yet — no taxonomy exists; the SearchBox stays the finder until H1.
+export async function getExploreLists(
+  dbi: Db,
+  opts: { limit?: number; excludeOwnerIds?: string[] } = {},
+): Promise<ListWithCountsAndOwner[]> {
+  const { limit = 24, excludeOwnerIds = [] } = opts;
+  // likes + saves as engagement, minus a small penalty per day since last touch (recency decay).
+  const scoreExpr = sql<number>`(
+    (select count(*)::int from ${votes} v where v.target_type = 'list' and v.target_id = ${lists.id})
+    + (select count(*)::int from ${saves} s where s.list_id = ${lists.id})
+    - (extract(epoch from (now() - ${lists.updatedAt})) / 86400.0) * 0.5
+  )`;
+  const where =
+    excludeOwnerIds.length > 0
+      ? and(eq(lists.isPublic, true), notInArray(lists.ownerId, excludeOwnerIds))
+      : eq(lists.isPublic, true);
+  const rows = await dbi
+    .select({
+      list: lists,
+      itemCount: sql<number>`(select count(*)::int from ${listItems} li where li.list_id = ${lists.id})`,
+      saveCount: sql<number>`(select count(*)::int from ${saves} s2 where s2.list_id = ${lists.id})`,
+      likeCount: likeCountExpr,
+      ownerHandle: profiles.handle,
+    })
+    .from(lists)
+    .innerJoin(profiles, eq(profiles.id, lists.ownerId))
+    .where(where)
+    .orderBy(sql`${scoreExpr} desc`, desc(lists.updatedAt))
+    .limit(limit);
+  return rows.map((r) => ({
+    ...r.list,
+    itemCount: r.itemCount,
+    saveCount: r.saveCount,
+    likeCount: r.likeCount,
     ownerHandle: r.ownerHandle,
   }));
 }

@@ -19,6 +19,10 @@ const config: Config = {
         canvas: "#F4EDE3",
         natural: { DEFAULT: "#2E7D52", soft: "#E7F1EB" },
         processed: { DEFAULT: "#B5701F", soft: "#F6ECDD" },
+        // Like (Order L8) — the ONE affection colour. A warm boutique rose-red, deliberately
+        // distinct from natural/processed so it never reads as a health verdict. Reserved for the
+        // Like heart on lists/cards; it must never appear on ingredient or nutrition UI.
+        like: { DEFAULT: "#C24C4C", soft: "#F7E8E6" },
       },
       fontFamily: {
         display: ["var(--font-display)", "Georgia", "serif"],
