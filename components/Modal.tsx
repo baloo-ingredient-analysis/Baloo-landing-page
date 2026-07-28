@@ -33,23 +33,29 @@ export function Modal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Two layers so a tall dialog is always reachable: the OUTER layer is the full-viewport scroll
+  // container (overflow-y-auto), the INNER flex has `min-h-full` so short dialogs stay centered while
+  // a dialog taller than the viewport grows the scroll area instead of clipping its top off-screen
+  // (the bug this fixes: a long form's email/password fields ending up above the viewport, unreachable).
   return (
-    <div
-      className={`fixed inset-0 z-50 flex justify-center bg-ink/20 p-5 ${
-        align === "top" ? "items-start pt-[12vh]" : "items-center"
-      }`}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-ink/20">
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={labelledBy}
-        aria-label={label}
-        className={`w-full animate-rise rounded-2xl border border-line bg-paper shadow-hero ${panelClassName}`}
+        className={`flex min-h-full justify-center p-5 ${
+          align === "top" ? "items-start pt-[12vh]" : "items-center"
+        }`}
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
       >
-        {children}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={labelledBy}
+          aria-label={label}
+          className={`w-full animate-rise rounded-2xl border border-line bg-paper shadow-hero ${panelClassName}`}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
