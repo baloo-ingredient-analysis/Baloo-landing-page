@@ -6,6 +6,25 @@
 > [`ARCHITECTURE.md`](ARCHITECTURE.md); what's *planned* lives in `Baloo_Launch_Plan.md`.
 
 ## Unreleased / in progress
+
+### `profile-page` branch (Orders PP1–PP4) — Pinterest-style profile + product Pantry
+> Not on `main` yet — this whole block ships when the branch merges.
+- **PP1 — Product Pantry (save products):** products can now be **Saved** to a private **Pantry** (a
+  collection of saved products), distinct from saving whole lists. New `product_saves` table
+  (`userId`,`productId`, PK) + migration 0009 with **owner-only RLS** (private, unlike public `saves`).
+  `lib/db/queries/pantry.ts` + `POST/DELETE /api/pantry` (`pantry` rate limit). New `PantryButton`
+  (neutral-ink bookmark) sits on the product page **beside** "Add to my list" — both actions coexist.
+- **PP2 — Profile = Pantry + Lists tabs (Pinterest-style):** `/u/[handle]` now has a **Pantry** tab
+  (owner-only, private; a product grid with instant name-search) and a **Lists** tab that **unifies**
+  your created lists *and* lists you saved from others, with a **Latest / Most-popular** sort. Visitors
+  see only public created lists, no Pantry. `/lists` redirects signed-in users to their profile Lists tab.
+- **PP3 — Create a list from the Pantry:** a "Create list" button opens a modal (name + public/private
+  toggle), then the Pantry drops into a **selection mode** to tick which saved products go in ("Add N to
+  list"). Reuses `createList` + `addListItem` — no new schema.
+- **PP4 — Nav line-icons:** the header nav (Following / Discover / Lists / Admin) is now curated
+  line-icons with the word revealed on hover/focus (always-present `aria-label`); **Lists** points at the
+  owner's profile Lists tab.
+
 - **L9 — Discover becomes Explore:** Discover is now the **Explore** surface — one ranked grid of
   public lists from people you *don't* follow (your Following lists already live at `/feed`), plus the
   "Recently analysed" product rows. The old three-section layout (Popular / Recently added / Recently
