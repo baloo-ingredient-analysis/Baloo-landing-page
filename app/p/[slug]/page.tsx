@@ -6,9 +6,11 @@ import { getProductForPage } from "@/lib/db/queries/products";
 import { ResultsView } from "@/components/ResultsView";
 import { SiteHeader } from "@/components/SiteHeader";
 import { AddToList } from "@/components/lists/AddToList";
+import { PantryButton } from "@/components/engagement/PantryButton";
 import { CommentThread } from "@/components/engagement/CommentThread";
 import { getSessionUser } from "@/lib/auth";
 import { getThread } from "@/lib/db/queries/comments";
+import { isProductSaved } from "@/lib/db/queries/pantry";
 import { storedIngredients } from "@/lib/analysis/stored";
 import type { Ingredient, Nutrition } from "@/lib/schema";
 
@@ -37,11 +39,15 @@ export default async function ProductPage({ params }: Params) {
   const data = await load(slug);
   if (!data) notFound();
 
-  // Discussion state (Order G8). Products still carry no like/save — L8 added Likes to LISTS only;
-  // a product's one action is "Add to my list". SSR-hydrated.
+  // Discussion + engagement state (Order G8; PP1 adds Save-to-Pantry). A product's actions are now
+  // "Save" (→ your private Pantry) and "Add to my list"; there's still no product Like (lists only).
+  // SSR-hydrated.
   const dbi = db()!; // load() already proved it exists
   const viewer = await getSessionUser();
-  const thread = await getThread(dbi, data.product.id, { sort: "top", viewerId: viewer?.id ?? null });
+  const [thread, viewerSavedProduct] = await Promise.all([
+    getThread(dbi, data.product.id, { sort: "top", viewerId: viewer?.id ?? null }),
+    viewer ? isProductSaved(dbi, viewer.id, data.product.id) : Promise.resolve(false),
+  ]);
 
   // One shared mapping (Order P2) so this page and the extract short-circuit can't drift apart.
   const ingredients: Partial<Ingredient>[] = storedIngredients(data);
@@ -56,7 +62,14 @@ export default async function ProductPage({ params }: Params) {
 
   return (
     <div className="relative flex min-h-screen flex-col">
-      <SiteHeader action={<AddToList productId={data.product.id} />} />
+      <SiteHeader
+        action={
+          <div className="flex items-center gap-2">
+            <PantryButton productId={data.product.id} initialSaved={viewerSavedProduct} />
+            <AddToList productId={data.product.id} />
+          </div>
+        }
+      />
       <main className="mx-auto flex w-full max-w-tool flex-1 flex-col px-5 pt-8">
         {data.items.length > 0 ? (
           // loading={false} → ResultsView renders the finished (non-streaming) product view.

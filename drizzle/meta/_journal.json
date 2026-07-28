@@ -64,6 +64,13 @@
       "when": 1784818989642,
       "tag": "0008_bored_inhumans",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785244545155,
+      "tag": "0009_perpetual_lockjaw",
+      "breakpoints": true
     }
   ]
 }
