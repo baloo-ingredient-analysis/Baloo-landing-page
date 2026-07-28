@@ -29,6 +29,7 @@ export function ShareSheet({
 }) {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
   const text = `${title} — on Baloo`;
   const targets = shareTargets({ url, text });
@@ -71,6 +72,32 @@ export function ShareSheet({
     }
   }
 
+  // Instagram has NO web "share this link" endpoint like WhatsApp/X/etc., and it's image-first — you
+  // can't prefill a post from the browser. So we do the best real thing: on mobile, the native share
+  // sheet (with the card image) lists Instagram; on desktop, save the card and open Instagram to post.
+  async function instagram() {
+    if (canNativeShare && cardPath) return nativeShare();
+    if (cardPath) {
+      try {
+        const a = document.createElement("a");
+        a.href = cardPath;
+        a.download = "baloo-card.png";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setNote("Card image saved — open Instagram and post it.");
+        setTimeout(() => setNote(null), 4000);
+      } catch {
+        /* download blocked — still open Instagram below */
+      }
+    } else {
+      copy(); // no card (e.g. a profile) → put the link on the clipboard to paste into IG
+      setNote("Link copied — paste it into your Instagram bio or a DM.");
+      setTimeout(() => setNote(null), 4000);
+    }
+    window.open("https://www.instagram.com/", "_blank", "noopener,noreferrer");
+  }
+
   return (
     <Modal onClose={onClose} labelledBy="share-sheet-title" panelClassName="max-w-sm p-5">
       <h2 id="share-sheet-title" className="font-display text-xl text-ink">
@@ -100,7 +127,18 @@ export function ShareSheet({
             {t.label}
           </a>
         ))}
+        {/* Instagram isn't a plain intent link (no web share URL) — it saves the card + opens IG, or
+            uses the native sheet on mobile. See instagram() above. */}
+        <button
+          type="button"
+          onClick={instagram}
+          className="rounded-lg border border-line bg-paper px-3 py-2 text-center text-sm font-medium text-ink transition hover:bg-canvas"
+        >
+          Instagram
+        </button>
       </div>
+
+      {note && <p className="mt-2 text-xs text-muted">{note}</p>}
 
       <div className="mt-3 flex flex-wrap gap-2">
         <button
