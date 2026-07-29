@@ -70,7 +70,7 @@ export function PantryButton({
         >
           <path d="M2 1.5h8a.5.5 0 01.5.5v10.5L6 9.5l-4.5 3V2a.5.5 0 01.5-.5z" />
         </svg>
-        {saved ? "Saved" : "Save"}
+        {saved ? "Saved to pantry" : "Save to pantry"}
       </button>
       {modal}
     </>

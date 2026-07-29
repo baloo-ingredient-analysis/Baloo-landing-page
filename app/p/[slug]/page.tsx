@@ -60,16 +60,18 @@ export default async function ProductPage({ params }: Params) {
       }
     : undefined;
 
+  // Primary product actions live ON the product (under the title), not tucked in the header — more
+  // reachable. Both coexist: Save to pantry (bookmark) + Add to my list.
+  const productActions = (
+    <>
+      <PantryButton productId={data.product.id} initialSaved={viewerSavedProduct} />
+      <AddToList productId={data.product.id} />
+    </>
+  );
+
   return (
     <div className="relative flex min-h-screen flex-col">
-      <SiteHeader
-        action={
-          <div className="flex items-center gap-2">
-            <PantryButton productId={data.product.id} initialSaved={viewerSavedProduct} />
-            <AddToList productId={data.product.id} />
-          </div>
-        }
-      />
+      <SiteHeader />
       <main className="mx-auto flex w-full max-w-tool flex-1 flex-col px-5 pt-8">
         {data.items.length > 0 ? (
           // loading={false} → ResultsView renders the finished (non-streaming) product view.
@@ -83,6 +85,7 @@ export default async function ProductPage({ params }: Params) {
             cacheKey={data.product.id}
             productSummary={data.summary ?? undefined}
             loading={false}
+            actions={productActions}
           />
         ) : (
           // Catalog product not yet explained (e.g. seeded from Open Food Facts before its AI
@@ -94,6 +97,7 @@ export default async function ProductPage({ params }: Params) {
             {data.product.retailer && (
               <p className="mt-1.5 text-sm text-muted">{data.product.retailer}</p>
             )}
+            <div className="mt-4 flex flex-wrap items-center gap-2">{productActions}</div>
             <p className="mt-4 text-sm text-muted">
               We haven&apos;t broken this one down yet — its ingredient explanation is on the way.
             </p>
