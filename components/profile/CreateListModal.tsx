@@ -87,13 +87,14 @@ export function CreateListModal({
           aria-checked={isPublic}
           aria-label="Public list"
           onClick={() => setIsPublic((v) => !v)}
-          className={`relative mt-0.5 h-6 w-10 shrink-0 rounded-full transition-colors ${
-            isPublic ? "bg-ink" : "bg-line"
+          className={`mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors ${
+            isPublic ? "border-ink bg-ink" : "border-line bg-canvas"
           }`}
         >
+          {/* A ring outlines the knob so it stays visible on the light (off) track too. */}
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-paper shadow-card transition-transform ${
-              isPublic ? "translate-x-[18px]" : "translate-x-0.5"
+            className={`inline-block h-4 w-4 rounded-full bg-paper shadow-card ring-1 ring-ink/15 transition-transform duration-200 ${
+              isPublic ? "translate-x-6" : "translate-x-1"
             }`}
           />
         </button>
