@@ -165,13 +165,17 @@ PP1–PP4), each a single reviewable commit.
 
 ## 8 · Verification & the test gap
 
-**In place:** `tsc --noEmit` (primary gate, CI) · `next build` (SSR/route breakage, CI) · read-only
-DB assertions (`scripts/check-db.ts`) · live browser DOM verification in dev · a deterministic **mock
-pipeline** (`MOCK_PIPELINE=1`).
+**In place:** `tsc --noEmit` (primary gate, CI) · `next build` (SSR/route breakage, CI) · **Vitest
+unit tests** (`npm test`, CI) · read-only DB assertions (`scripts/check-db.ts`) · live browser DOM
+verification in dev · a deterministic **mock pipeline** (`MOCK_PIPELINE=1`).
 
-**The gap (recommended next investment):** there is **no automated test suite** yet. Start with:
-1. **Unit tests** on the pure `lib/` functions — `canonical`, `nutrition`, `region`, `hash`, `slug`
-   (highest value, zero infra).
+**Unit tests — scaffolded.** Vitest (`vitest.config.ts`, scoped to `lib/**/*.test.ts`) with **31
+tests** over the pure, framework-agnostic layer: `canonical` (the dedup/slug invariants), `hash` (URL
+cache key), `slug`, `region` (availability math), `retailers` (URL detection/validation + region
+mapping). Runs in CI between typecheck and build.
+
+**Still planned (the next investment):**
+1. Extend units to `nutrition.ts` (the arithmetic + highlight selection).
 2. **Integration tests** on `lib/db/queries/*` against a throwaway Postgres.
 3. A couple of **Playwright smoke tests**: the paste-flow (mocked) + a signed-in list build.
 

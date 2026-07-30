@@ -33,6 +33,7 @@ keys to switch on the real pipeline and the community features.
 | `npm run dev` | Dev server on :3000 |
 | `npm run build` / `npm start` | Production build / serve |
 | `npm run typecheck` | `tsc --noEmit` (also runs in CI on every push) |
+| `npm test` | Unit tests (Vitest) over the pure `lib/` layer — runs in CI |
 | `npm run db:generate` | Generate a Drizzle migration from `lib/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations to `DATABASE_URL` |
 | `npm run db:seed` | Seed demo data (products, users, lists) |
