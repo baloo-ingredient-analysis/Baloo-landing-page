@@ -103,6 +103,10 @@ without `DATABASE_URL`. Connects as `postgres` (via the transaction pooler, `pre
   their one action is "Add to my list". Comment votes remain agreement (the thread's "Top" sort).
   "Popular this week" ranks by likes; Discover/Explore blends likes + saves(internal) + recency +
   regional availability (L7). Likes deliberately write no feed activity.
+- `product_saves` — the **Pantry** (Order PP1, `profile-page` branch): a private collection of saved
+  PRODUCTS (`userId`,`productId`, PK), separate from `saves` (saved lists). **Owner-only RLS** — no one
+  sees another's pantry. Surfaces on the profile's Pantry tab; products keep BOTH "Save to pantry" and
+  "Add to my list".
 - `comments` — threaded; soft-hidden via `hidden_at`/`hidden_by` (moderation tombstones).
 
 **Account deletion — "erase the person, keep the community" (Order S7a).** Everything hanging off
@@ -134,7 +138,7 @@ FKs to `CASCADE`** without re-reading that file.
 | `/` | The tool — paste → extract → stream; idle homepage board |
 | `/p/[slug]` | Canonical product page (stored analysis, reuses `ResultsView`) |
 | `/discover` | Explore — ranked public lists from people you don't follow (Following lives at `/feed`) + search |
-| `/u/[handle]` | Public profile (curator landing page) |
+| `/u/[handle]` | Profile (curator landing) — Pantry (owner-only, PP2) + Lists (own + saved) tabs; `/lists` redirects here |
 | `/list/[slug]` · `/list/[slug]/edit` | Public list · list editor |
 | `/lists` · `/lists/new` | My lists · create |
 | `/feed` | Following feed |

@@ -251,6 +251,24 @@ export const saves = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.listId] })],
 );
 
+// The Pantry (Order PP1): a private collection of SAVED PRODUCTS — distinct from `saves` above, which
+// saves LISTS. Composite PK so a product is saved at most once per user; both FKs cascade so account
+// or product deletion cleans up. PRIVATE by design — its RLS is owner-only read (unlike `saves`, which
+// is public for "saved by N"), so no one can see another person's pantry.
+export const productSaves = pgTable(
+  "product_saves",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.productId] })],
+);
+
 export const votes = pgTable(
   "votes",
   {
@@ -337,6 +355,7 @@ export type Ingredient = typeof ingredients.$inferSelect;
 export type NutritionRow = typeof nutrition.$inferSelect;
 export type List = typeof lists.$inferSelect;
 export type ListItem = typeof listItems.$inferSelect;
+export type ProductSave = typeof productSaves.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Report = typeof reports.$inferSelect;
 export type Offer = typeof offers.$inferSelect;

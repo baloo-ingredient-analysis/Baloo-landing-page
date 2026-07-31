@@ -17,6 +17,7 @@ export function ResultsView({
   cacheKey,
   productSummary,
   loading = false,
+  actions,
 }: {
   productName: string;
   retailer: string;
@@ -27,6 +28,7 @@ export function ResultsView({
   cacheKey?: string;
   productSummary?: string;
   loading?: boolean;
+  actions?: React.ReactNode; // product-page actions (Save to pantry, Add to my list) under the title
 }) {
   const [tab, setTab] = useState<Tab>("ingredients");
   const empty = ingredients.length === 0;
@@ -60,6 +62,7 @@ export function ResultsView({
         <h2 className="mt-1.5 font-display text-2xl leading-tight text-ink sm:text-3xl">
           {productName}
         </h2>
+        {actions && <div className="mt-4 flex flex-wrap items-center gap-2">{actions}</div>}
       </header>
 
       {/* Tabs per the design handoff: Ingredients / Nutrition / Processing (Soon, disabled). */}

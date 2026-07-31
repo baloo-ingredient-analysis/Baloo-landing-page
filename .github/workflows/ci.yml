@@ -1,6 +1,6 @@
-# CI — the safety net under our "tsc + build before commit" discipline (org pass, July 2026).
-# Runs on every push/PR to main: typecheck + production build. No secrets, no DB — the app is
-# built to boot without any env var (optional-infra rule), so the build is fully offline-safe.
+# CI — the safety net under our "tsc + test + build before commit" discipline (org pass, July 2026).
+# Runs on every push/PR to main: typecheck + unit tests + production build. No secrets, no DB — the
+# app is built to boot without any env var (optional-infra rule), so the whole run is offline-safe.
 name: CI
 
 on:
@@ -21,5 +21,7 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npx tsc --noEmit
+      - name: Test
+        run: npm test
       - name: Build
         run: npm run build

@@ -30,6 +30,7 @@ const LIMITS = {
   comment: { tokens: 8, window: "60 s" },
   follow: { tokens: 30, window: "60 s" },
   save: { tokens: 40, window: "60 s" },
+  pantry: { tokens: 40, window: "60 s" }, // save/unsave products to the Pantry (Order PP1)
   vote: { tokens: 60, window: "60 s" },
   report: { tokens: 8, window: "300 s" },
 } as const;

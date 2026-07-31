@@ -4,6 +4,7 @@
 // behaves exactly as pre-G2. Dropdown interaction mirrors ProfileSelector's pattern.
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useAuth } from "./useAuth";
@@ -54,17 +55,56 @@ export function AccountMenu() {
         : "Finish setup"
     : "Sign in";
 
+  // Clicking your handle goes to your PROFILE (same target as the Lists nav) — not a dropdown. A caret
+  // beside it opens the account menu (Settings / Sign out). Guests / handle-pending / signed-out keep
+  // the single button (they have no profile page to link to).
+  const hasProfile = !!(user && profile?.handle);
+  const profileHref = profile?.handle ? `/u/${profile.handle}?tab=lists` : "/";
+
   return (
     <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => (user ? setOpen((o) => !o) : setModal("signin"))}
-        aria-haspopup={user ? "menu" : undefined}
-        aria-expanded={user ? open : undefined}
-        className="max-w-[130px] truncate rounded-full border border-line bg-paper px-3.5 py-1.5 text-[13px] font-medium text-ink transition hover:border-ink/20"
-      >
-        {label}
-      </button>
+      {hasProfile ? (
+        <div className="flex items-center overflow-hidden rounded-full border border-line bg-paper text-[13px] font-medium text-ink">
+          <Link
+            href={profileHref}
+            onClick={() => setOpen(false)}
+            className="max-w-[120px] truncate py-1.5 pl-3.5 pr-2 transition hover:bg-canvas"
+          >
+            @{profile!.handle}
+          </Link>
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            aria-label="Account menu"
+            className="flex items-center border-l border-line px-2 py-1.5 text-muted transition hover:bg-canvas hover:text-ink"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            >
+              <path d="M3.5 6l4.5 4.5L12.5 6" />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => (user ? setOpen((o) => !o) : setModal("signin"))}
+          aria-haspopup={user ? "menu" : undefined}
+          aria-expanded={user ? open : undefined}
+          className="max-w-[130px] truncate rounded-full border border-line bg-paper px-3.5 py-1.5 text-[13px] font-medium text-ink transition hover:border-ink/20"
+        >
+          {label}
+        </button>
+      )}
 
       {open && user && (
         <div
