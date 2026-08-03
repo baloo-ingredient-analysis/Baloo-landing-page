@@ -1,8 +1,8 @@
 # Baloo Web API — v1 (mobile integration contract)
 
-Status: **DRAFT for Igor.** `ping` is built; `analyse-ingredients` and `find-product` are specced
-here and built this week. Field shapes below are the web's real types (`lib/schema.ts`) — treat them
-as the source of truth for the client.
+Status: **DRAFT for Igor.** `ping` + `analyse-ingredients` are **built**; `find-product` is specced
+here and built next. Field shapes below are the web's real types (`lib/schema.ts`) — treat them as
+the source of truth for the client.
 
 - **Base URL (sandbox):** `https://<preview-deployment>.vercel.app` (shared Fri). Prod base TBD.
 - **All routes:** `POST` unless noted, JSON in/out, `/api/v1/…`.
@@ -48,25 +48,36 @@ Health + key check. Returns the resolved key label so Igor can confirm his crede
 
 ---
 
-## `POST /api/v1/analyse-ingredients` — the brain (Tue–Wed)
+## `POST /api/v1/analyse-ingredients` — the brain ✅ built
 
 Mobile already has an ingredient list (from OFF / Vision). This runs Baloo's shared analysis engine
 (`analyseIngredients`, one prompt + schema) and returns the per-ingredient breakdown. Known products
-(deduped on `canonical_key`) return from the catalog cache with no model spend.
+(deduped on `canonical_key`) return from the catalog cache with no model spend; a miss is analysed
+and persisted so the next call for that product is a `hit`.
 
 **Request**
 
 ```json
 {
-  "product": { "name": "Oat Drink Barista", "brand": "Oatly", "size": "1L", "retailer": "Ocado" },
+  "product": {
+    "name": "Oat Drink Barista",
+    "brand": "Oatly",
+    "size": "1L",
+    "retailer": "Ocado",
+    "barcode": "7394376616457"
+  },
   "ingredients": ["Water", "Oats 10%", "Rapeseed oil", "Acidity regulator (Dipotassium phosphate)"],
   "percentages": [{ "ingredient": "Oats", "percentage": "10%" }],
   "nutrition": { "…optional pass-through, same shape as the response…" }
 }
 ```
 
-- `product.name` + `ingredients[]` are required; everything else optional.
-- `retailer`/`brand`/`size` improve the `canonical_key` dedupe (barcode, else brand+name+size).
+- `product.name` + `ingredients[]` (non-empty, ≤200) are required; everything else optional.
+- **`barcode` is the strongest identity** for the `canonical_key` dedupe (falls back to brand+name).
+  Send it whenever you have it — a barcode scan (mobile) and a URL paste (web) of the same product
+  then converge on one catalog row. `retailer`/`brand`/`size` also help.
+- Errors: `400 bad_request` (bad JSON / missing name / empty ingredients), `503 upstream_unavailable`
+  (Claude not configured), `422 analysis_failed` (engine error).
 
 **Response** (`200`)
 

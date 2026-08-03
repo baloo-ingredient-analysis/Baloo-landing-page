@@ -21,6 +21,11 @@ export type IngestInput = {
   product_name: string;
   retailer?: string | null;
   url?: string | null;
+  // brand/barcode strengthen the canonical_key. The paste flow has neither (name-only, as before);
+  // the mobile API (v1) passes them, so a barcode scan and a URL paste of the same product still
+  // converge on ONE row — but only when the identity actually matches.
+  brand?: string | null;
+  barcode?: string | null;
   ingredients: Ingredient[];
   product_summary?: string | null;
   nutrition?: Nutrition | null;
@@ -33,7 +38,11 @@ export async function ingestAnalysis(
   if (!dbi || !input.product_name || !input.ingredients?.length) return null;
 
   try {
-    const key = canonicalKey({ name: input.product_name });
+    const key = canonicalKey({
+      name: input.product_name,
+      brand: input.brand,
+      barcode: input.barcode,
+    });
     const slug = productSlug(input.product_name, key);
 
     // Dedup: converge on one row per canonical_key (descriptive fields refresh on re-scan).
@@ -41,6 +50,8 @@ export async function ingestAnalysis(
       canonicalKey: key,
       slug,
       name: input.product_name,
+      brand: input.brand ?? null,
+      barcode: input.barcode ?? null,
       retailer: input.retailer ?? null,
       source: "user_scan",
     });
