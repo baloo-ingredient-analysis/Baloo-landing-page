@@ -1,8 +1,8 @@
 # Baloo Web API — v1 (mobile integration contract)
 
-Status: **DRAFT for Igor.** `ping` + `analyse-ingredients` are **built**; `find-product` is specced
-here and built next. Field shapes below are the web's real types (`lib/schema.ts`) — treat them as
-the source of truth for the client.
+Status: **DRAFT for Igor.** All three routes (`ping`, `analyse-ingredients`, `find-product`) are
+**built** on branch `api-endpoints`. Field shapes below are the web's real types (`lib/schema.ts`) —
+treat them as the source of truth for the client.
 
 - **Base URL (sandbox):** `https://<preview-deployment>.vercel.app` (shared Fri). Prod base TBD.
 - **All routes:** `POST` unless noted, JSON in/out, `/api/v1/…`.
@@ -114,11 +114,13 @@ model only phrases them.
 
 ---
 
-## `POST /api/v1/find-product` — the scrape/search backstop (Wed–Thu)
+## `POST /api/v1/find-product` — the scrape/search backstop ✅ built
 
 For niche products the app's sources can't find. Give a direct `url` (reliable) or a `query`
-(best-effort search — the harder half; may need a search step on top of Firecrawl). Set
-`analyse: true` (default) to chain straight into analysis and get the full result in one call.
+(**best-effort**: Firecrawl web search → tries the top results, max 3, stops at the first page that
+yields an ingredient list). Set `analyse: true` (default) to chain straight into analysis and get the
+full result in one call. On `analyse: true` the result flows through the SAME cache as
+`analyse-ingredients`, so a product already in the catalog comes back instantly with no model spend.
 
 **Request** (one of `url` | `query` required)
 
