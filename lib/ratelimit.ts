@@ -23,6 +23,9 @@ const LIMITS = {
   nutritionContext: { tokens: 30, window: "60 s" },
   explain: { tokens: 20, window: "60 s" },
   productsAnalyze: { tokens: 10, window: "60 s" },
+  // Public v1 API (mobile integration) — keyed by the service key's LABEL, not IP/user. Generous
+  // for a backend caller; tighten per-endpoint when the paid routes land.
+  apiV1: { tokens: 60, window: "60 s" },
   // Community writes (Order S4) — keyed by USER id. Generous enough that a normal person never
   // notices; a spam flood hits them fast. Deletes/edits/unfollows are intentionally uncapped.
   writeList: { tokens: 30, window: "1 d" }, // new lists per day

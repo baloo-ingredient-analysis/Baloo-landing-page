@@ -10,6 +10,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 
 const ERRORS: Record<string, string> = {
   invalid_handle: "Handles are 3–20 characters: lowercase letters, numbers and hyphens.",
+  handle_reserved: "That handle is reserved — pick another.",
   handle_taken: "That handle's taken — try another.",
   auth_required: "You need to sign in first.",
 };
@@ -40,7 +41,7 @@ export default function Welcome() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(ERRORS[data.error] ?? "Something went wrong — try again.");
+        setError(data.message ?? ERRORS[data.error] ?? "Something went wrong — try again.");
         return;
       }
       refresh();
@@ -86,6 +87,9 @@ export default function Welcome() {
                   className="flex-1 bg-transparent px-1.5 py-2.5 text-ink outline-none"
                 />
               </div>
+              <p className="px-1 text-xs text-muted">
+                3–20 characters, lowercase letters, numbers and hyphens.
+              </p>
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}

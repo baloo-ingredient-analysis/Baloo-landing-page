@@ -34,3 +34,37 @@ export async function scrapeMarkdown(url: string): Promise<string | null> {
     return null;
   }
 }
+
+// Web search via Firecrawl's /v2/search — turns a product name into candidate page URLs, so the
+// mobile app can find a niche product by NAME (not just a direct link). Returns ordered URLs, best
+// first, or [] on failure/no-key. Shape-tolerant like scrapeMarkdown (v2: data.web[], older: data[]).
+export async function searchWeb(query: string, limit = 5): Promise<string[]> {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey || !query.trim()) return [];
+
+  try {
+    const res = await fetch("https://api.firecrawl.dev/v2/search", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query, limit }),
+    });
+
+    if (!res.ok) {
+      console.error("Firecrawl search failed:", res.status, await res.text());
+      return [];
+    }
+
+    const data = await res.json();
+    const arr: unknown[] = data?.data?.web ?? data?.data ?? data?.web ?? [];
+    return arr
+      .map((x) => (x && typeof x === "object" ? (x as { url?: string }).url : undefined))
+      .filter((u): u is string => typeof u === "string" && u.length > 0)
+      .slice(0, limit);
+  } catch (err) {
+    console.error("Firecrawl search error:", err);
+    return [];
+  }
+}
