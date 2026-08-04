@@ -5,7 +5,7 @@ The web-side integration API is live on a Vercel **preview** deployment. Full sp
 
 ## What you need
 
-- **Base URL:** `https://<preview-deployment>.vercel.app`  ← Miquel will paste the real one
+- **Base URL:** `https://baloo-web.vercel.app` (stable production alias; `baloo.life` will work too once the domain is pointed here)
 - **API key:** sent to you privately (never commit it). Send it on every request as either header:
   - `Authorization: Bearer <KEY>`
   - `x-api-key: <KEY>`
@@ -13,7 +13,7 @@ The web-side integration API is live on a Vercel **preview** deployment. Full sp
 ## Try it (copy-paste, replace `BASE` and `KEY`)
 
 ```bash
-BASE="https://<preview-deployment>.vercel.app"
+BASE="https://baloo-web.vercel.app"
 KEY="<your key>"
 
 # 1) health + key check  →  { ok, service, version, keyId, time }
