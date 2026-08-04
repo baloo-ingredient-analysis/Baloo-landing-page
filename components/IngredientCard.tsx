@@ -28,7 +28,7 @@ export function IngredientRow({
         aria-controls={bodyId}
         className="flex w-full items-center gap-3 px-4 py-3.5 text-left sm:px-5"
       >
-        <span className="w-6 shrink-0 font-display text-[15px] tabular-nums text-muted/60">
+        <span className="w-6 shrink-0 font-display text-[15px] tabular-nums text-muted">
           {index + 1}
         </span>
 

@@ -8,7 +8,7 @@ export function Footer() {
         Baloo explains what&apos;s in packaged food to help you understand labels — it isn&apos;t
         medical or dietary advice, and never tells you what to buy or avoid.
       </p>
-      <p className="mt-2 text-xs text-muted/70">A prototype for the upcoming Baloo app.</p>
+      <p className="mt-2 text-xs text-muted">A prototype for the upcoming Baloo app.</p>
     </footer>
   );
 }

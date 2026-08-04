@@ -58,7 +58,7 @@ export function HomeSearch({
           }}
           placeholder="Paste a product link — or ask, e.g. “kids cereals without junk”"
           aria-label="Paste a product link or search"
-          className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[15px] text-ink outline-none placeholder:text-muted/70"
+          className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[15px] text-ink outline-none placeholder:text-muted"
         />
         <button
           onClick={submit}

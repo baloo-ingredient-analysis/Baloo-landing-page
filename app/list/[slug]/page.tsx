@@ -111,7 +111,7 @@ export default async function ListPage({ params }: Params) {
                 ) : (
                   "by a Baloo user"
                 )}
-                {!list.isPublic && <span className="ml-2 text-muted/80">· private</span>}
+                {!list.isPublic && <span className="ml-2 text-muted">· private</span>}
               </p>
             </div>
 
@@ -162,7 +162,7 @@ export default async function ListPage({ params }: Params) {
                   href={`/p/${item.product.slug}`}
                   className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-canvas sm:px-5"
                 >
-                  <span className="w-6 shrink-0 font-display text-[15px] tabular-nums text-muted/60">
+                  <span className="w-6 shrink-0 font-display text-[15px] tabular-nums text-muted">
                     {i + 1}
                   </span>
                   <span className="min-w-0 flex-1">

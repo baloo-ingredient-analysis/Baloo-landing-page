@@ -104,7 +104,7 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
             }}
             placeholder="Paste a product link — or ask, e.g. “kids cereals without junk”"
             aria-label="Search or paste a product link"
-            className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[15px] text-ink outline-none placeholder:text-muted/70"
+            className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[15px] text-ink outline-none placeholder:text-muted"
           />
           <button
             onClick={submit}

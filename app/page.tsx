@@ -153,7 +153,7 @@ export default function Home() {
               >
                 See a sample analysis →
               </Link>
-              <span className="text-muted/70">
+              <span className="text-muted">
                 Free &middot; No sign-up &middot; Reads the actual product label
               </span>
             </p>

@@ -128,7 +128,7 @@ export function ListEditor({ initial }: { initial: Initial }) {
             onBlur={() => patchList({ title })}
             aria-label="List title"
             placeholder="Untitled list"
-            className="w-full bg-transparent font-display text-2xl text-ink outline-none placeholder:text-muted/60"
+            className="w-full bg-transparent font-display text-2xl text-ink outline-none placeholder:text-muted"
           />
           <textarea
             value={description}
@@ -137,7 +137,7 @@ export function ListEditor({ initial }: { initial: Initial }) {
             aria-label="Description"
             placeholder="What's this list about?"
             rows={2}
-            className="mt-1 w-full resize-none bg-transparent text-sm text-ink/80 outline-none placeholder:text-muted/60"
+            className="mt-1 w-full resize-none bg-transparent text-sm text-ink/80 outline-none placeholder:text-muted"
           />
         </div>
       </div>
@@ -224,7 +224,7 @@ export function ListEditor({ initial }: { initial: Initial }) {
               }}
               className="flex items-start gap-3 px-4 py-3 sm:px-5"
             >
-              <span className="mt-0.5 w-5 shrink-0 cursor-grab select-none text-muted/60" title="Drag to reorder" aria-hidden>
+              <span className="mt-0.5 w-5 shrink-0 cursor-grab select-none text-muted" title="Drag to reorder" aria-hidden>
                 ⠿
               </span>
               <span className="min-w-0 flex-1">
