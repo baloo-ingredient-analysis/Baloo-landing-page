@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProfileByHandle, upsertProfile } from "@/lib/db/queries/profiles";
-
-const HANDLE_RE = /^[a-z0-9-]{3,20}$/;
+import { validateHandle } from "@/lib/handle";
 
 // Handle setup / profile update (Order G2) — the first authenticated write in the codebase and
 // the template for every G4+ write: requireUser gate, validate, friendly JSON errors only.
@@ -22,10 +21,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
 
-  const handle = body.handle?.trim().toLowerCase() ?? "";
-  if (!HANDLE_RE.test(handle)) {
-    return NextResponse.json({ error: "invalid_handle" }, { status: 400 });
+  const checked = validateHandle(body.handle ?? "");
+  if (!checked.ok) {
+    const error = checked.error === "reserved" ? "handle_reserved" : "invalid_handle";
+    return NextResponse.json({ error, message: checked.message }, { status: 400 });
   }
+  const handle = checked.handle;
 
   // Availability: the handle may be taken by someone else, but re-claiming your own is fine.
   const existing = await getProfileByHandle(dbi, handle);
