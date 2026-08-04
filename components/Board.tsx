@@ -100,14 +100,14 @@ export function BoardView({ data }: { data: BoardPayload }) {
                 </span>
               </span>
             </div>
-            <span className="shrink-0 rounded-full bg-line px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.09em] text-muted">
+            <span className="shrink-0 rounded-full bg-line px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.09em] text-ink/70">
               Coming soon
             </span>
           </div>
         )}
       </div>
 
-      <p className="mt-3.5 text-xs text-muted/80">
+      <p className="mt-3.5 text-xs text-muted">
         Recorded at country level only — no personal data, no exact location.
       </p>
     </section>

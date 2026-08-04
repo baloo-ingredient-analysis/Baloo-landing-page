@@ -61,7 +61,7 @@ export function EmailCapture() {
           Notify me
         </button>
       </div>
-      <p className="mt-3 text-xs text-muted/80">No spam. Unsubscribe anytime.</p>
+      <p className="mt-3 text-xs text-muted">No spam. Unsubscribe anytime.</p>
     </div>
   );
 }

@@ -21,6 +21,9 @@ const STEPS = [
 export function HowItWorks() {
   return (
     <section className="mt-16 animate-fade-in border-t border-line pt-10 sm:mt-20">
+      {/* Quiet by design — no visible title, but a heading keeps the h1→h2→h3 order intact and
+          gives screen-reader users a section landmark. */}
+      <h2 className="sr-only">How it works</h2>
       <ol className="grid gap-8 sm:grid-cols-3 sm:gap-6">
         {STEPS.map((step, i) => (
           <li key={step.title} className="text-center sm:text-left">
@@ -28,7 +31,7 @@ export function HowItWorks() {
               <step.icon />
             </span>
             <h3 className="mt-4 flex items-center justify-center gap-2 font-display text-lg text-ink sm:justify-start">
-              <span className="text-sm tabular-nums text-muted/70">{i + 1}</span>
+              <span className="text-sm tabular-nums text-muted">{i + 1}</span>
               {step.title}
             </h3>
             <p className="mt-1.5 text-sm leading-relaxed text-muted">{step.body}</p>
