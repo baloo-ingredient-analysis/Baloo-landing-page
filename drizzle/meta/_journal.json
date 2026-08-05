@@ -71,6 +71,13 @@
       "when": 1785244545155,
       "tag": "0009_perpetual_lockjaw",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785914978045,
+      "tag": "0010_exotic_metal_master",
+      "breakpoints": true
     }
   ]
 }
