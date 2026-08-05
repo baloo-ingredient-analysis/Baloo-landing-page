@@ -14,10 +14,12 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "npx -y tsx scripts/seed-dev.ts",
     "db:seed-supply": "npx -y tsx scripts/seed-supply.ts",
-    "db:check": "npx -y tsx scripts/check-db.ts"
+    "db:check": "npx -y tsx scripts/check-db.ts",
+    "db:embeddings": "npx -y tsx scripts/backfill-embeddings.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",
+    "@ai-sdk/openai": "^1.3.24",
     "@ai-sdk/react": "^1.2.0",
     "@sentry/nextjs": "^10.68.0",
     "@supabase/ssr": "^0.12.0",

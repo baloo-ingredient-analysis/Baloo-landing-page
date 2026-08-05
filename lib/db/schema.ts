@@ -25,6 +25,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  vector,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import type { Nutrient } from "../schema";
@@ -88,8 +89,16 @@ export const products = pgTable(
     category: text("category"), // OFF/H1 taxonomy later; readies /c/[category]
     createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Semantic search (SS1): OpenAI text-embedding-3-small vector of brand+name+summary+ingredients.
+    // Nullable — filled on ingest / by the backfill script; NULL rows just don't match semantic
+    // queries (keyword search still covers them). pgvector; see drizzle/0010 + lib/embeddings.ts.
+    embedding: vector("embedding", { dimensions: 1536 }),
   },
-  (t) => [index("products_barcode_idx").on(t.barcode)],
+  (t) => [
+    index("products_barcode_idx").on(t.barcode),
+    // HNSW + cosine distance for fast nearest-neighbour against the query embedding.
+    index("products_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
+  ],
 );
 
 // Offers (Order P1): a retailer's listing of a product. Two retailer listings of the same barcode

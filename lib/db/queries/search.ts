@@ -10,6 +10,7 @@ import { and, desc, eq, ilike, or } from "drizzle-orm";
 import type { Db } from "../index";
 import { listItems, lists, profiles, products, saves, votes, type Product } from "../schema";
 import { sql } from "drizzle-orm";
+import { toVectorLiteral } from "../../embeddings";
 import type { ListWithCountsAndOwner } from "./lists";
 
 export type SearchResults = {
@@ -17,17 +18,66 @@ export type SearchResults = {
   lists: ListWithCountsAndOwner[];
 };
 
-export async function searchAll(dbi: Db, q: string, limitEach = 10): Promise<SearchResults> {
+// Cosine distance (pgvector <=> ) above this is treated as "not really related" and dropped, so a
+// query with no close products doesn't pull in junk. 0 = identical, 2 = opposite; ~0.2–0.5 is a good
+// match. Tunable once there's real catalog volume.
+const SEMANTIC_MAX_DISTANCE = 0.7;
+
+// Reciprocal-rank fusion: merge several ranked lists into one. An item ranked high in EITHER list
+// scores well, so exact keyword hits and semantic hits both surface. k=60 is the standard constant.
+function fuseByRank(lists: Product[][], k = 60): Product[] {
+  const score = new Map<string, number>();
+  const byId = new Map<string, Product>();
+  for (const list of lists) {
+    list.forEach((p, i) => {
+      byId.set(p.id, p);
+      score.set(p.id, (score.get(p.id) ?? 0) + 1 / (k + i + 1));
+    });
+  }
+  return [...score.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => byId.get(id)!);
+}
+
+/**
+ * Site search — products + PUBLIC lists. Products are HYBRID when `queryEmbedding` is provided:
+ * keyword (ILIKE) results fused with pgvector semantic results, so "dairy-free milk" finds an oat
+ * drink AND "oatly" finds Oatly. Without an embedding (no OPENAI_API_KEY, or the embed failed) it's
+ * pure keyword — identical to before. Lists stay keyword-only.
+ */
+export async function searchAll(
+  dbi: Db,
+  q: string,
+  limitEach = 10,
+  queryEmbedding?: number[] | null,
+): Promise<SearchResults> {
   const term = q.trim();
   if (term.length < 2) return { products: [], lists: [] };
   const pat = `%${term}%`;
+  const candidateN = Math.max(limitEach * 2, 20); // widen the pool before fusion
 
-  const productRows = await dbi
+  const keywordProducts = await dbi
     .select()
     .from(products)
     .where(or(ilike(products.name, pat), ilike(products.brand, pat)))
     .orderBy(desc(products.createdAt))
-    .limit(limitEach);
+    .limit(candidateN);
+
+  let semanticProducts: Product[] = [];
+  if (queryEmbedding && queryEmbedding.length) {
+    const vec = toVectorLiteral(queryEmbedding);
+    semanticProducts = await dbi
+      .select()
+      .from(products)
+      .where(
+        sql`${products.embedding} is not null and (${products.embedding} <=> ${vec}::vector) < ${SEMANTIC_MAX_DISTANCE}`,
+      )
+      .orderBy(sql`${products.embedding} <=> ${vec}::vector`)
+      .limit(candidateN);
+  }
+
+  const productRows =
+    queryEmbedding && queryEmbedding.length
+      ? fuseByRank([keywordProducts, semanticProducts]).slice(0, limitEach)
+      : keywordProducts.slice(0, limitEach);
 
   const listRows = await dbi
     .select({

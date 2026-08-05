@@ -15,6 +15,7 @@ import {
 import { upsertProductByCanonicalKey } from "./db/queries/products";
 import { upsertOffer } from "./db/queries/offers";
 import { canonicalKey, ingredientKey, productSlug } from "./canonical";
+import { embedText, productEmbeddingText } from "./embeddings";
 import type { Ingredient, Nutrition } from "./schema";
 
 export type IngestInput = {
@@ -114,6 +115,20 @@ export async function ingestAnalysis(
           })
           .onConflictDoNothing();
       }
+    }
+
+    // Semantic-search embedding (SS1). Best-effort: null without OPENAI_API_KEY and it swallows its
+    // own errors, so it never affects the catalog write. Recomputed on re-ingest to stay fresh.
+    const embedding = await embedText(
+      productEmbeddingText({
+        name: input.product_name,
+        brand: input.brand,
+        summary: input.product_summary,
+        ingredientNames: input.ingredients.map((i) => i.name),
+      }),
+    );
+    if (embedding) {
+      await dbi.update(productsTable).set({ embedding }).where(eq(productsTable.id, product.id));
     }
 
     return { productId: product.id, slug };
