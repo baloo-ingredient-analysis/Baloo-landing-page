@@ -123,18 +123,7 @@ export function ResultsView({
               loading={loading}
             />
 
-            {/* One container, not one card per ingredient — an index, not a stack. */}
-            <ul className="mt-4 overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
-              {ingredients.map((ing, i) => (
-                <IngredientRow key={i} ingredient={ing} index={i} />
-              ))}
-              {loading && (
-                <li className="flex list-none items-center gap-3 border-t border-line px-4 py-3.5 text-muted sm:px-5">
-                  <Spinner />
-                  <span className="text-sm">Analysing the rest…</span>
-                </li>
-              )}
-            </ul>
+            <IngredientsSection ingredients={ingredients} loading={loading} />
           </>
         )}
       </div>
@@ -194,10 +183,76 @@ function CountLede({
           </p>
         )
       )}
+    </div>
+  );
+}
 
-      <p className="mt-3 text-xs text-muted">
-        Tap any ingredient to see what it is and why it&rsquo;s here.
-      </p>
+// The ingredient list, nested inside a collapsible "Ingredients" section (Jitain): keep the screen
+// calm by default — the hero count + summary stay visible, the full list appears only if the reader
+// wants it. Open while a live analysis streams in (so the reveal still happens), collapsed on a
+// cached product page. Inside, each row still opens to "what it is" / "in this product".
+function IngredientsSection({
+  ingredients,
+  loading,
+}: {
+  ingredients: Partial<Ingredient>[];
+  loading: boolean;
+}) {
+  const [open, setOpen] = useState(loading);
+
+  return (
+    <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-paper shadow-card">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls="ingredients-list"
+        className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors hover:bg-canvas sm:px-5"
+      >
+        <span className="flex items-center gap-2">
+          <span className="font-display text-base text-ink">Ingredients</span>
+          <span className="rounded-md bg-canvas px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted">
+            {ingredients.length}
+          </span>
+        </span>
+        <span className="flex items-center gap-2 text-xs text-muted">
+          <span className="hidden sm:inline">{open ? "Hide" : "Show"}</span>
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+            className={`h-4 w-4 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          >
+            <path d="M3.5 6l4.5 4.5L12.5 6" />
+          </svg>
+        </span>
+      </button>
+
+      {/* Unfold: grid-rows 0fr → 1fr, the same idiom the rows use. Reduced-motion rule zeroes it. */}
+      <div
+        id="ingredients-list"
+        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <ul className="border-t border-line [&>li+li]:border-t [&>li+li]:border-line">
+            {ingredients.map((ing, i) => (
+              <IngredientRow key={i} ingredient={ing} index={i} />
+            ))}
+            {loading && (
+              <li className="flex list-none items-center gap-3 border-t border-line px-4 py-3.5 text-muted sm:px-5">
+                <Spinner />
+                <span className="text-sm">Analysing the rest…</span>
+              </li>
+            )}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
