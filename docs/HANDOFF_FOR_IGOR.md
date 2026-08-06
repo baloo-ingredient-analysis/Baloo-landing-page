@@ -1,11 +1,12 @@
 # Baloo Web API — handoff (for Igor)
 
-The web-side integration API is live on a Vercel **preview** deployment. Full spec:
+The web-side integration API is live on Baloo's production deployment. Full spec:
 [`API_CONTRACT_V1.md`](API_CONTRACT_V1.md). This is the 60-second "plug in and try it" version.
 
 ## What you need
 
-- **Base URL:** `https://baloo-web.vercel.app` (stable production alias; `baloo.life` will work too once the domain is pointed here)
+- **Base URL:** `https://baloo-web-pitelet.vercel.app` (stable). Note: NOT `baloo-web.vercel.app` — that
+  apex alias currently serves a different app. `baloo.life` will be the URL once the domain is pointed.
 - **API key:** sent to you privately (never commit it). Send it on every request as either header:
   - `Authorization: Bearer <KEY>`
   - `x-api-key: <KEY>`
@@ -13,7 +14,7 @@ The web-side integration API is live on a Vercel **preview** deployment. Full sp
 ## Try it (copy-paste, replace `BASE` and `KEY`)
 
 ```bash
-BASE="https://baloo-web.vercel.app"
+BASE="https://baloo-web-pitelet.vercel.app"
 KEY="<your key>"
 
 # 1) health + key check  →  { ok, service, version, keyId, time }
@@ -44,4 +45,4 @@ curl -s -X POST "$BASE/api/v1/find-product" \
 - **Errors are always** `{ "error": "<code>", "message": "<friendly>" }`: `401` bad/missing key,
   `400` bad input, `404` find-product found nothing, `429` rate limited, `503` service off/unconfigured.
 - **`find-product` `query`** is best-effort (web search → top results); a direct `url` is reliable.
-- This is a **preview** deployment — production is untouched. Ping me (Miquel) with the base URL + key.
+- Ping me (Miquel) once you've got the base URL + key working.
