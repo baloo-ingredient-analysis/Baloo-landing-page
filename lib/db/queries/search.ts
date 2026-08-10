@@ -25,7 +25,8 @@ const SEMANTIC_MAX_DISTANCE = 0.7;
 
 // Reciprocal-rank fusion: merge several ranked lists into one. An item ranked high in EITHER list
 // scores well, so exact keyword hits and semantic hits both surface. k=60 is the standard constant.
-function fuseByRank(lists: Product[][], k = 60): Product[] {
+// Exported for unit tests (search.test.ts); callers use searchAll.
+export function fuseByRank(lists: Product[][], k = 60): Product[] {
   const score = new Map<string, number>();
   const byId = new Map<string, Product>();
   for (const list of lists) {
