@@ -37,8 +37,8 @@ root files; blank skeletons to reset or seed new ones are in `docs/templates/`.
 
 ## Hard rules
 - Secrets are SERVER-SIDE env vars only: ANTHROPIC_API_KEY, FIRECRAWL_API_KEY, DATABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY, UPSTASH_REDIS_REST_URL/TOKEN, LOOPS_API_KEY. Never call these from the
-  client. The ONLY `NEXT_PUBLIC_*` vars are `NEXT_PUBLIC_SUPABASE_URL`/`_ANON_KEY` — public by design
+  SUPABASE_SERVICE_ROLE_KEY, UPSTASH_REDIS_REST_URL/TOKEN, LOOPS_API_KEY, OPENAI_API_KEY (semantic-
+  search embeddings), BALOO_API_KEYS (mobile v1 API service keys). Never call these from the client. The ONLY `NEXT_PUBLIC_*` vars are `NEXT_PUBLIC_SUPABASE_URL`/`_ANON_KEY` — public by design
   (Supabase safety is RLS, not key secrecy). No other secret ever gets a `NEXT_PUBLIC_` prefix.
 - Model: claude-sonnet-4-6 (see lib/config.ts). Use the AI SDK: `generateObject` for extract,
   `streamObject` + `experimental_useObject` for the streamed analysis.
@@ -136,10 +136,13 @@ over judgment." (in lib/prompts.ts)
   + unsubscribe (S7).
 
 ## Scope
-- **Graduated IN (built):** accounts/login, saved lists + saves, the nutrition-panel context, and
-  the community platform (profiles, discovery, follows/feed, comments, moderation). The active track
-  is the beta launch (`Baloo_Launch_Plan.md`): V3 design port, seed supply, one-click social sharing,
-  AI semantic search, plus the S-series security hardening.
+- **Graduated IN (built):** accounts/login, saved lists + saves, the nutrition-panel context, the
+  community platform (profiles, discovery, follows/feed, comments, moderation), **AI semantic search**
+  (`lib/embeddings` + pgvector; optional-infra — keyword-only without OPENAI_API_KEY; see
+  `docs/SEMANTIC_SEARCH.md`), **username rules** (`lib/handle`, `docs/USERNAME_RULES.md`), and the
+  **mobile v1 API** (`/api/v1/*`, service-key auth via `lib/apiAuth`; `docs/API_CONTRACT_V1.md`). The
+  active track is the beta launch (`Baloo_Launch_Plan.md`): V3 design port, seed supply, one-click
+  social sharing, plus the S-series security hardening.
 - **Still out of scope — do NOT build:** **scores/ratings/traffic-lights (forbidden forever)**,
   good/bad verdicts or "better-than" comparisons, a paywall (Stripe account only, no paid tiers in
   the beta), non-food products, and multiple languages/i18n. **Native mobile is deferred** (backlog

@@ -150,11 +150,17 @@ FKs to `CASCADE`** without re-reading that file.
 | Group | Routes |
 |---|---|
 | **Pipeline** | `extract`, `analyze`, `products/analyze` (background/retry engine), `products/search` |
-| **Content** | `lists`, `lists/[id]`, `lists/[id]/items`, `search`, `board`, `nutrition-context`, `explain` (AI "explain this") |
+| **Content** | `lists`, `lists/[id]`, `lists/[id]/items`, `search` (hybrid: pgvector semantic + keyword), `board`, `nutrition-context`, `explain` (AI "explain this") |
 | **Social** | `saves`, `votes`, `follows`, `comments`, `feed` |
 | **Moderation** | `reports`, `moderation` |
 | **Identity** | `me`, `profile`, `auth/callback` |
 | **Marketing** | `subscribe` (Loops) |
+| **Mobile API (v1)** | `v1/ping`, `v1/analyse-ingredients`, `v1/find-product` — service-key gated (`lib/apiAuth`, fail-closed) for the mobile app; contract in `docs/API_CONTRACT_V1.md` |
+
+**Semantic search (SS):** products carry an `embedding vector(1536)` (OpenAI `text-embedding-3-small`,
+migration 0010, pgvector + HNSW cosine). `/api/search` embeds the query and `searchAll` fuses the
+pgvector nearest-neighbours with the keyword hits via reciprocal-rank fusion. Optional-infra:
+keyword-only without `OPENAI_API_KEY`. Depth in `docs/SEMANTIC_SEARCH.md`.
 
 ---
 

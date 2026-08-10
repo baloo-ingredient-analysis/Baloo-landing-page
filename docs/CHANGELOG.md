@@ -5,10 +5,45 @@
 > the curated story; `git log` is the full record. Deeper "how it works" lives in
 > [`ARCHITECTURE.md`](ARCHITECTURE.md); what's *planned* lives in `Baloo_Launch_Plan.md`.
 
-## Unreleased / in progress
+## Beta hardening track (shipped to `main`, newest first)
 
-### `profile-page` branch (Orders PP1–PP4) — Pinterest-style profile + product Pantry
-> Not on `main` yet — this whole block ships when the branch merges.
+### Semantic search (SS1–SS4) — `5a37ae5`
+- **Search by meaning, hybrid with keyword.** `products.embedding vector(1536)` + HNSW cosine index
+  (migration 0010, pgvector installed like `pg_trgm`); `lib/embeddings.ts` (OpenAI
+  `text-embedding-3-small` via the AI SDK, **optional-infra** — keyword-only without `OPENAI_API_KEY`);
+  embed-on-ingest + `scripts/backfill-embeddings.ts` (`npm run db:embeddings`); reciprocal-rank fusion
+  of semantic + keyword hits in `searchAll`; query embedded (rate-limited) in `/api/search`. Verified
+  live ("milk for coffee" → the oat drink). Docs: `docs/SEMANTIC_SEARCH.md`.
+
+### Ingredients section — `4cd81d2`
+- The ingredient **list** now nests inside a collapsible **"Ingredients (N)"** toggle (Jitain — less on
+  screen by default). Hero count + summary stay visible; open while a live analysis streams, collapsed
+  on a cached page. Rows unchanged.
+
+### Accessibility (WCAG AA) — `d0bf6e7`
+- Contrast fixes (reduced-opacity `text-muted` → full; eyebrow pills → `text-ink/70`), heading order
+  (screen-reader `<h2>`), valid `app/robots.ts`. The signature-green link contrast is left for Kat.
+
+### Username rules — `82e4f49`
+- `lib/handle.ts` as one source of truth: length 3–20, lowercase `a–z`/`0–9`/hyphen, no leading/
+  trailing/doubled hyphen, reserved blocklist (routes/roles/brand), NFKC-folded. Wired into
+  `/api/profile` + the welcome UI; unit-tested. `docs/USERNAME_RULES.md`.
+
+### Mobile ↔ web API (v1) — Option 1 integration
+- Web-side endpoints the mobile backend calls: `GET /api/v1/ping`, `POST /api/v1/analyse-ingredients`
+  (the shared analysis engine — same prompt/schema as the site, catalog-cached on `canonical_key`),
+  `POST /api/v1/find-product` (Firecrawl scrape/search backstop). **Service-key auth** (`lib/apiAuth`,
+  fail-closed), per-key rate limit, shared analyse/cache core (`lib/apiV1Analysis`). Docs:
+  `docs/API_CONTRACT_V1.md`, `docs/HANDOFF_FOR_IGOR.md`, `docs/ENGINE_NOTES_FOR_IGOR.md`.
+
+### Tests — `lib/` safety net
+- Vitest over the pure layer (61 tests): `canonical`, `hash`, `slug`, `region`, `retailers`, `handle`,
+  `nutrition` (all the arithmetic), `embeddings`, and the search `fuseByRank`. Runs in CI.
+
+## Shipped — Phase 3 community platform
+
+### `profile-page` (Orders PP1–PP4) — Pinterest-style profile + product Pantry
+> Merged to `main`.
 - **PP1 — Product Pantry (save products):** products can now be **Saved** to a private **Pantry** (a
   collection of saved products), distinct from saving whole lists. New `product_saves` table
   (`userId`,`productId`, PK) + migration 0009 with **owner-only RLS** (private, unlike public `saves`).
