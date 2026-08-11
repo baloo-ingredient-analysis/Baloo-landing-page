@@ -128,12 +128,13 @@ over judgment." (in lib/prompts.ts)
   IP; explain/products-analyze by user). Optional-infra: no-op (fail-open) without Upstash — so it is
   INERT until `UPSTASH_REDIS_REST_URL/TOKEN` are set (empty locally; unset on Vercel).
 - Security headers (S5, `next.config.mjs` `headers()`): HSTS, X-Frame-Options DENY, nosniff,
-  Referrer-Policy, Permissions-Policy are ENFORCING; CSP is **report-only** for now (`connect-src`
-  includes the Supabase origin from env). Report-only is clean (zero violations observed), so the
-  eventual flip to enforcing is low-risk — do it after S6 gives a real report endpoint.
+  Referrer-Policy, Permissions-Policy AND the CSP are all **ENFORCING**. The CSP's only cross-origin
+  is Supabase (`connect-src` derives its https+wss origin from the public env var); everything else is
+  same-origin / inline / data:/blob:. Enabling Sentry Session Replay later needs `worker-src 'self'
+  blob:` added there (the DSN's connect-src origin is already derived).
 - Still PLANNED (S-series, `Baloo_Launch_Plan.md`): captcha/Turnstile (deferred — needs Cloudflare +
-  Supabase setup), write volume caps (S4), security headers + WAF (S5), Sentry (S6), account deletion
-  + unsubscribe (S7).
+  Supabase setup), write volume caps (S4), WAF (S5's headers + CSP are done), Sentry (S6), account
+  deletion + unsubscribe (S7).
 
 ## Scope
 - **Graduated IN (built):** accounts/login, saved lists + saves, the nutrition-panel context, the

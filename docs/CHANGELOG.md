@@ -7,6 +7,14 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### CSP enforcing (S5) — `748649a`
+- The Content-Security-Policy header flipped from `-Report-Only` to **enforcing**. Report-only had run
+  clean in prod (zero violations): the browser's only cross-origin is Supabase (`connect-src` derives
+  its https+wss origin from `NEXT_PUBLIC_SUPABASE_URL`), and every script/style/image/font is
+  same-origin, inline, or a `data:`/`blob:` URI. Verified against a production build — homepage and
+  `/discover` load with no CSP violations in the console. Note in `next.config.mjs`: enabling Sentry
+  Session Replay later will need `worker-src 'self' blob:`.
+
 ### Semantic search (SS1–SS4) — `5a37ae5`
 - **Search by meaning, hybrid with keyword.** `products.embedding vector(1536)` + HNSW cosine index
   (migration 0010, pgvector installed like `pg_trgm`); `lib/embeddings.ts` (OpenAI
