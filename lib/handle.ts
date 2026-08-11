@@ -7,7 +7,9 @@
 export const HANDLE_MIN = 3;
 export const HANDLE_MAX = 20;
 
-export type HandleError = "length" | "charset" | "edges" | "reserved";
+import { containsProfanity } from "./profanity";
+
+export type HandleError = "length" | "charset" | "edges" | "reserved" | "profanity";
 
 export type HandleResult =
   | { ok: true; handle: string }
@@ -54,6 +56,9 @@ export function validateHandle(raw: string): HandleResult {
   }
   if (RESERVED_HANDLES.has(handle)) {
     return { ok: false, error: "reserved", message: "That handle is reserved — pick another." };
+  }
+  if (containsProfanity(handle)) {
+    return { ok: false, error: "profanity", message: "That handle isn't allowed — please choose another." };
   }
 
   return { ok: true, handle };

@@ -61,4 +61,13 @@ describe("validateHandle", () => {
     // NFKC folds the fullwidth 'ａｄｍｉｎ' back to 'admin'
     expect(validateHandle("ａｄｍｉｎ")).toMatchObject({ ok: false, error: "reserved" });
   });
+
+  it("rejects profanity (incl. leetspeak), but keeps innocent look-alike words", () => {
+    expect(validateHandle("fuckbaloo")).toMatchObject({ ok: false, error: "profanity" });
+    expect(validateHandle("sh1t-head")).toMatchObject({ ok: false, error: "profanity" });
+    expect(validateHandle("big-ass")).toMatchObject({ ok: false, error: "profanity" });
+    // Scunthorpe guard: these are fine
+    expect(validateHandle("class-of-99").ok).toBe(true);
+    expect(validateHandle("analyst").ok).toBe(true);
+  });
 });
