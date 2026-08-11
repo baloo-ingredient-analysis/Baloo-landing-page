@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 
-// Security response headers (Order S5). The enforcing set is safe on any HTTPS host; the CSP is
-// REPORT-ONLY for now (observe violations without breaking Supabase auth, Next's inline hydration,
-// or styles) — flip it to enforcing once report-only is clean in prod. All headers apply to every
-// route.
+// Security response headers (Order S5). The enforcing set is safe on any HTTPS host. The CSP is now
+// ENFORCING — report-only was clean (the browser only talks to Supabase; every script/style/image
+// is same-origin, inline, or data:). NOTE for later: enabling Sentry Session Replay needs
+// `worker-src 'self' blob:` added below (its DSN's connect-src is already derived). All headers apply
+// to every route.
 
 // Supabase is the only cross-origin the browser talks to (auth + REST + future realtime). Derive its
 // origin from the public env var so connect-src stays correct across projects; fall back to 'self'.
@@ -33,7 +34,7 @@ function sentryOrigin() {
 
 const csp = [
   "default-src 'self'",
-  // Next injects inline hydration scripts (no nonce here); 'unsafe-eval' covers dev HMR. Report-only.
+  // Next injects inline hydration scripts (no nonce here); 'unsafe-eval' covers dev HMR.
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'", // Tailwind + framework-injected styles
   "img-src 'self' data: blob:",
@@ -51,7 +52,7 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
-  { key: "Content-Security-Policy-Report-Only", value: csp },
+  { key: "Content-Security-Policy", value: csp },
 ];
 
 const nextConfig = {
