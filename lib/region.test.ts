@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { computeAvailability, availabilityLabel, weightedAvailability } from "./region";
+import {
+  computeAvailability,
+  availabilityLabel,
+  weightedAvailability,
+  productAvailability,
+  blendGeoRank,
+} from "./region";
 import { GEO_WEIGHTS } from "./config";
 
 describe("computeAvailability", () => {
@@ -81,5 +87,45 @@ describe("weightedAvailability (Order GR2 — two-tier geo score)", () => {
 
   it("honours a custom delivery weight", () => {
     expect(weightedAvailability(new Map([["p", ["Koro"]]]), "GB", 0.5)).toBe(0.5);
+  });
+});
+
+describe("productAvailability (single product, GR2/GR4)", () => {
+  it("scores the best tier across a product's retailers", () => {
+    expect(productAvailability(["Ocado"], "GB")).toBe(1);
+    expect(productAvailability(["Koro"], "GB")).toBe(GEO_WEIGHTS.wDel);
+    expect(productAvailability(["Target"], "GB")).toBe(0);
+    expect(productAvailability(["Koro", "Ocado"], "GB")).toBe(1); // home beats delivers
+  });
+  it("is 0 for no retailers or an unknown country", () => {
+    expect(productAvailability([], "GB")).toBe(0);
+    expect(productAvailability(["Ocado"], null)).toBe(0);
+  });
+});
+
+describe("blendGeoRank (GR3/GR4 — geo nudges a base ranking, never overrides it)", () => {
+  const geo = new Map<string, number>([["A", 0], ["B", 0], ["C", 1], ["D", 0]]);
+  const base = ["A", "B", "C", "D"]; // base order, best first
+  const geoOf = (id: string) => geo.get(id) ?? 0;
+
+  it("lifts a locally-buyable item but keeps a popular non-local one on top", () => {
+    // λ_feed default: scores A=1.0, C=0.8, B=0.75, D=0.25 → C rises above B, A stays #1.
+    expect(blendGeoRank(base, geoOf, GEO_WEIGHTS.lambdaFeed)).toEqual(["A", "C", "B", "D"]);
+  });
+
+  it("is a no-op when λ=0 or every geo is 0", () => {
+    expect(blendGeoRank(base, geoOf, 0)).toEqual(base);
+    expect(blendGeoRank(base, () => 0, GEO_WEIGHTS.lambdaFeed)).toEqual(base);
+  });
+
+  it("the light search λ nudges less than the feed λ", () => {
+    // With a smaller λ the same C may not overtake B — relevance dominates. Assert C never passes A.
+    const out = blendGeoRank(base, geoOf, GEO_WEIGHTS.lambdaSearch);
+    expect(out[0]).toBe("A");
+    expect(out.indexOf("C")).toBeLessThanOrEqual(2);
+  });
+
+  it("handles an empty list", () => {
+    expect(blendGeoRank([], () => 1, 0.6)).toEqual([]);
   });
 });

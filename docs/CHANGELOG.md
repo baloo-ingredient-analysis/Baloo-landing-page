@@ -7,6 +7,18 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### Geo-ranking (GR1–GR4)
+- Interest-first ranking with geo as a **soft multiplier** (`base × (1 + λ·geo)`), never a hard
+  filter (Jitain's call). **GR1** retailer country model (`lib/retailers.ts` — ISO codes, `home`/
+  `delivers`/`none` tiers, `EXTRA_RETAILER_GEO` incl. Koro; `retailerRegion` now derived, L7
+  unchanged). **GR2** `weightedAvailability`/`productAvailability` two-tier geo score + `GEO_WEIGHTS`.
+  **GR3** `withRegionAvailability` now blends geo into the Explore/feed ranking via `blendGeoRank`
+  (`λ_feed`) instead of the old pure-`pct` sort — a locally-buyable list is nudged up, a popular
+  non-local one keeps its place, nothing is dropped; the neutral availability badge is unchanged.
+  **GR4** `searchAll` applies a **lighter** `λ_search` geo tiebreak to product results (country from
+  Vercel geo) — relevance still decides the page. Pure math is framework-agnostic + unit-tested;
+  `docs/GEO_RANKING.md`. GR5 (seed-data verify + Jitain's 3 tuning answers) still open.
+
 ### CSP enforcing (S5) — `748649a`
 - The Content-Security-Policy header flipped from `-Report-Only` to **enforcing**. Report-only had run
   clean in prod (zero violations): the browser's only cross-origin is Supabase (`connect-src` derives

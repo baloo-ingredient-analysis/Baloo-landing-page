@@ -125,7 +125,7 @@ Small, additive layers over the L7 foundation — no query rewrites. Commit-per-
 - Tests: `lib/region.test.ts` — delivery tier, empty list = 0, all-local = 1, mixed.
 - **Commit:** `GR2: weighted two-tier geo availability + tunable weights`.
 
-### GR3 — Blended re-rank for feed / Explore
+### GR3 — Blended re-rank for feed / Explore — ✅ DONE
 - `lib/db/queries/lists.ts`: replace `withRegionAvailability`'s pure-`pct` sort with the blended
   re-rank — derive `base` from the incoming (already engagement-ordered) rank position, multiply by
   `(1 + lambdaFeed × geo)`, re-sort stably. Still a post-fetch annotate layer; still never drops a
@@ -136,11 +136,15 @@ Small, additive layers over the L7 foundation — no query rewrites. Commit-per-
   non-local one; unknown country = unchanged order.
 - **Commit:** `GR3: blend geo into feed/Explore ranking (interest-first, geo as nudge)`.
 
-### GR4 — Light geo tiebreak in search
-- Apply the same multiplier with `lambdaSearch` as a post-step in `searchAll` (products and lists),
-  after the RRF fusion — so relevance dominates and geo only breaks near-ties.
-- Thread the query embedding path already there; add country from geo.
-- Tests: a relevance-strong non-local hit still ranks first; geo only reorders near-equal relevance.
+### GR4 — Light geo tiebreak in search — ✅ DONE
+- `searchAll` takes an optional `country` (viewer's Vercel geo, threaded from `/api/search`) and
+  applies `blendGeoRank` with `lambdaSearch` to the **product** results after RRF fusion — relevance
+  decides the page, geo only reorders near-equal hits. **Search lists stay on pure relevance** (they
+  match by title/description; per-list retailer geo there is low-value — deferred, note only).
+- Product geo uses each row's own `products.retailer` (offers aren't joined in search) — a good
+  approximation; the full offer set is used on the feed (GR3).
+- Tests: the lighter `lambdaSearch` keeps a relevance-strong item ahead of a merely-local one
+  (asserted against the feed λ).
 - **Commit:** `GR4: geo as a light tiebreaker in search`.
 
 ### GR5 — Verify + document

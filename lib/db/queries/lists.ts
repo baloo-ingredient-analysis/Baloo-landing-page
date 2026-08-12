@@ -19,10 +19,13 @@ import {
 import {
   computeAvailability,
   availabilityLabel,
+  weightedAvailability,
+  blendGeoRank,
   type AvailabilityTone,
   type ListAvailability,
 } from "../../region";
 import type { Region } from "../../retailers";
+import { GEO_WEIGHTS } from "../../config";
 
 export async function createList(
   dbi: Db,
@@ -339,9 +342,13 @@ export async function getListsRetailers(
   return out;
 }
 
-// Annotate already-fetched lists with their availability in `region` and SOFT-rank by it (higher %
-// first; stable — the incoming order is the tie-break; a list with no availability sorts last but is
-// NEVER dropped). Additive layer over getPublicListsRecent / getPopularListsThisWeek.
+// Annotate already-fetched lists with their availability badge in `region`, then BLEND geo into the
+// ranking (Order GR3). The incoming order is the base ranking (engagement + recency); geo enters as
+// `base × (1 + λ_feed · geo)` via `blendGeoRank`, so a locally-buyable list is nudged up but a very
+// popular non-local one keeps its place — interest drives ranking, geo never hard-filters (a list is
+// NEVER dropped). `region` doubles as the ranking country (the `UK→GB` shim in retailerServes folds
+// it). The neutral `availability` badge still comes from L7's binary `computeAvailability`.
+// Additive layer over getExploreLists / getPublicListsRecent / getPopularListsThisWeek.
 export async function withRegionAvailability<T extends { id: string }>(
   dbi: Db,
   rows: T[],
@@ -349,14 +356,16 @@ export async function withRegionAvailability<T extends { id: string }>(
 ): Promise<(T & { availability: ListRegionInfo | null })[]> {
   if (rows.length === 0) return [];
   const retailers = await getListsRetailers(dbi, rows.map((r) => r.id));
-  return rows
-    .map((row, i) => {
-      const a = computeAvailability(retailers.get(row.id) ?? new Map(), region);
-      const label = availabilityLabel(a);
-      return { row: { ...row, availability: label ? { ...a, ...label } : null }, i };
-    })
-    .sort((x, y) => (y.row.availability?.pct ?? 0) - (x.row.availability?.pct ?? 0) || x.i - y.i)
-    .map((e) => e.row);
+  const annotated = rows.map((row) => {
+    const perProduct = retailers.get(row.id) ?? new Map<string, string[]>();
+    const a = computeAvailability(perProduct, region);
+    const label = availabilityLabel(a);
+    const geo = weightedAvailability(perProduct, region);
+    return { ...row, availability: label ? { ...a, ...label } : null, _geo: geo };
+  });
+  return blendGeoRank(annotated, (r) => r._geo, GEO_WEIGHTS.lambdaFeed).map(
+    ({ _geo, ...row }) => row as T & { availability: ListRegionInfo | null },
+  );
 }
 
 async function touch(dbi: Db, listId: string): Promise<void> {
