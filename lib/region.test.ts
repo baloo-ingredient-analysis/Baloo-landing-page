@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { computeAvailability, availabilityLabel } from "./region";
+import { computeAvailability, availabilityLabel, weightedAvailability } from "./region";
+import { GEO_WEIGHTS } from "./config";
 
 describe("computeAvailability", () => {
   it("is empty for an empty list", () => {
@@ -40,5 +41,45 @@ describe("availabilityLabel", () => {
       label: "Not sold where you shop",
       tone: "none",
     });
+  });
+});
+
+describe("weightedAvailability (Order GR2 — two-tier geo score)", () => {
+  const wDel = GEO_WEIGHTS.wDel;
+
+  it("is 0 for an empty list, an unknown country, or a missing country", () => {
+    expect(weightedAvailability(new Map(), "GB")).toBe(0);
+    expect(weightedAvailability(new Map([["p", ["Ocado"]]]), null)).toBe(0);
+    expect(weightedAvailability(new Map([["p", ["Ocado"]]]), "")).toBe(0);
+  });
+
+  it("scores 1 when every product is sold in the user's country", () => {
+    const perProduct = new Map<string, string[]>([
+      ["p1", ["Ocado"]],
+      ["p2", ["Tesco"]],
+    ]);
+    expect(weightedAvailability(perProduct, "GB")).toBe(1);
+  });
+
+  it("takes the BEST tier per product (home beats delivers beats none)", () => {
+    // For a GB user: Ocado is home (1), Koro-only delivers (wDel), Target-only none (0).
+    const perProduct = new Map<string, string[]>([
+      ["p1", ["Ocado", "Koro"]], // home wins → 1
+      ["p2", ["Koro"]], // delivers → wDel
+      ["p3", ["Target"]], // US only → 0
+    ]);
+    expect(weightedAvailability(perProduct, "GB")).toBeCloseTo((1 + wDel + 0) / 3);
+  });
+
+  it("weights cross-border delivery below a based-here retailer", () => {
+    const local = weightedAvailability(new Map([["p", ["Ocado"]]]), "GB");
+    const shipped = weightedAvailability(new Map([["p", ["Koro"]]]), "GB");
+    expect(local).toBe(1);
+    expect(shipped).toBe(wDel);
+    expect(shipped).toBeLessThan(local);
+  });
+
+  it("honours a custom delivery weight", () => {
+    expect(weightedAvailability(new Map([["p", ["Koro"]]]), "GB", 0.5)).toBe(0.5);
   });
 });

@@ -105,16 +105,19 @@ apply his final numbers.
 
 Small, additive layers over the L7 foundation — no query rewrites. Commit-per-order.
 
-### GR1 — Country + delivery model (pure, no behaviour change yet)
-- `lib/retailers.ts`: migrate retailers to `{ countries: string[]; deliversTo?: string[] }` (ISO
-  alpha-2). Keep `Region`/`retailerRegion` working via a `"UK"→"GB"` shim so L7 callers are untouched.
-  Add helpers `retailerCountries(name)` and `retailerServes(name, country) → 1 | w_del | 0`.
-- `lib/config.ts`: update `SUPPORTED_RETAILERS` with `countries`; add **Koro** (`DE` home, EU
-  `deliversTo`) as the cross-border example.
+### GR1 — Country + delivery model (pure, no behaviour change yet) — ✅ DONE
+- `lib/retailers.ts`: one name→geography registry over the pasteable retailers plus geo-only ones.
+  `Region`/`retailerRegion` now DERIVE from `countries` (US-home→"US", GB-home→"UK") so L7 is
+  untouched; `normCountry` folds `"UK"→"GB"`. Added `retailerCountries(name)` and
+  `retailerServes(name, country) → "home" | "delivers" | "none"` (weights applied in GR2, not here).
+- `lib/config.ts`: `SUPPORTED_RETAILERS` gains `countries` (pasteable set unchanged — homepage hero +
+  URL validation). **Koro** lives in a separate `EXTRA_RETAILER_GEO` (DE home, EU `deliversTo`), so
+  it's geo-mapped for ranking WITHOUT being advertised or accepted as a pasteable link — promote it
+  into `SUPPORTED_RETAILERS` when we're ready to scrape it.
 - Tests: `lib/retailers.test.ts` — home match = 1, delivery-only = `w_del`, none = 0, shim maps UK↔GB.
 - **Commit:** `GR1: retailer country + delivers-to model (ISO codes, Koro, UK→GB shim)`.
 
-### GR2 — Weighted geo score (pure math)
+### GR2 — Weighted geo score (pure math) — ✅ DONE
 - `lib/region.ts`: add `weightedAvailability(perProductRetailers, country, w_del) → geo ∈ [0,1]`
   (two-tier max per product, mean across products). Leave `computeAvailability`/`availabilityLabel`
   in place — the badge still uses `pct`.
