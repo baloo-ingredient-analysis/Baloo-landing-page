@@ -1,64 +1,57 @@
 import { describe, it, expect } from "vitest";
-import {
-  looksLikeUrl,
-  validateUrl,
-  detectRetailer,
-  isSupportedUrl,
-  retailerRegion,
-  countryToRegion,
-} from "./retailers";
+import { retailerServes, retailerCountries, retailerRegion } from "./retailers";
 
-describe("looksLikeUrl (dual-intent search heuristic)", () => {
-  it("accepts full URLs and bare domains", () => {
-    expect(looksLikeUrl("https://ocado.com/products/1")).toBe(true);
-    expect(looksLikeUrl("ocado.com/products/1")).toBe(true);
-    expect(looksLikeUrl("example.com")).toBe(true);
+describe("retailerServes (Order GR1 — two-tier country geography)", () => {
+  it("home = based in that country (UK folded to GB)", () => {
+    expect(retailerServes("Ocado", "GB")).toBe("home");
+    expect(retailerServes("Ocado", "UK")).toBe("home"); // shim
+    expect(retailerServes("Tesco", "GB")).toBe("home");
+    expect(retailerServes("Whole Foods", "US")).toBe("home");
+    expect(retailerServes("Target", "US")).toBe("home");
   });
-  it("rejects natural-language queries", () => {
-    expect(looksLikeUrl("kids cereals without junk")).toBe(false);
-    expect(looksLikeUrl("hello world")).toBe(false);
+
+  it("delivers = reachable by cross-border shipping only (Koro across the EU + UK)", () => {
+    expect(retailerServes("Koro", "DE")).toBe("home");
+    expect(retailerServes("Koro", "GB")).toBe("delivers");
+    expect(retailerServes("Koro", "FR")).toBe("delivers");
+    expect(retailerServes("Koro", "US")).toBe("none"); // not in the EU delivery reach
+  });
+
+  it("none for a wrong country, unknown retailer, or missing inputs", () => {
+    expect(retailerServes("Ocado", "US")).toBe("none");
+    expect(retailerServes("Nonesuch", "US")).toBe("none");
+    expect(retailerServes(null, "US")).toBe("none");
+    expect(retailerServes("Ocado", null)).toBe("none");
+    expect(retailerServes("Ocado", "")).toBe("none");
+  });
+
+  it("is case-insensitive on the country code", () => {
+    expect(retailerServes("Ocado", "gb")).toBe("home");
+    expect(retailerServes("Koro", "fr")).toBe("delivers");
   });
 });
 
-describe("detectRetailer / isSupportedUrl", () => {
-  it("recognises supported retailers (incl. subdomains)", () => {
-    expect(detectRetailer("https://www.ocado.com/products/x")).toBe("Ocado");
-    expect(detectRetailer("https://tesco.com/groceries/x")).toBe("Tesco");
-    expect(detectRetailer("https://wholefoodsmarket.com/product/x")).toBe("Whole Foods");
-    expect(isSupportedUrl("https://target.com/p/x")).toBe(true);
-  });
-  it("returns null / false for unsupported hosts and junk", () => {
-    expect(detectRetailer("https://amazon.com/x")).toBeNull();
-    expect(detectRetailer("not a url")).toBeNull();
-    expect(isSupportedUrl("https://amazon.com/x")).toBe(false);
+describe("retailerCountries", () => {
+  it("returns home markets, empty for unknowns", () => {
+    expect(retailerCountries("Koro")).toEqual(["DE"]);
+    expect(retailerCountries("Ocado")).toEqual(["GB"]);
+    expect(retailerCountries("Nonesuch")).toEqual([]);
+    expect(retailerCountries(null)).toEqual([]);
   });
 });
 
-describe("validateUrl", () => {
-  it("rejects empties, non-URLs, wrong protocols, and unsupported retailers", () => {
-    expect(validateUrl("").ok).toBe(false);
-    expect(validateUrl("notaurl").ok).toBe(false);
-    expect(validateUrl("ftp://ocado.com").ok).toBe(false);
-    expect(validateUrl("https://amazon.com/x").ok).toBe(false);
-  });
-  it("accepts a real product link from a supported retailer", () => {
-    expect(validateUrl("https://ocado.com/products/123")).toEqual({ ok: true });
-  });
-});
-
-describe("retailerRegion / countryToRegion", () => {
-  it("maps retailers to their market", () => {
+describe("retailerRegion (legacy L7, now derived from countries)", () => {
+  it("keeps the same US/UK answers for the pasteable retailers", () => {
     expect(retailerRegion("Ocado")).toBe("UK");
+    expect(retailerRegion("Tesco")).toBe("UK");
     expect(retailerRegion("Target")).toBe("US");
     expect(retailerRegion("Whole Foods")).toBe("US");
-    expect(retailerRegion("Nope")).toBeNull();
-    expect(retailerRegion(null)).toBeNull();
+    expect(retailerRegion("Kroger")).toBe("US");
   });
-  it("maps an ISO country to a Baloo region", () => {
-    expect(countryToRegion("US")).toBe("US");
-    expect(countryToRegion("gb")).toBe("UK");
-    expect(countryToRegion("UK")).toBe("UK");
-    expect(countryToRegion("FR")).toBeNull();
-    expect(countryToRegion(null)).toBeNull();
+
+  it("is null for geo-only or unknown retailers (L7 ignores them)", () => {
+    expect(retailerRegion("Koro")).toBeNull(); // DE-based, not US/UK
+    expect(retailerRegion("Nonesuch")).toBeNull();
+    expect(retailerRegion(null)).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { SUPPORTED_RETAILERS } from "./config";
+import { SUPPORTED_RETAILERS, EXTRA_RETAILER_GEO } from "./config";
 
 export type UrlCheck = { ok: true } | { ok: false; reason: string };
 
@@ -57,8 +57,45 @@ export function isSupportedUrl(url: string): boolean {
   return detectRetailer(url) !== null;
 }
 
-// ── Region (Order L7) ─────────────────────────────────────────────────────────────────────────
-// The market a retailer serves, used to soft-rank Discover by "% available where you shop".
+// ── Retailer geography (Order GR1) ──────────────────────────────────────────────────────────────
+// One name→geography registry over the pasteable retailers PLUS geo-only ones (Koro). Countries are
+// ISO-3166 alpha-2; `deliversTo` is cross-border shipping. Source of truth for both the legacy L7
+// region soft-rank and GR2's weighted geo score.
+const RETAILER_GEO: Map<string, { countries: string[]; deliversTo: string[] }> = new Map(
+  [...SUPPORTED_RETAILERS, ...EXTRA_RETAILER_GEO].map((r) => [
+    r.name,
+    { countries: r.countries, deliversTo: r.deliversTo ?? [] },
+  ]),
+);
+
+// "UK" is not an ISO code; Vercel geolocation returns "GB". Fold it so both spellings resolve.
+function normCountry(country: string | null | undefined): string | null {
+  const cc = (country ?? "").toUpperCase();
+  if (!cc) return null;
+  return cc === "UK" ? "GB" : cc;
+}
+
+// The home countries a retailer is based in (empty when unrecognised).
+export function retailerCountries(name: string | null | undefined): string[] {
+  return (name && RETAILER_GEO.get(name)?.countries) || [];
+}
+
+export type ServeTier = "home" | "delivers" | "none";
+
+// How a retailer serves a given country: based there (home, strongest), ships there (delivers,
+// weaker), or neither. Drives GR2's weighted availability.
+export function retailerServes(name: string | null | undefined, country: string | null | undefined): ServeTier {
+  const cc = normCountry(country);
+  const geo = name ? RETAILER_GEO.get(name) : undefined;
+  if (!cc || !geo) return "none";
+  if (geo.countries.includes(cc)) return "home";
+  if (geo.deliversTo.includes(cc)) return "delivers";
+  return "none";
+}
+
+// ── Region (Order L7 — legacy binary market) ────────────────────────────────────────────────────
+// Kept for the current Discover soft-rank + region picker until GR3 rewires ranking to countries.
+// Derived from the geo registry so there's ONE source of truth (US-home → "US", GB-home → "UK").
 export type Region = "US" | "UK";
 
 export const REGIONS: { id: Region; label: string }[] = [
@@ -66,10 +103,12 @@ export const REGIONS: { id: Region; label: string }[] = [
   { id: "UK", label: "UK" },
 ];
 
-// The region a retailer name serves, or null if it isn't one we recognise.
+// The region a retailer name serves, or null if it isn't one we recognise / isn't US/UK-based.
 export function retailerRegion(name: string | null | undefined): Region | null {
-  if (!name) return null;
-  return SUPPORTED_RETAILERS.find((r) => r.name === name)?.region ?? null;
+  const countries = retailerCountries(name);
+  if (countries.includes("US")) return "US";
+  if (countries.includes("GB")) return "UK";
+  return null;
 }
 
 // Map a viewer's ISO country (from Vercel geolocation) to a Baloo region, or null when unknown.

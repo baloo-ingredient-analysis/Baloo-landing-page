@@ -16,14 +16,37 @@ export const ROUTE_MAX_DURATION = 60;
 // for tokens produced, not for the ceiling.
 export const ANALYSIS_MAX_TOKENS = 16000;
 
-// Retailers the brief commits to supporting. Used for client-side URL validation
-// and for the friendly error copy. Extend by adding to this list.
-// `region` (Order L7) is the market a retailer serves — drives Discover's "% available where you
-// shop" soft-ranking. Derived here in code (the retailer set is small + static), never stored.
-export const SUPPORTED_RETAILERS: { name: string; match: string[]; region: "US" | "UK" }[] = [
-  { name: "Whole Foods", match: ["wholefoodsmarket.com", "wholefoods.com"], region: "US" },
-  { name: "Ocado", match: ["ocado.com"], region: "UK" },
-  { name: "Tesco", match: ["tesco.com"], region: "UK" },
-  { name: "Target", match: ["target.com"], region: "US" },
-  { name: "Kroger", match: ["kroger.com"], region: "US" },
+// Retailers the brief commits to supporting. Used for client-side URL validation, the friendly
+// error copy, and the homepage hero row. Extend by adding to this list.
+// `countries` (Order GR1, ISO-3166 alpha-2 home markets) drives geo-ranking + Discover's "% available
+// where you shop". `deliversTo` (optional) is cross-border shipping — a weaker signal (GR2). Derived
+// here in code (the retailer set is small + static), never stored.
+export type RetailerGeo = { name: string; countries: string[]; deliversTo?: string[] };
+
+export const SUPPORTED_RETAILERS: (RetailerGeo & { match: string[] })[] = [
+  { name: "Whole Foods", match: ["wholefoodsmarket.com", "wholefoods.com"], countries: ["US"] },
+  { name: "Ocado", match: ["ocado.com"], countries: ["GB"] },
+  { name: "Tesco", match: ["tesco.com"], countries: ["GB"] },
+  { name: "Target", match: ["target.com"], countries: ["US"] },
+  { name: "Kroger", match: ["kroger.com"], countries: ["US"] },
 ];
+
+// EU + EEA + UK — the reach of a pan-European shipper like Koro. Kept as one constant so cross-border
+// retailers share it.
+export const EU_DELIVERY: string[] = [
+  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "GR", "HU", "IE", "IT", "LV", "LT",
+  "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "GB",
+];
+
+// Retailers we can map geographically but do NOT (yet) accept as pasteable links or show on the
+// homepage — geo-ranking only (GR1). Koro is the cross-border example (based in DE, ships across the
+// EU + UK), so the "delivers-to" tier has a real case to rank and test against. Promote an entry into
+// SUPPORTED_RETAILERS (with `match` domains) when we're ready to accept its product links.
+export const EXTRA_RETAILER_GEO: RetailerGeo[] = [
+  { name: "Koro", countries: ["DE"], deliversTo: EU_DELIVERY },
+];
+
+// Geo-ranking weights (Order GR2). One place to dial with Luna's testing.
+//  - wDel: how much a cross-border "delivers here" counts vs. a retailer based here (1.0).
+//  - lambdaFeed / lambdaSearch: how hard geo nudges the base ranking (feed strong, search light).
+export const GEO_WEIGHTS = { wDel: 0.35, lambdaFeed: 0.6, lambdaSearch: 0.2 };
