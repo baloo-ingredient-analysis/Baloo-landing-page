@@ -21,7 +21,9 @@ export async function GET(req: Request) {
     queryEmbedding = await embedText(q);
   }
 
-  const { products, lists } = await searchAll(dbi, q, 10, queryEmbedding);
+  // Viewer country from Vercel geo (country-level only, no PII) → light geo tiebreak on products (GR4).
+  const country = req.headers.get("x-vercel-ip-country");
+  const { products, lists } = await searchAll(dbi, q, 10, queryEmbedding, country);
   return NextResponse.json({
     products: products.map((p) => ({ id: p.id, name: p.name, brand: p.brand, slug: p.slug })),
     lists: lists.map((l) => ({

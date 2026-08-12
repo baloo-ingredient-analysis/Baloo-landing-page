@@ -11,6 +11,8 @@ import type { Db } from "../index";
 import { listItems, lists, profiles, products, saves, votes, type Product } from "../schema";
 import { sql } from "drizzle-orm";
 import { toVectorLiteral } from "../../embeddings";
+import { productAvailability, blendGeoRank } from "../../region";
+import { GEO_WEIGHTS } from "../../config";
 import type { ListWithCountsAndOwner } from "./lists";
 
 export type SearchResults = {
@@ -43,12 +45,18 @@ export function fuseByRank(lists: Product[][], k = 60): Product[] {
  * keyword (ILIKE) results fused with pgvector semantic results, so "dairy-free milk" finds an oat
  * drink AND "oatly" finds Oatly. Without an embedding (no OPENAI_API_KEY, or the embed failed) it's
  * pure keyword — identical to before. Lists stay keyword-only.
+ *
+ * When `country` is given (viewer's Vercel geo), product results get a LIGHT geo tiebreak (Order
+ * GR4): relevance still decides the page, geo only reorders near-equal hits (`lambdaSearch` ≪
+ * `lambdaFeed`), so a strongly-relevant non-local product still ranks first. Lists stay on pure
+ * relevance. No-op without a country.
  */
 export async function searchAll(
   dbi: Db,
   q: string,
   limitEach = 10,
   queryEmbedding?: number[] | null,
+  country?: string | null,
 ): Promise<SearchResults> {
   const term = q.trim();
   if (term.length < 2) return { products: [], lists: [] };
@@ -75,10 +83,19 @@ export async function searchAll(
       .limit(candidateN);
   }
 
-  const productRows =
+  const relevanceRanked =
     queryEmbedding && queryEmbedding.length
       ? fuseByRank([keywordProducts, semanticProducts]).slice(0, limitEach)
       : keywordProducts.slice(0, limitEach);
+
+  // GR4: light geo tiebreak on the visible page — reorders near-equal relevance, never overrides it.
+  const productRows = country
+    ? blendGeoRank(
+        relevanceRanked,
+        (p) => productAvailability(p.retailer ? [p.retailer] : [], country),
+        GEO_WEIGHTS.lambdaSearch,
+      )
+    : relevanceRanked;
 
   const listRows = await dbi
     .select({
