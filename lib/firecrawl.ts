@@ -2,10 +2,18 @@
 // Using REST directly avoids tying the build to a specific Firecrawl SDK version.
 // Returns clean markdown of the fully-rendered page, or null on failure.
 
+// Fail-fast cap (Luna's feedback): a page that can't be read should give up in ~30s, not hang toward
+// the route's 60s ceiling and make someone wait a minute for a "no". Passed to Firecrawl as its own
+// budget AND enforced client-side with an AbortController in case the HTTP call itself stalls. Set
+// above the ~10-20s a slow-but-valid product page can legitimately take, so we don't cut real scrapes.
+const SCRAPE_TIMEOUT_MS = 30_000;
+
 export async function scrapeMarkdown(url: string): Promise<string | null> {
   const apiKey = process.env.FIRECRAWL_API_KEY;
   if (!apiKey) return null;
 
+  const controller = new AbortController();
+  const abort = setTimeout(() => controller.abort(), SCRAPE_TIMEOUT_MS + 2_000);
   try {
     const res = await fetch("https://api.firecrawl.dev/v2/scrape", {
       method: "POST",
@@ -17,7 +25,9 @@ export async function scrapeMarkdown(url: string): Promise<string | null> {
         url,
         formats: ["markdown"],
         onlyMainContent: true,
+        timeout: SCRAPE_TIMEOUT_MS,
       }),
+      signal: controller.signal,
     });
 
     if (!res.ok) {
@@ -30,8 +40,11 @@ export async function scrapeMarkdown(url: string): Promise<string | null> {
     const markdown: string | undefined = data?.data?.markdown ?? data?.markdown;
     return markdown && markdown.trim().length > 0 ? markdown : null;
   } catch (err) {
+    // AbortError (our timeout) lands here too — treated like any other scrape failure.
     console.error("Firecrawl scrape error:", err);
     return null;
+  } finally {
+    clearTimeout(abort);
   }
 }
 
