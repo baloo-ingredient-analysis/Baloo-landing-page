@@ -16,7 +16,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Footer } from "@/components/Footer";
 
 const FRIENDLY_ERROR =
-  "We couldn't read that page. Try a direct product link from Whole Foods, Ocado, Tesco, Target, or Kroger.";
+  "We couldn't read that page. Some store pages block automated reading, or don't list ingredients — try a different product, or a link from another store.";
 
 type Phase = "idle" | "reading" | "analyzing" | "done" | "error";
 type Header = {
@@ -34,6 +34,17 @@ export default function Home() {
   const [header, setHeader] = useState<Header | null>(null);
   const [cached, setCached] = useState<Ingredient[] | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Bumping this remounts HomeSearch, clearing its retained URL — so "New scan" gives a truly blank
+  // box instead of forcing the user to delete the previous link by hand (Luna's feedback).
+  const [resetKey, setResetKey] = useState(0);
+
+  function handleReset() {
+    setHeader(null);
+    setCached(null);
+    setErrorMsg(null);
+    setPhase("idle");
+    setResetKey((k) => k + 1);
+  }
 
   const { object, submit, isLoading, error } = useObject({
     api: "/api/analyze",
@@ -141,8 +152,20 @@ export default function Home() {
             </div>
           )}
 
+          {!idle && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 py-1.5 text-sm font-medium text-ink shadow-card transition hover:border-natural/50 hover:text-natural focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-natural/10"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              New scan
+            </button>
+          )}
           <div className={idle ? "mt-7" : ""}>
-            <HomeSearch onAnalyze={handleAnalyze} busy={busy} />
+            <HomeSearch key={resetKey} onAnalyze={handleAnalyze} busy={busy} />
           </div>
 
           {idle && (

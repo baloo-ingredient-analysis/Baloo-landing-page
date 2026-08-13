@@ -140,9 +140,15 @@ export function ResultsView({
 }
 
 // The striking count lede (Order L1c, V3) — the number is the hero of the analysis view: it should
-// "feel striking, or give a sensation that it's clean" (Jitain). `count` is the total from extract,
-// known up-front so the big number is there immediately even mid-stream; natural/processed grow as
-// tags stream in. Counts are computed HERE in code; the model never counts (CLAUDE.md).
+// "feel striking, or give a sensation that it's clean" (Jitain). Counts are computed HERE in code;
+// the model never counts (CLAUDE.md).
+//
+// The hero number MUST match the list the reader sees. `count` (from extract) is only the initial
+// placeholder shown before any ingredient has streamed in; once rows arrive, the analysed list is the
+// source of truth. They can differ when the analyser splits a compound ingredient (e.g. a single
+// "Live Cultures (…)" label into its 3 named cultures) — which previously left the hero saying "2"
+// while the list + the natural/processed tally showed 4. Deriving from `ingredients` keeps all three
+// in agreement.
 function CountLede({
   count,
   ingredients,
@@ -156,16 +162,17 @@ function CountLede({
 }) {
   const natural = ingredients.filter((i) => i.tag === "Natural").length;
   const processed = ingredients.filter((i) => i.tag === "Processed").length;
+  const shown = ingredients.length > 0 ? ingredients.length : count;
 
   return (
     <div className="mt-6">
       <div className="flex items-end gap-3">
         <span className="font-display text-[52px] leading-[0.82] text-natural tabular-nums sm:text-[58px]">
-          {count}
+          {shown}
         </span>
         <div className="pb-1.5">
           <p className="font-display text-xl leading-tight text-ink sm:text-[23px]">
-            {count === 1 ? "ingredient" : "ingredients"} in this product
+            {shown === 1 ? "ingredient" : "ingredients"} in this product
           </p>
           <p className="mt-1 text-sm tabular-nums text-muted">
             In label order — {natural} natural, {processed} processed

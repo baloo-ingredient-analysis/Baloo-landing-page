@@ -52,8 +52,11 @@ root files; blank skeletons to reset or seed new ones are in `docs/templates/`.
   4096 truncates long ingredient lists, the object never validates, and the `after()` persist is
   silently lost. Do not remove it.
 - Every failure shows ONE friendly message, never a raw error:
-  "We couldn't read that page. Try a direct product link from Whole Foods, Ocado, Tesco, Target,
-  or Kroger."
+  "We couldn't read that page. Some store pages block automated reading, or don't list ingredients —
+  try a different product, or a link from another store." (Honest per Luna's testing: some supported
+  retailers — Tesco especially — hard-block the scraper, so the copy must NOT promise a named retailer
+  will work. The structural fix is the barcode/Open Food Facts capture path (engine convergence with
+  the mobile app), which sidesteps retailer scraping entirely.)
 
 ## Data layer (Phase 2 — scan logging)
 - On every SUCCESSFUL analysis, `lib/stats.ts` logs a scan to Upstash: a capped "recent scans" list
