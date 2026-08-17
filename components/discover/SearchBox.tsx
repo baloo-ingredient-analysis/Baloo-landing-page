@@ -225,7 +225,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
                     src={c.image}
                     alt=""
                     loading="lazy"
-                    className="h-[42px] w-[42px] shrink-0 rounded-lg bg-canvas object-cover"
+                    className="h-[42px] w-[42px] shrink-0 rounded-lg border border-line bg-white object-contain p-1"
                   />
                 ) : (
                   <span
