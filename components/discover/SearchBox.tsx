@@ -27,14 +27,16 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
-  const [analyzing, setAnalyzing] = useState<string | null>(null); // barcode currently importing
+  // The product currently being imported/analysed (barcode + name), so we can show a full "analysing"
+  // screen instead of just a tiny button spinner during the ~10-30s Claude call.
+  const [analyzing, setAnalyzing] = useState<{ barcode: string; name: string } | null>(null);
   const [offErr, setOffErr] = useState<string | null>(null);
   const first = useRef(true);
 
   // Analyse a specific Open Food Facts product on demand: import it (analyse once, cache), then go
   // to its page. Picking a candidate is exact, so we pass the barcode, not the query.
-  async function analyseCandidate(barcode: string) {
-    setAnalyzing(barcode);
+  async function analyseCandidate(barcode: string, name: string) {
+    setAnalyzing({ barcode, name });
     setOffErr(null);
     try {
       const res = await fetch("/api/off/lookup", {
@@ -45,16 +47,16 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
       const data = await res.json();
       if (res.ok && data.ok && data.slug) {
         router.push(`/p/${data.slug}`);
-        return;
+        return; // keep the analysing screen up through navigation (don't flash the list back)
       }
       setOffErr(
         res.status === 404
           ? "That product has no ingredient list on Open Food Facts."
           : "We couldn't analyse that right now. Please try again in a moment.",
       );
+      setAnalyzing(null);
     } catch {
       setOffErr("We couldn't analyse that right now. Please try again in a moment.");
-    } finally {
       setAnalyzing(null);
     }
   }
@@ -100,12 +102,33 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
+        disabled={analyzing !== null}
         aria-label="Search products and lists"
         placeholder="Search products and lists…"
-        className="w-full rounded-full border border-line bg-paper px-5 py-3 text-ink shadow-card outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20"
+        className="w-full rounded-full border border-line bg-paper px-5 py-3 text-ink shadow-card outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20 disabled:opacity-60"
       />
 
-      {loading && (
+      {/* Analysing screen — a full, animated state while the ~10-30s import + Claude call runs, so it
+          never feels frozen. Stays up through the redirect to the product page. */}
+      {analyzing && (
+        <div className="mt-12 flex flex-col items-center gap-5 text-center animate-fade-in" role="status" aria-live="polite">
+          <span className="relative flex h-14 w-14 items-center justify-center" aria-hidden>
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-natural/20" />
+            <span className="absolute inline-flex h-9 w-9 animate-pulse rounded-full bg-natural/15" />
+            <span className="relative h-7 w-7 animate-spin rounded-full border-2 border-line border-t-natural" />
+          </span>
+          <div>
+            <p className="font-display text-[22px] leading-tight text-ink">
+              Analysing {analyzing.name}…
+            </p>
+            <p className="mt-1.5 text-sm text-muted">
+              This takes a few seconds — we&rsquo;re reading the label and explaining every ingredient.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!analyzing && loading && (
         <p className="mt-4 flex items-center gap-2 text-sm text-muted">
           <span
             aria-hidden
@@ -115,7 +138,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
         </p>
       )}
 
-      {searched && !loading && hits && (nP > 0 || nL > 0) && (
+      {!analyzing && searched && !loading && hits && (nP > 0 || nL > 0) && (
         <div className="mt-5 animate-fade-in">
           <p className="text-sm tabular-nums text-muted">
             {nP + nL} {nP + nL === 1 ? "result" : "results"}
@@ -188,7 +211,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
 
       {/* The whole Open Food Facts database — products not in our catalog yet. Picking one analyses
           it on demand and adds it to the catalog. Shows alongside catalog results, not only on a miss. */}
-      {searched && !loading && showOff && (
+      {!analyzing && searched && !loading && showOff && (
         <div className="mt-6 animate-fade-in">
           <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
             Analyse from Open Food Facts
@@ -202,17 +225,11 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
                 </span>
                 <button
                   type="button"
-                  onClick={() => analyseCandidate(c.barcode)}
+                  onClick={() => analyseCandidate(c.barcode, c.name)}
                   disabled={analyzing !== null}
                   className="inline-flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-paper transition hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {analyzing === c.barcode && (
-                    <span
-                      aria-hidden
-                      className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-paper/40 border-t-paper"
-                    />
-                  )}
-                  {analyzing === c.barcode ? "Analysing…" : "Analyse"}
+                  Analyse
                 </button>
               </li>
             ))}
@@ -228,7 +245,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
         </div>
       )}
 
-      {empty && (
+      {!analyzing && empty && (
         <div className="mt-5 max-w-[640px] animate-fade-in rounded-2xl border border-line bg-paper p-5 shadow-card">
           <p className="text-sm text-ink">No matches for &quot;{q.trim()}&quot;.</p>
           <p className="mt-1 text-sm text-muted">
