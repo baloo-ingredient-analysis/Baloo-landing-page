@@ -87,6 +87,27 @@ describe("parseOffIngredients", () => {
     ]);
   });
 
+  it("flattens compound ingredients to their real sub-ingredients (no vague 'mix of…')", () => {
+    const doritos = {
+      ingredients: [
+        { text: "Corn flour", percent: 68.7 },
+        { text: "Corn oil" },
+        {
+          text: "Mix of cheese-flavoured ingredients",
+          ingredients: [
+            { text: "Maltodextrin" },
+            { text: "Salt", percent: 0.7 },
+            { text: "Flavours", ingredients: [{ text: "Milk" }] }, // nested-in-nested
+          ],
+        },
+      ],
+    };
+    const ing = parseOffIngredients(doritos, "en");
+    expect(ing.map((i) => i.name)).toEqual(["Corn flour", "Corn oil", "Maltodextrin", "Salt", "Milk"]);
+    expect(ing[0].percent).toBe("68.7%");
+    expect(ing[3].percent).toBe("0.7%");
+  });
+
   it("REJECTS a product with no English/Spanish ingredient text (no i18n yet)", () => {
     const greek = {
       lang: "el",

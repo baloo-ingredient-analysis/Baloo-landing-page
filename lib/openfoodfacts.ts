@@ -72,11 +72,20 @@ function splitIngredientText(text: string): OffIngredient[] {
     .filter((i) => i.name);
 }
 
+// FLATTEN compound ingredients to their real sub-ingredients (label order preserved). OFF nests the
+// components of a compound under it — "Mix of cheese-flavoured ingredients" carries 19 nested items
+// (maltodextrin, whey, salt…). The vague group name tells you nothing, so we drop it and emit its
+// specifics instead; recurses for nested compounds. Plain ingredients (no nesting) pass through.
 function fromStructured(arr: unknown): OffIngredient[] {
   if (!Array.isArray(arr)) return [];
   const out: OffIngredient[] = [];
   for (const it of arr) {
     if (!it || typeof it !== "object") continue;
+    const nested = (it as { ingredients?: unknown }).ingredients;
+    if (Array.isArray(nested) && nested.length) {
+      out.push(...fromStructured(nested)); // compound → its specific components
+      continue;
+    }
     const name = String((it as { text?: unknown }).text ?? "").trim();
     if (!name) continue;
     const pctRaw = (it as { percent?: unknown }).percent;
