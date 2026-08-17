@@ -14,7 +14,7 @@ import { ProductRow, RowChevron } from "@/components/ProductRow";
 type Hit = {
   products: { id: string; name: string; brand: string | null; slug: string }[];
   lists: { id: string; slug: string; title: string; itemCount: number; ownerHandle: string | null }[];
-  off: { barcode: string; name: string; brand: string | null; image: string | null }[];
+  off: { barcode: string; name: string; brand: string | null }[];
 };
 
 type Filter = "all" | "products" | "lists";
@@ -219,22 +219,12 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
           <ul className="mt-2 max-w-[760px] overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
             {hits!.off.map((c) => (
               <li key={c.barcode} className="flex items-center gap-3 px-4 py-3">
-                {c.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={c.image}
-                    alt=""
-                    loading="lazy"
-                    className="h-[42px] w-[42px] shrink-0 rounded-lg border border-line bg-white object-contain p-1"
-                  />
-                ) : (
-                  <span
-                    aria-hidden
-                    className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg bg-canvas font-display text-lg text-ink/30"
-                  >
-                    {(c.brand ?? c.name)[0]?.toUpperCase()}
-                  </span>
-                )}
+                <span
+                  aria-hidden
+                  className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg bg-canvas font-display text-lg text-ink/30"
+                >
+                  {(c.brand ?? c.name)[0]?.toUpperCase()}
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-display text-[17px] leading-tight text-ink">{c.name}</span>
                   {c.brand && <span className="block truncate text-xs text-muted">{c.brand}</span>}

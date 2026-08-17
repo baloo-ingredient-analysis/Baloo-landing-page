@@ -210,19 +210,17 @@ export async function getOffProductByBarcode(barcode: string): Promise<OffProduc
 // A lightweight search hit — enough to pick a product, then hydrate the full one by barcode. We use
 // OFF's dedicated search service (search-a-licious): ~10x faster than the legacy cgi/search.pl, better
 // ranked, and it returns clean JSON (search.pl intermittently returns an HTML error page).
-export type OffCandidate = { barcode: string; name: string; brand: string | null; image: string | null };
+export type OffCandidate = { barcode: string; name: string; brand: string | null };
 
 const OFF_SEARCH = "https://search.openfoodfacts.org/search";
 
-/** Search OFF by name, best first — barcode + name (+ thumbnail) candidates. Hydrate a choice via
- *  getOffProductByBarcode. Images come from images.openfoodfacts.org (allowed in the CSP img-src). */
+/** Search OFF by name, best first — barcode + name candidates. Hydrate a choice via getOffProductByBarcode. */
 export async function searchOffCandidates(query: string, limit = 5): Promise<OffCandidate[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   const url =
     `${OFF_SEARCH}?q=${encodeURIComponent(q)}` +
-    `&page_size=${Math.min(limit, 25)}` +
-    `&fields=code,product_name,product_name_en,brands,image_front_small_url,image_small_url,image_url`;
+    `&page_size=${Math.min(limit, 25)}&fields=code,product_name,product_name_en,brands`;
   const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
   if (!data || !Array.isArray(data.hits)) return [];
   const out: OffCandidate[] = [];
@@ -234,12 +232,7 @@ export async function searchOffCandidates(query: string, limit = 5): Promise<Off
     const brand = Array.isArray(brands)
       ? (typeof brands[0] === "string" ? brands[0] : null)
       : firstOf(brands);
-    const image =
-      (typeof h.image_front_small_url === "string" && h.image_front_small_url) ||
-      (typeof h.image_small_url === "string" && h.image_small_url) ||
-      (typeof h.image_url === "string" && h.image_url) ||
-      null;
-    out.push({ barcode, name, brand, image });
+    out.push({ barcode, name, brand });
     if (out.length >= limit) break;
   }
   return out;
