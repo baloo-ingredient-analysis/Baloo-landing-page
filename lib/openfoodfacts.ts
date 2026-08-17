@@ -229,42 +229,69 @@ export type OffCandidate = { barcode: string; name: string; brand: string | null
 
 const OFF_SEARCH = "https://search.openfoodfacts.org/search";
 
+// Map a viewer's ISO country (Vercel geo) to the country name OFF tags products with (as produced by
+// cleanTags: lowercased, dashes → spaces). Used to prefer the product's local version, since the same
+// product's ingredients differ by market. Only the markets we care about; unknown → no preference.
+const COUNTRY_TAG: Record<string, string> = {
+  ES: "spain", GB: "united kingdom", UK: "united kingdom", US: "united states",
+  FR: "france", DE: "germany", IT: "italy", PT: "portugal", NL: "netherlands",
+  BE: "belgium", IE: "ireland", AT: "austria", CH: "switzerland", PL: "poland",
+  MX: "mexico", AR: "argentina", CO: "colombia", CL: "chile",
+};
+
 /** Search OFF by name, best first — barcode + name candidates. English/Spanish products only (Baloo
- *  has no i18n), and deduped so five near-identical "Coca Cola Zero" entries collapse to one. Hydrate
- *  a choice via getOffProductByBarcode. */
-export async function searchOffCandidates(query: string, limit = 5): Promise<OffCandidate[]> {
+ *  has no i18n), and deduped so five near-identical "Coca Cola Zero" entries collapse to one. When a
+ *  `country` (ISO, from Vercel geo) is given, the product's LOCAL version is preferred — since the
+ *  same product's ingredients differ by market — as a soft nudge (local first, then the rest), so the
+ *  version kept through dedup is the one sold where the user is. Hydrate a choice via
+ *  getOffProductByBarcode. */
+export async function searchOffCandidates(
+  query: string,
+  limit = 5,
+  country?: string | null,
+): Promise<OffCandidate[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   // Over-fetch: language filtering + dedup shrink the list, so ask for more than we need.
   const url =
     `${OFF_SEARCH}?q=${encodeURIComponent(q)}` +
-    `&page_size=25&fields=code,product_name,product_name_en,brands,lang`;
+    `&page_size=25&fields=code,product_name,product_name_en,brands,lang,countries_tags`;
   const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
   if (!data || !Array.isArray(data.hits)) return [];
 
-  const out: OffCandidate[] = [];
-  const seen = new Set<string>();
-  for (const h of data.hits) {
+  const localName = country ? COUNTRY_TAG[country.toUpperCase()] ?? null : null;
+
+  // First pass: keep English/Spanish hits, flagging which are sold in the viewer's country.
+  const rows: { c: OffCandidate; isLocal: boolean; i: number }[] = [];
+  data.hits.forEach((h, i) => {
     const lang = typeof h.lang === "string" ? h.lang : "";
-    if (lang !== "en" && lang !== "es") continue; // English/Spanish only
+    if (lang !== "en" && lang !== "es") return; // English/Spanish only
 
     const barcode = String(h.code ?? "").replace(/\D/g, "");
     const name = String(h.product_name_en || h.product_name || "").replace(/\s+/g, " ").trim();
-    if (barcode.length < 8 || !name) continue;
+    if (barcode.length < 8 || !name) return;
 
     const brands = h.brands;
     const brand = Array.isArray(brands)
       ? (typeof brands[0] === "string" ? brands[0] : null)
       : firstOf(brands);
+    const isLocal = Boolean(localName && cleanTags(h.countries_tags).includes(localName));
+    rows.push({ c: { barcode, name, brand }, isLocal, i });
+  });
 
-    // Collapse duplicate entries of the same product (different barcodes/countries/contributors). OFF
-    // brands are inconsistent, so dedupe on the normalised NAME alone — "Coca cola zero", "Coca-Cola
-    // zero" and "Coca Cola Zero" all fold to one.
-    const key = normalizeName(name);
+  // Soft geo nudge: local versions first, OFF's relevance order preserved within each group.
+  rows.sort((a, b) => Number(b.isLocal) - Number(a.isLocal) || a.i - b.i);
+
+  // Collapse duplicate entries of the same product (different barcodes/countries/contributors). OFF
+  // brands are inconsistent, so dedupe on the normalised NAME alone — and because local is sorted
+  // first, the version kept is the local one when it exists.
+  const out: OffCandidate[] = [];
+  const seen = new Set<string>();
+  for (const { c } of rows) {
+    const key = normalizeName(c.name);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-
-    out.push({ barcode, name, brand });
+    out.push(c);
     if (out.length >= limit) break;
   }
   return out;

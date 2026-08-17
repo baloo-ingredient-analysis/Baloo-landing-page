@@ -30,9 +30,10 @@ export async function GET(req: Request) {
   const country = req.headers.get("x-vercel-ip-country");
 
   // Catalog + OFF in parallel — OFF is a fast public service and optional-infra (returns [] on failure).
+  // OFF candidates prefer the viewer's local market (same product, different ingredients per country).
   const [{ products, lists }, offRaw] = await Promise.all([
     searchAll(dbi, q, 10, queryEmbedding, country),
-    searchOffCandidates(q, 8),
+    searchOffCandidates(q, 8, country),
   ]);
 
   // Don't show an OFF candidate we already have in the catalog (dedupe by barcode).
