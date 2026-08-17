@@ -14,6 +14,7 @@ import { ProductRow, RowChevron } from "@/components/ProductRow";
 type Hit = {
   products: { id: string; name: string; brand: string | null; slug: string }[];
   lists: { id: string; slug: string; title: string; itemCount: number; ownerHandle: string | null }[];
+  off: { barcode: string; name: string; brand: string | null }[];
 };
 
 type Filter = "all" | "products" | "lists";
@@ -26,39 +27,40 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
-  const [off, setOff] = useState<{ state: "idle" | "loading" | "error"; msg?: string }>({ state: "idle" });
+  const [analyzing, setAnalyzing] = useState<string | null>(null); // barcode currently importing
+  const [offErr, setOffErr] = useState<string | null>(null);
   const first = useRef(true);
 
-  // Catalog miss → look the product up in Open Food Facts, analyse once, and go to its page.
-  async function analyseFromOff() {
-    const query = q.trim();
-    if (query.length < 2) return;
-    setOff({ state: "loading" });
+  // Analyse a specific Open Food Facts product on demand: import it (analyse once, cache), then go
+  // to its page. Picking a candidate is exact, so we pass the barcode, not the query.
+  async function analyseCandidate(barcode: string) {
+    setAnalyzing(barcode);
+    setOffErr(null);
     try {
       const res = await fetch("/api/off/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ barcode }),
       });
       const data = await res.json();
       if (res.ok && data.ok && data.slug) {
         router.push(`/p/${data.slug}`);
         return;
       }
-      setOff({
-        state: "error",
-        msg:
-          res.status === 404
-            ? "We couldn't find that in Open Food Facts either — try a more specific name."
-            : "We couldn't analyse that right now. Please try again in a moment.",
-      });
+      setOffErr(
+        res.status === 404
+          ? "That product has no ingredient list on Open Food Facts."
+          : "We couldn't analyse that right now. Please try again in a moment.",
+      );
     } catch {
-      setOff({ state: "error", msg: "We couldn't analyse that right now. Please try again in a moment." });
+      setOffErr("We couldn't analyse that right now. Please try again in a moment.");
+    } finally {
+      setAnalyzing(null);
     }
   }
 
   useEffect(() => {
-    setOff({ state: "idle" }); // a new query clears any prior OFF result/error
+    setOffErr(null); // a new query clears any prior OFF error
     if (first.current) first.current = false;
     else {
       const url = q.trim() ? `${basePath}?q=${encodeURIComponent(q.trim())}` : basePath;
@@ -77,7 +79,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         setHits(await res.json());
       } catch {
-        setHits({ products: [], lists: [] });
+        setHits({ products: [], lists: [], off: [] });
       }
       setSearched(true);
       setLoading(false);
@@ -87,9 +89,11 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
 
   const nP = hits?.products.length ?? 0;
   const nL = hits?.lists.length ?? 0;
-  const empty = searched && !loading && nP === 0 && nL === 0;
+  const nOff = hits?.off?.length ?? 0;
+  const empty = searched && !loading && nP === 0 && nL === 0 && nOff === 0;
   const showLists = filter !== "products" && nL > 0;
   const showProducts = filter !== "lists" && nP > 0;
+  const showOff = filter !== "lists" && nOff > 0; // OFF candidates are products
 
   return (
     <div>
@@ -182,31 +186,55 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
         </div>
       )}
 
-      {empty && (
-        <div className="mt-5 max-w-[640px] animate-fade-in rounded-2xl border border-line bg-paper p-5 shadow-card">
-          <p className="text-sm text-ink">Not in our catalog yet — no matches for &quot;{q.trim()}&quot;.</p>
-          <p className="mt-1 text-sm text-muted">
-            We can look it up in Open Food Facts and break down its ingredients for you.
+      {/* The whole Open Food Facts database — products not in our catalog yet. Picking one analyses
+          it on demand and adds it to the catalog. Shows alongside catalog results, not only on a miss. */}
+      {searched && !loading && showOff && (
+        <div className="mt-6 animate-fade-in">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+            Analyse from Open Food Facts
+          </h2>
+          <ul className="mt-2 max-w-[760px] overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
+            {hits!.off.map((c) => (
+              <li key={c.barcode} className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="min-w-0">
+                  <span className="block truncate font-display text-[17px] text-ink">{c.name}</span>
+                  {c.brand && <span className="block truncate text-xs text-muted">{c.brand}</span>}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => analyseCandidate(c.barcode)}
+                  disabled={analyzing !== null}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-paper transition hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {analyzing === c.barcode && (
+                    <span
+                      aria-hidden
+                      className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-paper/40 border-t-paper"
+                    />
+                  )}
+                  {analyzing === c.barcode ? "Analysing…" : "Analyse"}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-muted">
+            Live from Open Food Facts — we&rsquo;ll break it down and add it to the catalog.
           </p>
-          <button
-            type="button"
-            onClick={analyseFromOff}
-            disabled={off.state === "loading"}
-            className="mt-3 inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-paper transition hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {off.state === "loading" && (
-              <span
-                aria-hidden
-                className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-paper/40 border-t-paper"
-              />
-            )}
-            {off.state === "loading" ? "Looking it up…" : `Analyse "${q.trim()}"`}
-          </button>
-          {off.state === "error" && off.msg && (
+          {offErr && (
             <p className="mt-2 text-sm text-processed" role="alert">
-              {off.msg}
+              {offErr}
             </p>
           )}
+        </div>
+      )}
+
+      {empty && (
+        <div className="mt-5 max-w-[640px] animate-fade-in rounded-2xl border border-line bg-paper p-5 shadow-card">
+          <p className="text-sm text-ink">No matches for &quot;{q.trim()}&quot;.</p>
+          <p className="mt-1 text-sm text-muted">
+            We couldn&rsquo;t find it in our catalog or on Open Food Facts — try a more specific name or
+            brand.
+          </p>
         </div>
       )}
     </div>
