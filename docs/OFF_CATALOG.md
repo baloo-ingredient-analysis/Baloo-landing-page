@@ -27,7 +27,7 @@ public API (no key; descriptive User-Agent; optional-infra — any failure retur
 shape (barcode, name, brand, quantity, ordered ingredients + %, `Nutrition`, image, stores, countries).
 Unit-tested against a fixture; verified live against a real barcode.
 
-### OFF2 — Import an OFF product into the catalog
+### OFF2 — Import an OFF product into the catalog — ✅ done
 `importOffProduct(barcodeOrQuery)`: map → build the analyser input from OFF's ingredient list → run
 `analyseIngredients` (reuses the existing engine, skipping scrape/extract since OFF is already
 structured) → `ingestAnalysis` (canonical_key = `barcode:<code>`). Nutrition passed straight through.
