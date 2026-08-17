@@ -71,14 +71,22 @@ export async function importOffByBarcode(barcode: string): Promise<ImportResult>
   return importOffMapped(dbi, off);
 }
 
-/** Import the best name match (the web's search-miss path): search for candidates, hydrate the top
- *  one by barcode (so we get the full structured ingredients + nutrition), then import. */
+/** Import the best name match (the web's search-miss path): search for candidates and import the
+ *  first that actually carries an ingredient list. The top hit often lacks ingredients (a photo-only
+ *  OFF entry), so we walk the ranked candidates rather than giving up on the first. */
 export async function importOffByQuery(query: string): Promise<ImportResult> {
   const dbi = db();
   if (!dbi) return { ok: false, reason: "no_db" };
-  const [top] = await searchOffCandidates(query, 5);
-  if (!top) return { ok: false, reason: "not_found" };
-  const off = await getOffProductByBarcode(top.barcode);
-  if (!off) return { ok: false, reason: "not_found" };
-  return importOffMapped(dbi, off);
+  const candidates = await searchOffCandidates(query, 6);
+  if (!candidates.length) return { ok: false, reason: "not_found" };
+
+  let sawCandidate = false;
+  for (const c of candidates) {
+    const off = await getOffProductByBarcode(c.barcode);
+    if (!off) continue;
+    sawCandidate = true;
+    if (off.ingredients.length) return importOffMapped(dbi, off); // first with ingredients wins
+  }
+  // Found products but none listed ingredients (vs. matched nothing at all).
+  return { ok: false, reason: sawCandidate ? "no_ingredients" : "not_found" };
 }

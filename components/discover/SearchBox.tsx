@@ -18,7 +18,7 @@ type Hit = {
 
 type Filter = "all" | "products" | "lists";
 
-export function SearchBox() {
+export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [q, setQ] = useState(searchParams.get("q") ?? "");
@@ -61,7 +61,7 @@ export function SearchBox() {
     setOff({ state: "idle" }); // a new query clears any prior OFF result/error
     if (first.current) first.current = false;
     else {
-      const url = q.trim() ? `/discover?q=${encodeURIComponent(q.trim())}` : "/discover";
+      const url = q.trim() ? `${basePath}?q=${encodeURIComponent(q.trim())}` : basePath;
       router.replace(url, { scroll: false });
     }
 
@@ -83,7 +83,7 @@ export function SearchBox() {
       setLoading(false);
     }, 250);
     return () => clearTimeout(t);
-  }, [q, router]);
+  }, [q, router, basePath]);
 
   const nP = hits?.products.length ?? 0;
   const nL = hits?.lists.length ?? 0;
