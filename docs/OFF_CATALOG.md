@@ -39,7 +39,9 @@ Records OFF `stores` as offers where recognised. Never re-analyses a known barco
 - `scripts/seed-off.ts` (`npm run db:seed-off`): bulk-import a curated list of popular UK/ES barcodes so
   search feels full on day one. Dry-run by default; respects OFF rate limits.
 
-### OFF4 — Search as the front door + verify + docs
+### OFF4 — Search as the front door + verify + docs — ✅ done
+(SearchBox OFF fallback shipped; homepage hero left as-is — a search-first hero rewrite is a design/
+Jitain call, not made unilaterally. The dual-intent box already routes text search to /discover.)
 Make search the primary homepage action (the dual-intent box already exists); the paste-link path
 becomes the secondary "add by name/image". Verify end to end; update ARCHITECTURE.md + CHANGELOG.md.
 

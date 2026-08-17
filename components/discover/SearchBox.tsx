@@ -2,8 +2,9 @@
 
 // Discover search (Order G5, restyled per the D-G5 handoff §4): debounced /api/search with ?q=
 // URL state, a segmented All/Products/Lists filter, tabular count line, brand-initial thumbnails,
-// and — on a miss — the discovery→ingestion bridge ("paste the product link and we'll read the
-// label for you").
+// and — on a catalog miss — the OFF fallback (Order OFF4): look the product up in Open Food Facts,
+// analyse it once, and jump to its page. This replaced the old "paste the product link" bridge now
+// that scraping retailers is a dead end.
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -25,9 +26,39 @@ export function SearchBox() {
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  const [off, setOff] = useState<{ state: "idle" | "loading" | "error"; msg?: string }>({ state: "idle" });
   const first = useRef(true);
 
+  // Catalog miss → look the product up in Open Food Facts, analyse once, and go to its page.
+  async function analyseFromOff() {
+    const query = q.trim();
+    if (query.length < 2) return;
+    setOff({ state: "loading" });
+    try {
+      const res = await fetch("/api/off/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok && data.slug) {
+        router.push(`/p/${data.slug}`);
+        return;
+      }
+      setOff({
+        state: "error",
+        msg:
+          res.status === 404
+            ? "We couldn't find that in Open Food Facts either — try a more specific name."
+            : "We couldn't analyse that right now. Please try again in a moment.",
+      });
+    } catch {
+      setOff({ state: "error", msg: "We couldn't analyse that right now. Please try again in a moment." });
+    }
+  }
+
   useEffect(() => {
+    setOff({ state: "idle" }); // a new query clears any prior OFF result/error
     if (first.current) first.current = false;
     else {
       const url = q.trim() ? `/discover?q=${encodeURIComponent(q.trim())}` : "/discover";
@@ -153,17 +184,29 @@ export function SearchBox() {
 
       {empty && (
         <div className="mt-5 max-w-[640px] animate-fade-in rounded-2xl border border-line bg-paper p-5 shadow-card">
-          <p className="text-sm text-ink">No matches for &quot;{q.trim()}&quot;.</p>
+          <p className="text-sm text-ink">Not in our catalog yet — no matches for &quot;{q.trim()}&quot;.</p>
           <p className="mt-1 text-sm text-muted">
-            Try a product name or a retailer. Or paste the product link on the home tool and
-            we&apos;ll read the label for you.
+            We can look it up in Open Food Facts and break down its ingredients for you.
           </p>
-          <Link
-            href="/"
-            className="mt-3 inline-block rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-paper transition hover:bg-ink/85"
+          <button
+            type="button"
+            onClick={analyseFromOff}
+            disabled={off.state === "loading"}
+            className="mt-3 inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-paper transition hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Analyse a product link
-          </Link>
+            {off.state === "loading" && (
+              <span
+                aria-hidden
+                className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-paper/40 border-t-paper"
+              />
+            )}
+            {off.state === "loading" ? "Looking it up…" : `Analyse "${q.trim()}"`}
+          </button>
+          {off.state === "error" && off.msg && (
+            <p className="mt-2 text-sm text-processed" role="alert">
+              {off.msg}
+            </p>
+          )}
         </div>
       )}
     </div>
