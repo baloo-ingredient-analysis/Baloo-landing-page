@@ -33,7 +33,7 @@ Unit-tested against a fixture; verified live against a real barcode.
 structured) → `ingestAnalysis` (canonical_key = `barcode:<code>`). Nutrition passed straight through.
 Records OFF `stores` as offers where recognised. Never re-analyses a known barcode (catalog short-circuit).
 
-### OFF3 — Wire OFF into search + a seed script
+### OFF3 — Wire OFF into search + a seed script — ✅ done
 - On a catalog **miss**, optionally do a live OFF **name** lookup → import the top confident match →
   return it (so coverage isn't limited to what's pre-seeded).
 - `scripts/seed-off.ts` (`npm run db:seed-off`): bulk-import a curated list of popular UK/ES barcodes so

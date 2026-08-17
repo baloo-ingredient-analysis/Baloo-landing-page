@@ -6,7 +6,7 @@
 //
 // Optional-infra: no DB or no ANTHROPIC_API_KEY -> a typed failure, never a throw. See docs/OFF_CATALOG.md.
 
-import { getOffProductByBarcode, searchOffProducts, type OffProduct } from "./openfoodfacts";
+import { getOffProductByBarcode, searchOffCandidates, type OffProduct } from "./openfoodfacts";
 import { analyseIngredients } from "./analysis/pipeline";
 import { ingestAnalysis } from "./ingest";
 import { canonicalKey } from "./canonical";
@@ -71,11 +71,14 @@ export async function importOffByBarcode(barcode: string): Promise<ImportResult>
   return importOffMapped(dbi, off);
 }
 
-/** Import the best name match (the web's search-miss path). */
+/** Import the best name match (the web's search-miss path): search for candidates, hydrate the top
+ *  one by barcode (so we get the full structured ingredients + nutrition), then import. */
 export async function importOffByQuery(query: string): Promise<ImportResult> {
   const dbi = db();
   if (!dbi) return { ok: false, reason: "no_db" };
-  const [best] = await searchOffProducts(query, 1);
-  if (!best) return { ok: false, reason: "not_found" };
-  return importOffMapped(dbi, best);
+  const [top] = await searchOffCandidates(query, 5);
+  if (!top) return { ok: false, reason: "not_found" };
+  const off = await getOffProductByBarcode(top.barcode);
+  if (!off) return { ok: false, reason: "not_found" };
+  return importOffMapped(dbi, off);
 }

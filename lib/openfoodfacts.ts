@@ -207,20 +207,33 @@ export async function getOffProductByBarcode(barcode: string): Promise<OffProduc
   return mapOffProduct(data.product);
 }
 
-/** Search OFF by name, best first. Only returns products that carry an ingredient list. */
-export async function searchOffProducts(query: string, limit = 5): Promise<OffProduct[]> {
+// A lightweight search hit — enough to pick a product, then hydrate the full one by barcode. We use
+// OFF's dedicated search service (search-a-licious): ~10x faster than the legacy cgi/search.pl, better
+// ranked, and it returns clean JSON (search.pl intermittently returns an HTML error page).
+export type OffCandidate = { barcode: string; name: string; brand: string | null };
+
+const OFF_SEARCH = "https://search.openfoodfacts.org/search";
+
+/** Search OFF by name, best first — barcode + name candidates. Hydrate a choice via getOffProductByBarcode. */
+export async function searchOffCandidates(query: string, limit = 5): Promise<OffCandidate[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   const url =
-    `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(q)}` +
-    `&search_simple=1&action=process&json=1&page_size=${Math.min(limit * 3, 30)}&fields=${FIELDS}`;
-  const data = (await offFetch(url)) as { products?: Record<string, unknown>[] } | null;
-  if (!data || !Array.isArray(data.products)) return [];
-  const mapped: OffProduct[] = [];
-  for (const p of data.products) {
-    const m = mapOffProduct(p);
-    if (m && m.ingredients.length) mapped.push(m); // no ingredients = nothing to analyse
-    if (mapped.length >= limit) break;
+    `${OFF_SEARCH}?q=${encodeURIComponent(q)}` +
+    `&page_size=${Math.min(limit, 25)}&fields=code,product_name,product_name_en,brands`;
+  const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
+  if (!data || !Array.isArray(data.hits)) return [];
+  const out: OffCandidate[] = [];
+  for (const h of data.hits) {
+    const barcode = String(h.code ?? "").replace(/\D/g, "");
+    const name = String(h.product_name_en || h.product_name || "").trim();
+    if (barcode.length < 8 || !name) continue;
+    const brands = h.brands;
+    const brand = Array.isArray(brands)
+      ? (typeof brands[0] === "string" ? brands[0] : null)
+      : firstOf(brands);
+    out.push({ barcode, name, brand });
+    if (out.length >= limit) break;
   }
-  return mapped;
+  return out;
 }

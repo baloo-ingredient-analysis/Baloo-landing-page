@@ -25,6 +25,9 @@ const LIMITS = {
   productsAnalyze: { tokens: 10, window: "60 s" },
   // Semantic search (SS3) — embeds the query (a small paid call), keyed by IP. Generous for typing.
   search: { tokens: 30, window: "60 s" },
+  // OFF live-lookup: a catalog miss that pulls a product from Open Food Facts and analyses it once.
+  // Paid path (one Claude call on a new product), so keep it modest per IP.
+  offLookup: { tokens: 10, window: "60 s" },
   // Public v1 API (mobile integration) — keyed by the service key's LABEL, not IP/user. Generous
   // for a backend caller; tighten per-endpoint when the paid routes land.
   apiV1: { tokens: 60, window: "60 s" },
