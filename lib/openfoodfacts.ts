@@ -238,11 +238,12 @@ export type OffCandidate = { barcode: string; name: string; brand: string | null
 
 const OFF_SEARCH = "https://search.openfoodfacts.org/search";
 
-// Map a viewer's ISO country (Vercel geo) to the country name OFF tags products with (as produced by
-// cleanTags: lowercased, dashes → spaces). Used to prefer the product's local version, since the same
-// product's ingredients differ by market. Only the markets we care about; unknown → no preference.
+// Map a viewer's ISO country (Vercel geo) to the OFF `countries_tags` slug (en:<slug>), so search is
+// scoped to the products actually sold where the user is — the same product's ingredients differ by
+// market, and a generic query like "pizza" should surface local brands (Casa Tarradellas), not the
+// globally-popular ones. Only the markets we care about; unknown → global search.
 const COUNTRY_TAG: Record<string, string> = {
-  ES: "spain", GB: "united kingdom", UK: "united kingdom", US: "united states",
+  ES: "spain", GB: "united-kingdom", UK: "united-kingdom", US: "united-states",
   FR: "france", DE: "germany", IT: "italy", PT: "portugal", NL: "netherlands",
   BE: "belgium", IE: "ireland", AT: "austria", CH: "switzerland", PL: "poland",
   MX: "mexico", AR: "argentina", CO: "colombia", CL: "chile",
@@ -261,28 +262,41 @@ export async function searchOffCandidates(
 ): Promise<OffCandidate[]> {
   const q = query.trim();
   if (q.length < 2) return [];
-  // Over-fetch: quality/language filtering + dedup shrink the list, so ask for more than we need.
+  const localTag = country ? COUNTRY_TAG[country.toUpperCase()] ?? null : null;
+  // Local market first (a Spanish user searching "pizza" should get Casa Tarradellas, not global
+  // brands); fall back to a global search only when the local scope turns up nothing.
+  if (localTag) {
+    const local = await runOffSearch(q, limit, `en:${localTag}`);
+    if (local.length) return local;
+  }
+  return runOffSearch(q, limit, null);
+}
+
+async function runOffSearch(
+  q: string,
+  limit: number,
+  countryTag: string | null,
+): Promise<OffCandidate[]> {
+  // Country scoping is a Lucene filter INSIDE q — the &countries_tags= query param does not filter.
+  const filter = countryTag ? ` countries_tags:"${countryTag}"` : "";
   const url =
-    `${OFF_SEARCH}?q=${encodeURIComponent(q)}` +
-    `&page_size=25&fields=code,product_name,product_name_en,brands,lang,countries_tags,states_tags,completeness,popularity_key`;
+    `${OFF_SEARCH}?q=${encodeURIComponent(q + filter)}` +
+    `&page_size=25&fields=code,product_name,product_name_en,brands,lang,states_tags,completeness,popularity_key`;
   const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
   if (!data || !Array.isArray(data.hits)) return [];
 
-  const localName = country ? COUNTRY_TAG[country.toUpperCase()] ?? null : null;
-
-  // First pass — QUALITY GATE: keep only real, well-filled products with a COMPLETE ingredient list,
-  // so we never surface junk duplicates ("dorito dorito"), stub entries with no ingredients, or
-  // barely-filled records. Flag which are sold in the viewer's country, and carry popularity so the
-  // canonical entry (the one people actually scan) wins over near-duplicates.
-  const rows: { c: OffCandidate; isLocal: boolean; pop: number; completeness: number; i: number }[] = [];
+  // QUALITY GATE: keep only real, well-filled English/Spanish products with a COMPLETE ingredient
+  // list — never junk duplicates ("dorito dorito"), stub entries with no ingredients, or barely-filled
+  // records. Popularity surfaces the canonical (most-scanned) entry over near-duplicates.
+  const rows: { c: OffCandidate; pop: number; completeness: number; i: number }[] = [];
   data.hits.forEach((h, i) => {
     const lang = typeof h.lang === "string" ? h.lang : "";
-    if (lang !== "en" && lang !== "es") return; // English/Spanish only
+    if (lang !== "en" && lang !== "es") return; // English/Spanish only (matches the import's rule)
 
     const states = Array.isArray(h.states_tags) ? (h.states_tags as unknown[]) : [];
     if (!states.includes("en:ingredients-completed")) return; // must have a full ingredient list
     const completeness = typeof h.completeness === "number" ? h.completeness : 0;
-    if (completeness < 0.5) return; // barely-filled record → skip (drops OCR/junk entries)
+    if (completeness < 0.5) return; // barely-filled record → skip
 
     const barcode = String(h.code ?? "").replace(/\D/g, "");
     const name = String(h.product_name_en || h.product_name || "").replace(/\s+/g, " ").trim();
@@ -292,21 +306,15 @@ export async function searchOffCandidates(
     const brand = Array.isArray(brands)
       ? (typeof brands[0] === "string" ? brands[0] : null)
       : firstOf(brands);
-    const isLocal = Boolean(localName && cleanTags(h.countries_tags).includes(localName));
     const pop = typeof h.popularity_key === "number" ? h.popularity_key : 0;
-    rows.push({ c: { barcode, name, brand }, isLocal, pop, completeness, i });
+    rows.push({ c: { barcode, name, brand }, pop, completeness, i });
   });
 
-  // Local versions first (geo), then the canonical/most-scanned entry, then best-filled. This surfaces
-  // the ONE real product and buries near-duplicates.
-  rows.sort(
-    (a, b) =>
-      Number(b.isLocal) - Number(a.isLocal) || b.pop - a.pop || b.completeness - a.completeness || a.i - b.i,
-  );
+  // Canonical/most-scanned first, then best-filled — surfaces the ONE real product, buries dupes.
+  rows.sort((a, b) => b.pop - a.pop || b.completeness - a.completeness || a.i - b.i);
 
-  // Collapse duplicate entries of the same product (different barcodes/countries/contributors). OFF
-  // brands are inconsistent, so dedupe on the normalised NAME alone — and because local is sorted
-  // first, the version kept is the local one when it exists.
+  // Collapse duplicate entries of the same product. OFF brands are inconsistent, so dedupe on the
+  // normalised NAME alone — "Coca cola zero", "Coca-Cola zero", "Coca Cola Zero" all fold to one.
   const out: OffCandidate[] = [];
   const seen = new Set<string>();
   for (const { c } of rows) {

@@ -26,8 +26,9 @@ export async function GET(req: Request) {
     queryEmbedding = await embedText(q);
   }
 
-  // Viewer country from Vercel geo (country-level only, no PII) → light geo tiebreak on products (GR4).
-  const country = req.headers.get("x-vercel-ip-country");
+  // Viewer country: Vercel geo in prod (country-level, no PII); OFF_DEFAULT_COUNTRY as a fallback for
+  // local dev / a beta default market. Scopes OFF search to that market + the GR4 geo tiebreak.
+  const country = req.headers.get("x-vercel-ip-country") || process.env.OFF_DEFAULT_COUNTRY || null;
 
   // Catalog + OFF in parallel — OFF is a fast public service and optional-infra (returns [] on failure).
   // OFF candidates prefer the viewer's local market (same product, different ingredients per country).
