@@ -9,6 +9,7 @@
 // so search just serves the existing catalog when OFF is unreachable.
 
 import type { Nutrition } from "./schema";
+import { normalizeName } from "./canonical";
 
 const OFF_BASE = "https://world.openfoodfacts.org";
 const USER_AGENT = "Baloo/1.0 (https://baloo.life; ingredient analysis)";
@@ -17,7 +18,7 @@ const OFF_TIMEOUT_MS = 8_000;
 // The fields we actually use — keep the payload small (OFF products are large).
 const FIELDS = [
   "code", "product_name", "product_name_en", "brands", "quantity", "lang",
-  "ingredients", "ingredients_text", "ingredients_text_en",
+  "ingredients", "ingredients_text", "ingredients_text_en", "ingredients_text_es",
   "nutriments", "serving_size", "image_url", "image_front_url",
   "stores_tags", "stores", "countries_tags",
 ].join(",");
@@ -71,37 +72,51 @@ function splitIngredientText(text: string): OffIngredient[] {
     .filter((i) => i.name);
 }
 
-// Ordered, label-order ingredients. OFF's structured `ingredients` array carries clean DECLARED
-// percents but its `text` is in the product's ORIGINAL language (French for an EU Nutella). Since
-// Baloo is English-only, we PREFER `ingredients_text_en` whenever the product's main language isn't
-// English; that text often still carries the percent inline ("hazelnuts 13%"), which we parse. For
-// English (or single-language) products the structured array is already English, so we use it and
-// keep its exact percents. `percent_estimate` is never used — our contract is the printed label %.
+function fromStructured(arr: unknown): OffIngredient[] {
+  if (!Array.isArray(arr)) return [];
+  const out: OffIngredient[] = [];
+  for (const it of arr) {
+    if (!it || typeof it !== "object") continue;
+    const name = String((it as { text?: unknown }).text ?? "").trim();
+    if (!name) continue;
+    const pctRaw = (it as { percent?: unknown }).percent;
+    const percent =
+      pctRaw !== undefined && pctRaw !== null && `${pctRaw}`.trim() !== ""
+        ? `${`${pctRaw}`.replace(/%/g, "").trim()}%`
+        : null;
+    out.push({ name, percent });
+  }
+  return out;
+}
+
+// Ordered, label-order ingredients — ENGLISH or SPANISH only. Baloo has no i18n yet, so we never
+// surface Greek/German/etc. ingredient text: a product is only usable if it has an English or Spanish
+// ingredient list. For an English/Spanish product the structured `ingredients` array is already in
+// that language and carries clean DECLARED percents, so we use it; otherwise we fall back to the
+// explicit `ingredients_text_en` / `_es` (which often still carry inline "13%", which we parse).
+// Returns [] when there's no English/Spanish text — the import path then skips the product.
+// `percent_estimate` is never used — our contract is the printed label %.
 export function parseOffIngredients(
-  raw: { ingredients?: unknown; ingredients_text?: unknown; ingredients_text_en?: unknown },
+  raw: {
+    ingredients?: unknown;
+    ingredients_text?: unknown;
+    ingredients_text_en?: unknown;
+    ingredients_text_es?: unknown;
+  },
   lang?: string,
 ): OffIngredient[] {
   const enText = typeof raw.ingredients_text_en === "string" ? raw.ingredients_text_en.trim() : "";
-  const preferEnglishText = Boolean(lang && lang !== "en" && enText);
+  const esText = typeof raw.ingredients_text_es === "string" ? raw.ingredients_text_es.trim() : "";
+  const nativeSupported = lang === "en" || lang === "es";
 
-  const arr = raw.ingredients;
-  if (!preferEnglishText && Array.isArray(arr) && arr.length) {
-    const out: OffIngredient[] = [];
-    for (const it of arr) {
-      if (!it || typeof it !== "object") continue;
-      const name = String((it as { text?: unknown }).text ?? "").trim();
-      if (!name) continue;
-      const pctRaw = (it as { percent?: unknown }).percent;
-      const percent =
-        pctRaw !== undefined && pctRaw !== null && `${pctRaw}`.trim() !== ""
-          ? `${`${pctRaw}`.replace(/%/g, "").trim()}%`
-          : null;
-      out.push({ name, percent });
-    }
+  // Native English/Spanish product → the structured array is in that language, keep its exact percents.
+  if (nativeSupported) {
+    const out = fromStructured(raw.ingredients);
     if (out.length) return out;
   }
-
-  const text = enText || (typeof raw.ingredients_text === "string" ? raw.ingredients_text.trim() : "");
+  // Else require an explicit English or Spanish text (a translation). No en/es text → unsupported → [].
+  const text =
+    enText || esText || (nativeSupported && typeof raw.ingredients_text === "string" ? raw.ingredients_text.trim() : "");
   return text ? splitIngredientText(text) : [];
 }
 
@@ -214,24 +229,41 @@ export type OffCandidate = { barcode: string; name: string; brand: string | null
 
 const OFF_SEARCH = "https://search.openfoodfacts.org/search";
 
-/** Search OFF by name, best first — barcode + name candidates. Hydrate a choice via getOffProductByBarcode. */
+/** Search OFF by name, best first — barcode + name candidates. English/Spanish products only (Baloo
+ *  has no i18n), and deduped so five near-identical "Coca Cola Zero" entries collapse to one. Hydrate
+ *  a choice via getOffProductByBarcode. */
 export async function searchOffCandidates(query: string, limit = 5): Promise<OffCandidate[]> {
   const q = query.trim();
   if (q.length < 2) return [];
+  // Over-fetch: language filtering + dedup shrink the list, so ask for more than we need.
   const url =
     `${OFF_SEARCH}?q=${encodeURIComponent(q)}` +
-    `&page_size=${Math.min(limit, 25)}&fields=code,product_name,product_name_en,brands`;
+    `&page_size=25&fields=code,product_name,product_name_en,brands,lang`;
   const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
   if (!data || !Array.isArray(data.hits)) return [];
+
   const out: OffCandidate[] = [];
+  const seen = new Set<string>();
   for (const h of data.hits) {
+    const lang = typeof h.lang === "string" ? h.lang : "";
+    if (lang !== "en" && lang !== "es") continue; // English/Spanish only
+
     const barcode = String(h.code ?? "").replace(/\D/g, "");
-    const name = String(h.product_name_en || h.product_name || "").trim();
+    const name = String(h.product_name_en || h.product_name || "").replace(/\s+/g, " ").trim();
     if (barcode.length < 8 || !name) continue;
+
     const brands = h.brands;
     const brand = Array.isArray(brands)
       ? (typeof brands[0] === "string" ? brands[0] : null)
       : firstOf(brands);
+
+    // Collapse duplicate entries of the same product (different barcodes/countries/contributors). OFF
+    // brands are inconsistent, so dedupe on the normalised NAME alone — "Coca cola zero", "Coca-Cola
+    // zero" and "Coca Cola Zero" all fold to one.
+    const key = normalizeName(name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+
     out.push({ barcode, name, brand });
     if (out.length >= limit) break;
   }

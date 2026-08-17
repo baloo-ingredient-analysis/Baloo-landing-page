@@ -19,12 +19,16 @@ body {
   color: theme("colors.ink");
 }
 
-/* Respect reduced motion. */
+/* Respect reduced motion — but keep loading spinners turning: a frozen spinner reads as "broken",
+   and a progress indicator is functional feedback, not decoration (an allowed exception). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
+  }
+  .animate-spin {
+    animation-duration: 0.8s !important;
   }
 }

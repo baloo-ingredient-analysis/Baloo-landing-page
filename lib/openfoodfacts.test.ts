@@ -7,6 +7,7 @@ const nutella = {
   product_name: "Nutella",
   brands: "Nutella,Ferrero",
   quantity: "400 g",
+  lang: "en",
   ingredients_text: "Sugar, palm oil, hazelnuts 13%, skimmed milk powder 8.7%, fat-reduced cocoa 7.4%",
   ingredients: [
     { text: "Sugar", percent_estimate: 42 },
@@ -34,7 +35,7 @@ const nutella = {
 
 describe("parseOffIngredients", () => {
   it("keeps label order and uses the DECLARED percent (not the estimate)", () => {
-    const ing = parseOffIngredients(nutella);
+    const ing = parseOffIngredients(nutella, "en");
     expect(ing.map((i) => i.name)).toEqual([
       "Sugar", "Palm oil", "Hazelnuts", "Skimmed milk powder", "Fat-reduced cocoa",
     ]);
@@ -44,8 +45,8 @@ describe("parseOffIngredients", () => {
     expect(ing[4].percent).toBe("7.4%");
   });
 
-  it("falls back to splitting ingredients_text when there's no structured array", () => {
-    const ing = parseOffIngredients({ ingredients_text: "Water, Sugar, Salt (sea salt)" });
+  it("falls back to splitting ingredients_text for a native English product without a structured array", () => {
+    const ing = parseOffIngredients({ ingredients_text: "Water, Sugar, Salt (sea salt)" }, "en");
     expect(ing.map((i) => i.name)).toEqual(["Water", "Sugar", "Salt"]);
     expect(ing.every((i) => i.percent === null)).toBe(true);
   });
@@ -76,6 +77,23 @@ describe("parseOffIngredients", () => {
     };
     const ing = parseOffIngredients(enProduct, "en"); // lang en → structured
     expect(ing).toEqual([{ name: "Oats", percent: "61%" }, { name: "Water", percent: null }]);
+  });
+
+  it("accepts native Spanish products", () => {
+    const es = { ingredients: [{ text: "Azúcar", percent: 20 }, { text: "Agua" }] };
+    expect(parseOffIngredients(es, "es")).toEqual([
+      { name: "Azúcar", percent: "20%" },
+      { name: "Agua", percent: null },
+    ]);
+  });
+
+  it("REJECTS a product with no English/Spanish ingredient text (no i18n yet)", () => {
+    const greek = {
+      lang: "el",
+      ingredients: [{ text: "Ζάχαρη" }, { text: "Νερό" }],
+      ingredients_text: "Ζάχαρη, Νερό",
+    };
+    expect(parseOffIngredients(greek, "el")).toEqual([]); // not en/es, no en/es text → skipped
   });
 });
 
