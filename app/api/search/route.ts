@@ -33,7 +33,7 @@ export async function GET(req: Request) {
   // OFF candidates prefer the viewer's local market (same product, different ingredients per country).
   const [{ products, lists }, offRaw] = await Promise.all([
     searchAll(dbi, q, 10, queryEmbedding, country),
-    searchOffCandidates(q, 8, country),
+    searchOffCandidates(q, 6, country),
   ]);
 
   // Don't show an OFF candidate we already have in the catalog (dedupe by barcode).

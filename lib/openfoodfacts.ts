@@ -252,20 +252,28 @@ export async function searchOffCandidates(
 ): Promise<OffCandidate[]> {
   const q = query.trim();
   if (q.length < 2) return [];
-  // Over-fetch: language filtering + dedup shrink the list, so ask for more than we need.
+  // Over-fetch: quality/language filtering + dedup shrink the list, so ask for more than we need.
   const url =
     `${OFF_SEARCH}?q=${encodeURIComponent(q)}` +
-    `&page_size=25&fields=code,product_name,product_name_en,brands,lang,countries_tags`;
+    `&page_size=25&fields=code,product_name,product_name_en,brands,lang,countries_tags,states_tags,completeness,popularity_key`;
   const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
   if (!data || !Array.isArray(data.hits)) return [];
 
   const localName = country ? COUNTRY_TAG[country.toUpperCase()] ?? null : null;
 
-  // First pass: keep English/Spanish hits, flagging which are sold in the viewer's country.
-  const rows: { c: OffCandidate; isLocal: boolean; i: number }[] = [];
+  // First pass — QUALITY GATE: keep only real, well-filled products with a COMPLETE ingredient list,
+  // so we never surface junk duplicates ("dorito dorito"), stub entries with no ingredients, or
+  // barely-filled records. Flag which are sold in the viewer's country, and carry popularity so the
+  // canonical entry (the one people actually scan) wins over near-duplicates.
+  const rows: { c: OffCandidate; isLocal: boolean; pop: number; completeness: number; i: number }[] = [];
   data.hits.forEach((h, i) => {
     const lang = typeof h.lang === "string" ? h.lang : "";
     if (lang !== "en" && lang !== "es") return; // English/Spanish only
+
+    const states = Array.isArray(h.states_tags) ? (h.states_tags as unknown[]) : [];
+    if (!states.includes("en:ingredients-completed")) return; // must have a full ingredient list
+    const completeness = typeof h.completeness === "number" ? h.completeness : 0;
+    if (completeness < 0.5) return; // barely-filled record → skip (drops OCR/junk entries)
 
     const barcode = String(h.code ?? "").replace(/\D/g, "");
     const name = String(h.product_name_en || h.product_name || "").replace(/\s+/g, " ").trim();
@@ -276,11 +284,16 @@ export async function searchOffCandidates(
       ? (typeof brands[0] === "string" ? brands[0] : null)
       : firstOf(brands);
     const isLocal = Boolean(localName && cleanTags(h.countries_tags).includes(localName));
-    rows.push({ c: { barcode, name, brand }, isLocal, i });
+    const pop = typeof h.popularity_key === "number" ? h.popularity_key : 0;
+    rows.push({ c: { barcode, name, brand }, isLocal, pop, completeness, i });
   });
 
-  // Soft geo nudge: local versions first, OFF's relevance order preserved within each group.
-  rows.sort((a, b) => Number(b.isLocal) - Number(a.isLocal) || a.i - b.i);
+  // Local versions first (geo), then the canonical/most-scanned entry, then best-filled. This surfaces
+  // the ONE real product and buries near-duplicates.
+  rows.sort(
+    (a, b) =>
+      Number(b.isLocal) - Number(a.isLocal) || b.pop - a.pop || b.completeness - a.completeness || a.i - b.i,
+  );
 
   // Collapse duplicate entries of the same product (different barcodes/countries/contributors). OFF
   // brands are inconsistent, so dedupe on the normalised NAME alone — and because local is sorted
