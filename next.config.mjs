@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 
 // Security response headers (Order S5). The enforcing set is safe on any HTTPS host. The CSP is now
-// ENFORCING — report-only was clean (the browser only talks to Supabase; every script/style/image
-// is same-origin, inline, or data:). NOTE for later: enabling Sentry Session Replay needs
+// ENFORCING. Cross-origin is limited to Supabase (connect-src) and Open Food Facts product
+// thumbnails (img-src); everything else is same-origin, inline, or data:. NOTE for later: enabling Sentry Session Replay needs
 // `worker-src 'self' blob:` added below (its DSN's connect-src is already derived). All headers apply
 // to every route.
 
@@ -37,7 +37,7 @@ const csp = [
   // Next injects inline hydration scripts (no nonce here); 'unsafe-eval' covers dev HMR.
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'", // Tailwind + framework-injected styles
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://images.openfoodfacts.org", // OFF product thumbnails (OFF4)
   "font-src 'self'", // fonts are self-hosted via next/font
   `connect-src 'self'${supabaseOrigins()}${sentryOrigin()}`,
   "frame-ancestors 'none'",
