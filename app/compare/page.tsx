@@ -15,7 +15,7 @@ export default function ComparePage() {
   return (
     <div className="relative flex min-h-screen flex-col">
       <SiteHeader variant="left" />
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-5">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-5">
         <section className="pt-12 sm:pt-16">
           <div className="max-w-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Internal tool</p>
@@ -23,8 +23,9 @@ export default function ComparePage() {
               Filtered vs raw
             </h1>
             <p className="mt-4 text-[17px] leading-relaxed text-muted">
-              One search, two results. Left is our filtered pipeline (what users see); right is the raw
-              Open Food Facts response — no quality gate, no dedup, no country. So we can see the mess.
+              One search, three sources. Our filtered pipeline (what users see), the raw Open Food Facts
+              response (no gate, no dedup, no country), and a paid barcode DB looked up on the same
+              products — so we can judge whose ingredient data is actually cleaner.
             </p>
           </div>
 
