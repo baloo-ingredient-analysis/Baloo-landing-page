@@ -14,7 +14,7 @@ import { ProductRow, RowChevron } from "@/components/ProductRow";
 type Hit = {
   products: { id: string; name: string; brand: string | null; slug: string }[];
   lists: { id: string; slug: string; title: string; itemCount: number; ownerHandle: string | null }[];
-  off: { barcode: string; name: string; brand: string | null }[];
+  off: { barcode: string; name: string; brand: string | null; quantity: string | null }[];
 };
 
 type Filter = "all" | "products" | "lists";
@@ -89,13 +89,15 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
     return () => clearTimeout(t);
   }, [q, router, basePath]);
 
-  const nP = hits?.products.length ?? 0;
-  const nL = hits?.lists.length ?? 0;
+  // Catalog products (ready to view) + OFF candidates (analyse on tap) are ONE product list — the user
+  // shouldn't have to care which is which. Catalog first (we already have them), then OFF.
+  const nCatalog = hits?.products.length ?? 0;
   const nOff = hits?.off?.length ?? 0;
-  const empty = searched && !loading && nP === 0 && nL === 0 && nOff === 0;
+  const nProducts = nCatalog + nOff;
+  const nL = hits?.lists.length ?? 0;
+  const empty = searched && !loading && nProducts === 0 && nL === 0;
   const showLists = filter !== "products" && nL > 0;
-  const showProducts = filter !== "lists" && nP > 0;
-  const showOff = filter !== "lists" && nOff > 0; // OFF candidates are products
+  const showProducts = filter !== "lists" && nProducts > 0;
 
   return (
     <div>
@@ -138,12 +140,12 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
         </p>
       )}
 
-      {!analyzing && searched && !loading && hits && (nP > 0 || nL > 0) && (
+      {!analyzing && searched && !loading && hits && (nProducts > 0 || nL > 0) && (
         <div className="mt-5 animate-fade-in">
           <p className="text-sm tabular-nums text-muted">
-            {nP + nL} {nP + nL === 1 ? "result" : "results"}
+            {nProducts + nL} {nProducts + nL === 1 ? "result" : "results"}
             {" · "}
-            {nL} {nL === 1 ? "list" : "lists"}, {nP} {nP === 1 ? "product" : "products"}
+            {nL} {nL === 1 ? "list" : "lists"}, {nProducts} {nProducts === 1 ? "product" : "products"}
           </p>
 
           {/* Segmented filter — active pill = ink fill (D-G5 §4). */}
@@ -200,53 +202,27 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
                 Products
               </h2>
               <ul className="mt-2 max-w-[760px] overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
+                {/* Already analysed — open instantly. */}
                 {hits.products.map((p) => (
                   <ProductRow key={p.id} slug={p.slug} name={p.name} brand={p.brand} />
                 ))}
+                {/* From Open Food Facts — tapping analyses it, then opens (same list, no separate step). */}
+                {hits.off.map((c) => (
+                  <ProductRow
+                    key={c.barcode}
+                    name={c.name}
+                    brand={c.brand}
+                    meta={[c.brand, c.quantity].filter(Boolean).join(" · ") || undefined}
+                    onClick={() => analyseCandidate(c.barcode, c.name)}
+                  />
+                ))}
               </ul>
+              {offErr && (
+                <p className="mt-2 text-sm text-processed" role="alert">
+                  {offErr}
+                </p>
+              )}
             </>
-          )}
-        </div>
-      )}
-
-      {/* The whole Open Food Facts database — products not in our catalog yet. Picking one analyses
-          it on demand and adds it to the catalog. Shows alongside catalog results, not only on a miss. */}
-      {!analyzing && searched && !loading && showOff && (
-        <div className="mt-6 animate-fade-in">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-            Analyse from Open Food Facts
-          </h2>
-          <ul className="mt-2 max-w-[760px] overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
-            {hits!.off.map((c) => (
-              <li key={c.barcode} className="flex items-center gap-3 px-4 py-3">
-                <span
-                  aria-hidden
-                  className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg bg-canvas font-display text-lg text-ink/30"
-                >
-                  {(c.brand ?? c.name)[0]?.toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-display text-[17px] leading-tight text-ink">{c.name}</span>
-                  {c.brand && <span className="block truncate text-xs text-muted">{c.brand}</span>}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => analyseCandidate(c.barcode, c.name)}
-                  disabled={analyzing !== null}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-paper transition hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Analyse
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-muted">
-            Live from Open Food Facts — we&rsquo;ll break it down and add it to the catalog.
-          </p>
-          {offErr && (
-            <p className="mt-2 text-sm text-processed" role="alert">
-              {offErr}
-            </p>
           )}
         </div>
       )}

@@ -234,7 +234,7 @@ export async function getOffProductByBarcode(barcode: string): Promise<OffProduc
 // A lightweight search hit — enough to pick a product, then hydrate the full one by barcode. We use
 // OFF's dedicated search service (search-a-licious): ~10x faster than the legacy cgi/search.pl, better
 // ranked, and it returns clean JSON (search.pl intermittently returns an HTML error page).
-export type OffCandidate = { barcode: string; name: string; brand: string | null };
+export type OffCandidate = { barcode: string; name: string; brand: string | null; quantity: string | null };
 
 const OFF_SEARCH = "https://search.openfoodfacts.org/search";
 
@@ -281,7 +281,7 @@ async function runOffSearch(
   const filter = countryTag ? ` countries_tags:"${countryTag}"` : "";
   const url =
     `${OFF_SEARCH}?q=${encodeURIComponent(q + filter)}` +
-    `&page_size=25&fields=code,product_name,product_name_en,brands,lang,states_tags,completeness,popularity_key`;
+    `&page_size=25&fields=code,product_name,product_name_en,brands,quantity,lang,states_tags,completeness,popularity_key`;
   const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
   if (!data || !Array.isArray(data.hits)) return [];
 
@@ -307,7 +307,8 @@ async function runOffSearch(
       ? (typeof brands[0] === "string" ? brands[0] : null)
       : firstOf(brands);
     const pop = typeof h.popularity_key === "number" ? h.popularity_key : 0;
-    rows.push({ c: { barcode, name, brand }, pop, completeness, i });
+    const quantity = typeof h.quantity === "string" && h.quantity.trim() ? h.quantity.trim() : null;
+    rows.push({ c: { barcode, name, brand, quantity }, pop, completeness, i });
   });
 
   // Canonical/most-scanned first, then best-filled — surfaces the ONE real product, buries dupes.
