@@ -31,6 +31,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
   // screen instead of just a tiny button spinner during the ~10-30s Claude call.
   const [analyzing, setAnalyzing] = useState<{ barcode: string; name: string } | null>(null);
   const [offErr, setOffErr] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false); // "Show more" — reveal the rest of the products
   const first = useRef(true);
 
   // Analyse a specific Open Food Facts product on demand: import it (analyse once, cache), then go
@@ -63,6 +64,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
 
   useEffect(() => {
     setOffErr(null); // a new query clears any prior OFF error
+    setExpanded(false); // a new query collapses back to the first page of products
     if (first.current) first.current = false;
     else {
       const url = q.trim() ? `${basePath}?q=${encodeURIComponent(q.trim())}` : basePath;
@@ -98,6 +100,20 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
   const empty = searched && !loading && nProducts === 0 && nL === 0;
   const showLists = filter !== "products" && nL > 0;
   const showProducts = filter !== "lists" && nProducts > 0;
+
+  // Catalog + OFF as ONE ordered product list (catalog first). "Show more" reveals past the first page.
+  const INITIAL_PRODUCTS = 6;
+  const productItems = hits
+    ? [
+        ...hits.products.map((p) => ({
+          type: "catalog" as const, key: p.id, name: p.name, brand: p.brand, slug: p.slug, quantity: null as string | null, barcode: "",
+        })),
+        ...hits.off.map((c) => ({
+          type: "off" as const, key: c.barcode, name: c.name, brand: c.brand, slug: "", quantity: c.quantity, barcode: c.barcode,
+        })),
+      ]
+    : [];
+  const visibleProducts = expanded ? productItems : productItems.slice(0, INITIAL_PRODUCTS);
 
   return (
     <div>
@@ -202,21 +218,31 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
                 Products
               </h2>
               <ul className="mt-2 max-w-[760px] overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
-                {/* Already analysed — open instantly. */}
-                {hits.products.map((p) => (
-                  <ProductRow key={p.id} slug={p.slug} name={p.name} brand={p.brand} />
-                ))}
-                {/* From Open Food Facts — tapping analyses it, then opens (same list, no separate step). */}
-                {hits.off.map((c) => (
-                  <ProductRow
-                    key={c.barcode}
-                    name={c.name}
-                    brand={c.brand}
-                    meta={[c.brand, c.quantity].filter(Boolean).join(" · ") || undefined}
-                    onClick={() => analyseCandidate(c.barcode, c.name)}
-                  />
-                ))}
+                {visibleProducts.map((it) =>
+                  it.type === "catalog" ? (
+                    // Already analysed — open instantly.
+                    <ProductRow key={it.key} slug={it.slug} name={it.name} brand={it.brand} />
+                  ) : (
+                    // From Open Food Facts — tapping analyses it, then opens (same list, no separate step).
+                    <ProductRow
+                      key={it.key}
+                      name={it.name}
+                      brand={it.brand}
+                      meta={[it.brand, it.quantity].filter(Boolean).join(" · ") || undefined}
+                      onClick={() => analyseCandidate(it.barcode, it.name)}
+                    />
+                  ),
+                )}
               </ul>
+              {!expanded && nProducts > INITIAL_PRODUCTS && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded(true)}
+                  className="mt-3 text-sm font-medium text-natural hover:underline"
+                >
+                  Show {nProducts - INITIAL_PRODUCTS} more
+                </button>
+              )}
               {offErr && (
                 <p className="mt-2 text-sm text-processed" role="alert">
                   {offErr}
