@@ -98,13 +98,14 @@ function fromStructured(arr: unknown): OffIngredient[] {
   return out;
 }
 
-// Ordered, label-order ingredients — ENGLISH or SPANISH only. Baloo has no i18n yet, so we never
-// surface Greek/German/etc. ingredient text: a product is only usable if it has an English or Spanish
-// ingredient list. For an English/Spanish product the structured `ingredients` array is already in
-// that language and carries clean DECLARED percents, so we use it; otherwise we fall back to the
-// explicit `ingredients_text_en` / `_es` (which often still carry inline "13%", which we parse).
-// Returns [] when there's no English/Spanish text — the import path then skips the product.
-// `percent_estimate` is never used — our contract is the printed label %.
+// Ordered, label-order ingredients — in ANY source language. The analysis translates ingredient names
+// to English on the way out (Claude is multilingual), so we no longer reject a Dutch/French/Greek
+// product: we just hand over whatever list OFF has. Preference order, best data first:
+//   1. Native English/Spanish product → its structured array (clean DECLARED percents).
+//   2. An explicit English or Spanish translation text (often still carries inline "13%").
+//   3. Otherwise the structured array in its own language (flattened) — translated at analysis time.
+//   4. Otherwise the plain ingredients_text in its own language.
+// Returns [] only when the product genuinely has no ingredient list. `percent_estimate` is never used.
 export function parseOffIngredients(
   raw: {
     ingredients?: unknown;
@@ -118,14 +119,17 @@ export function parseOffIngredients(
   const esText = typeof raw.ingredients_text_es === "string" ? raw.ingredients_text_es.trim() : "";
   const nativeSupported = lang === "en" || lang === "es";
 
-  // Native English/Spanish product → the structured array is in that language, keep its exact percents.
   if (nativeSupported) {
     const out = fromStructured(raw.ingredients);
     if (out.length) return out;
   }
-  // Else require an explicit English or Spanish text (a translation). No en/es text → unsupported → [].
-  const text =
-    enText || esText || (nativeSupported && typeof raw.ingredients_text === "string" ? raw.ingredients_text.trim() : "");
+  if (enText) return splitIngredientText(enText);
+  if (esText) return splitIngredientText(esText);
+
+  // Any other language — kept, not rejected; names get translated to English during analysis.
+  const foreign = fromStructured(raw.ingredients);
+  if (foreign.length) return foreign;
+  const text = typeof raw.ingredients_text === "string" ? raw.ingredients_text.trim() : "";
   return text ? splitIngredientText(text) : [];
 }
 
@@ -249,11 +253,12 @@ const COUNTRY_TAG: Record<string, string> = {
   MX: "mexico", AR: "argentina", CO: "colombia", CL: "chile",
 };
 
-/** Search OFF by name, best first — barcode + name candidates. English/Spanish products only (Baloo
- *  has no i18n), and deduped so five near-identical "Coca Cola Zero" entries collapse to one. When a
- *  `country` (ISO, from Vercel geo) is given, the product's LOCAL version is preferred — since the
- *  same product's ingredients differ by market — as a soft nudge (local first, then the rest), so the
- *  version kept through dedup is the one sold where the user is. Hydrate a choice via
+/** Search OFF by name → deduped product candidates. Two things make this robust across ALL brands:
+ *  (1) we search the viewer's local market AND globally, then merge local-first — so local brands
+ *  (Hacendado) surface for a generic query while international brands (Terrasana, mostly non-Spanish on
+ *  OFF) are still fully covered; (2) NO language filter — a Dutch/French product is kept, and its
+ *  ingredient names are translated to English during analysis. We only require a COMPLETE ingredient
+ *  list, and rank by popularity so the canonical entry wins and junk sinks. Hydrate a choice via
  *  getOffProductByBarcode. */
 export async function searchOffCandidates(
   query: string,
@@ -263,44 +268,48 @@ export async function searchOffCandidates(
   const q = query.trim();
   if (q.length < 2) return [];
   const localTag = country ? COUNTRY_TAG[country.toUpperCase()] ?? null : null;
-  // Local market first (a Spanish user searching "pizza" should get Casa Tarradellas, not global
-  // brands); fall back to a global search only when the local scope turns up nothing.
-  if (localTag) {
-    const local = await runOffSearch(q, limit, `en:${localTag}`);
-    if (local.length) return local;
+
+  // Local + global in parallel, then merge local-first — a soft geo preference, not a hard filter.
+  const [local, global] = await Promise.all([
+    localTag ? runOffSearch(q, `en:${localTag}`) : Promise.resolve([] as OffCandidate[]),
+    runOffSearch(q, null),
+  ]);
+
+  const out: OffCandidate[] = [];
+  const seen = new Set<string>();
+  for (const c of [...local, ...global]) {
+    const key = normalizeName(c.name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(c);
+    if (out.length >= limit) break;
   }
-  return runOffSearch(q, limit, null);
+  return out;
 }
 
-async function runOffSearch(
-  q: string,
-  limit: number,
-  countryTag: string | null,
-): Promise<OffCandidate[]> {
+/** One OFF search pass (optionally scoped to a country), quality-filtered + popularity-ranked. Returns
+ *  all passing candidates; the caller merges + dedupes across the local and global passes. */
+async function runOffSearch(q: string, countryTag: string | null): Promise<OffCandidate[]> {
   // Country scoping is a Lucene filter INSIDE q — the &countries_tags= query param does not filter.
   const filter = countryTag ? ` countries_tags:"${countryTag}"` : "";
   const url =
     `${OFF_SEARCH}?q=${encodeURIComponent(q + filter)}` +
-    `&page_size=25&fields=code,product_name,product_name_en,brands,quantity,lang,states_tags,completeness,popularity_key`;
+    `&page_size=25&fields=code,product_name,product_name_en,brands,quantity,states_tags,completeness,popularity_key`;
   const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
   if (!data || !Array.isArray(data.hits)) return [];
 
-  // QUALITY GATE: keep only real, well-filled English/Spanish products with a COMPLETE ingredient
-  // list — never junk duplicates ("dorito dorito"), stub entries with no ingredients, or barely-filled
-  // records. Popularity surfaces the canonical (most-scanned) entry over near-duplicates.
+  // QUALITY GATE: require a COMPLETE ingredient list (so Analyse never dead-ends) and drop empty/garbage
+  // records. NO language filter — foreign products are kept and translated during analysis.
   const rows: { c: OffCandidate; pop: number; completeness: number; i: number }[] = [];
   data.hits.forEach((h, i) => {
-    const lang = typeof h.lang === "string" ? h.lang : "";
-    if (lang !== "en" && lang !== "es") return; // English/Spanish only (matches the import's rule)
-
     const states = Array.isArray(h.states_tags) ? (h.states_tags as unknown[]) : [];
     if (!states.includes("en:ingredients-completed")) return; // must have a full ingredient list
     const completeness = typeof h.completeness === "number" ? h.completeness : 0;
-    if (completeness < 0.5) return; // barely-filled record → skip
+    if (completeness < 0.35) return; // near-empty record → skip
 
     const barcode = String(h.code ?? "").replace(/\D/g, "");
     const name = String(h.product_name_en || h.product_name || "").replace(/\s+/g, " ").trim();
-    if (barcode.length < 8 || !name) return;
+    if (barcode.length < 8 || !name || name.toLowerCase() === "undefined") return;
 
     const brands = h.brands;
     const brand = Array.isArray(brands)
@@ -311,19 +320,7 @@ async function runOffSearch(
     rows.push({ c: { barcode, name, brand, quantity }, pop, completeness, i });
   });
 
-  // Canonical/most-scanned first, then best-filled — surfaces the ONE real product, buries dupes.
+  // Canonical/most-scanned first, then best-filled — surfaces the real product, buries dupes.
   rows.sort((a, b) => b.pop - a.pop || b.completeness - a.completeness || a.i - b.i);
-
-  // Collapse duplicate entries of the same product. OFF brands are inconsistent, so dedupe on the
-  // normalised NAME alone — "Coca cola zero", "Coca-Cola zero", "Coca Cola Zero" all fold to one.
-  const out: OffCandidate[] = [];
-  const seen = new Set<string>();
-  for (const { c } of rows) {
-    const key = normalizeName(c.name);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(c);
-    if (out.length >= limit) break;
-  }
-  return out;
+  return rows.map((r) => r.c);
 }

@@ -61,7 +61,9 @@ Ingredients in label order: ${input.ingredients_list.join(", ")}
 Percentages where known: ${pct}
 
 For each ingredient, in the same order, return:
-- name
+- name: the ingredient's common English name. The source list may be in another language (e.g.
+  Dutch, French, Spanish) — translate each name to plain English (e.g. "Suiker" → "Sugar",
+  "Huile de tournesol" → "Sunflower oil"). Keep the label ORDER exactly; never reorder or drop any.
 - tag: "Natural" or "Processed"
 - role: a 2-4 word functional label for what it does in THIS product. Prefer one of: Base,
   Sweetener, Thickener / stabiliser, Emulsifier, Preservative, Colour, Flavour,
