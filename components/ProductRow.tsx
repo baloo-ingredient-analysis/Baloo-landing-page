@@ -10,34 +10,43 @@ export function ProductRow({
   brand,
   retailer,
   meta,
+  onClick,
 }: {
-  slug: string;
+  slug?: string; // omit for a not-yet-analysed product (use onClick instead)
   name: string;
   brand?: string | null;
   retailer?: string | null;
   meta?: string; // overrides the default brand·retailer join when a caller wants different text
+  onClick?: () => void; // when set, the row is a button (analyse-on-tap) instead of a link
 }) {
   const metaLine = meta ?? [brand, retailer].filter(Boolean).join(" · ");
+  const cls = "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-canvas sm:px-5";
+  const inner = (
+    <>
+      <span
+        aria-hidden
+        className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg bg-canvas font-display text-lg text-ink/30"
+      >
+        {(brand ?? name)[0]?.toUpperCase()}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-display text-[17px] leading-tight text-ink">{name}</span>
+        {metaLine && <span className="block truncate text-xs text-muted">{metaLine}</span>}
+      </span>
+      <RowChevron />
+    </>
+  );
   return (
     <li>
-      <Link
-        href={`/p/${slug}`}
-        className="flex items-center gap-3 px-4 py-3 transition hover:bg-canvas sm:px-5"
-      >
-        <span
-          aria-hidden
-          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg bg-canvas font-display text-lg text-ink/30"
-        >
-          {(brand ?? name)[0]?.toUpperCase()}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-display text-[17px] leading-tight text-ink">
-            {name}
-          </span>
-          {metaLine && <span className="text-xs text-muted">{metaLine}</span>}
-        </span>
-        <RowChevron />
-      </Link>
+      {onClick ? (
+        <button type="button" onClick={onClick} className={cls}>
+          {inner}
+        </button>
+      ) : (
+        <Link href={`/p/${slug}`} className={cls}>
+          {inner}
+        </Link>
+      )}
     </li>
   );
 }

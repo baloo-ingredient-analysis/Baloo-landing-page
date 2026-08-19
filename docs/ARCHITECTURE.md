@@ -162,6 +162,17 @@ migration 0010, pgvector + HNSW cosine). `/api/search` embeds the query and `sea
 pgvector nearest-neighbours with the keyword hits via reciprocal-rank fusion. Optional-infra:
 keyword-only without `OPENAI_API_KEY`. Depth in `docs/SEMANTIC_SEARCH.md`.
 
+**Open Food Facts catalog source (OFF):** scraping retailer sites is a dead end (they block us and
+never publish the barcode — tested), so the catalog is filled from **Open Food Facts** instead.
+`lib/openfoodfacts.ts` looks products up by barcode (`/api/v2/product`) or name (search-a-licious) and
+maps them to our shapes (English-preferring ingredients, canonical nutrition). `lib/offImport.ts`
+runs the existing `analyseIngredients` on OFF's ingredient list (skipping scrape+extract) and persists
+via `ingestAnalysis` (canonical_key = barcode; known products reused). `/api/off/lookup` is the web's
+search-miss path (name/barcode → import → product slug), surfaced by `SearchBox` when the catalog has
+no match; `npm run db:seed-off` bulk-imports popular products. Optional-infra: OFF unreachable → search
+just serves the existing catalog. ODbL (attribution; legal sign-off before paid/B2B use). Depth in
+`docs/OFF_CATALOG.md`.
+
 ---
 
 ## 5. Auth & authorization

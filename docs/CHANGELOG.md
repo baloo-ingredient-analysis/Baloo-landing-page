@@ -7,6 +7,20 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### Open Food Facts catalog + search-first (OFF1–OFF4) — `feat/off-catalog`
+- **The web stops scraping retailers and sources products from Open Food Facts.** Tested finding:
+  Tesco/Kroger hard-block us, and even reachable sites (Ocado/Target) never publish the barcode, and
+  Mercadona/Lidl/Aldi don't publish ingredient pages (their data is already on OFF). So: search a
+  catalog filled from OFF. **OFF1** `lib/openfoodfacts.ts` — barcode + name (search-a-licious) lookup +
+  pure mappers (English-preferring ingredients, canonical nutrition). **OFF2** `lib/offImport.ts` —
+  map → run the existing `analyseIngredients` (skip scrape/extract) → `ingestAnalysis` (canonical_key =
+  barcode; known products reused, never re-analysed). **OFF3** `/api/off/lookup` (search-miss path,
+  IP-rate-limited) + `npm run db:seed-off` (bulk-import popular UK/ES products, dry-run by default).
+  **OFF4** `SearchBox` offers "Analyse from Open Food Facts" on a catalog miss → product page. Verified
+  live: Nutella (barcode) and Nocilla (name) imported end to end with English breakdowns; 88 tests +
+  build green. ODbL — legal sign-off before any paid/B2B use. Docs: `docs/OFF_CATALOG.md`. On the
+  branch; not yet merged.
+
 ### Geo-ranking (GR1–GR4)
 - Interest-first ranking with geo as a **soft multiplier** (`base × (1 + λ·geo)`), never a hard
   filter (Jitain's call). **GR1** retailer country model (`lib/retailers.ts` — ISO codes, `home`/

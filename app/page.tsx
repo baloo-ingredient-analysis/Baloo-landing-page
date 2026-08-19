@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { analysisSchema, type Ingredient, type Nutrition } from "@/lib/schema";
 import Link from "next/link";
-import { HomeSearch } from "@/components/HomeSearch";
+import { SearchBox } from "@/components/discover/SearchBox";
 import { LoadingState } from "@/components/LoadingState";
 import { ResultsView } from "@/components/ResultsView";
 import { EmailCapture } from "@/components/EmailCapture";
-import { RetailerRow } from "@/components/RetailerRow";
 import { PopularLists } from "@/components/PopularLists";
 import { HowItWorks } from "@/components/HowItWorks";
 import { Board } from "@/components/Board";
@@ -34,16 +33,13 @@ export default function Home() {
   const [header, setHeader] = useState<Header | null>(null);
   const [cached, setCached] = useState<Ingredient[] | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // Bumping this remounts HomeSearch, clearing its retained URL — so "New scan" gives a truly blank
-  // box instead of forcing the user to delete the previous link by hand (Luna's feedback).
-  const [resetKey, setResetKey] = useState(0);
 
+  // Return to the idle home (the search screen). Used by the "New search" button after a link paste.
   function handleReset() {
     setHeader(null);
     setCached(null);
     setErrorMsg(null);
     setPhase("idle");
-    setResetKey((k) => k + 1);
   }
 
   const { object, submit, isLoading, error } = useObject({
@@ -127,7 +123,6 @@ export default function Home() {
   const streamed = (object?.ingredients ?? []) as Partial<Ingredient>[];
   const ingredients = cached ?? streamed;
   const idle = phase === "idle";
-  const busy = phase === "reading" || (phase === "analyzing" && isLoading);
   const analysing = phase === "analyzing" && isLoading;
   const streamError = Boolean(error) && phase === "analyzing";
   const hasHeader = Boolean(header) && !errorMsg && !streamError;
@@ -139,47 +134,46 @@ export default function Home() {
       <SiteHeader variant="left" />
       <main className="mx-auto flex w-full max-w-tool flex-1 flex-col px-5">
         <section className={idle ? "pt-12 sm:pt-16" : "pt-8"}>
-          {idle && (
-            <div className="max-w-xl">
-              <RetailerRow />
-              <h1 className="mt-5 font-display text-[40px] leading-[1.08] tracking-[-0.01em] text-ink sm:text-[54px]">
-                Know what&rsquo;s in <em className="text-natural">your</em> food.
-              </h1>
-              <p className="mt-5 max-w-md text-[17px] leading-relaxed text-muted">
-                Paste a supermarket product link and get a calm, plain-language breakdown of every
-                ingredient — what it is, and why it&rsquo;s there.
-              </p>
-            </div>
-          )}
+          {idle ? (
+            <>
+              <div className="max-w-xl">
+                <h1 className="font-display text-[40px] leading-[1.08] tracking-[-0.01em] text-ink sm:text-[54px]">
+                  Know what&rsquo;s in <em className="text-natural">your</em> food.
+                </h1>
+                <p className="mt-5 max-w-md text-[17px] leading-relaxed text-muted">
+                  Search any product for a calm, plain-language breakdown of every ingredient — what
+                  it is, and why it&rsquo;s there.
+                </p>
+              </div>
 
-          {!idle && (
+              {/* The search engine IS the home screen. useSearchParams needs a Suspense boundary. */}
+              <div className="mt-7 max-w-xl">
+                <Suspense fallback={null}>
+                  <SearchBox basePath="/" />
+                </Suspense>
+              </div>
+
+              <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                <Link
+                  href="/p/oatly-oat-drink-barista-edition"
+                  className="font-medium text-natural hover:underline"
+                >
+                  See a sample analysis →
+                </Link>
+                <span className="text-muted">Free &middot; No sign-up &middot; No score, ever</span>
+              </p>
+            </>
+          ) : (
             <button
               type="button"
               onClick={handleReset}
-              className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 py-1.5 text-sm font-medium text-ink shadow-card transition hover:border-natural/50 hover:text-natural focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-natural/10"
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 py-1.5 text-sm font-medium text-ink shadow-card transition hover:border-natural/50 hover:text-natural focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-natural/10"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M12 5v14M5 12h14" />
+                <path d="M15 18l-6-6 6-6" />
               </svg>
-              New scan
+              New search
             </button>
-          )}
-          <div className={idle ? "mt-7" : ""}>
-            <HomeSearch key={resetKey} onAnalyze={handleAnalyze} busy={busy} />
-          </div>
-
-          {idle && (
-            <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-              <Link
-                href="/p/oatly-oat-drink-barista-edition"
-                className="font-medium text-natural hover:underline"
-              >
-                See a sample analysis →
-              </Link>
-              <span className="text-muted">
-                Free &middot; No sign-up &middot; Reads the actual product label
-              </span>
-            </p>
           )}
         </section>
 
@@ -192,7 +186,7 @@ export default function Home() {
         {(errorMsg || streamError) && (
           <div className="mt-12 rounded-2xl border border-line bg-paper p-6 text-center shadow-card animate-fade-in">
             <p className="text-ink">{errorMsg ?? FRIENDLY_ERROR}</p>
-            <p className="mt-1 text-sm text-muted">Paste another link above to try again.</p>
+            <p className="mt-1 text-sm text-muted">Use New search above, or search for the product by name.</p>
           </div>
         )}
 

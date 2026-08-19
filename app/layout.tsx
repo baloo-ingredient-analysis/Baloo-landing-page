@@ -20,7 +20,7 @@ const display = Playfair_Display({
 export const metadata: Metadata = {
   title: "Baloo — Know what's in your food",
   description:
-    "Paste a supermarket product link and see what every ingredient is, and why it's there.",
+    "Search any food product and see what every ingredient is, and why it's there. Calm, plain language, no score.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

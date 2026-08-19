@@ -2,8 +2,9 @@
 
 // Discover search (Order G5, restyled per the D-G5 handoff §4): debounced /api/search with ?q=
 // URL state, a segmented All/Products/Lists filter, tabular count line, brand-initial thumbnails,
-// and — on a miss — the discovery→ingestion bridge ("paste the product link and we'll read the
-// label for you").
+// and — on a catalog miss — the OFF fallback (Order OFF4): look the product up in Open Food Facts,
+// analyse it once, and jump to its page. This replaced the old "paste the product link" bridge now
+// that scraping retailers is a dead end.
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -13,11 +14,12 @@ import { ProductRow, RowChevron } from "@/components/ProductRow";
 type Hit = {
   products: { id: string; name: string; brand: string | null; slug: string }[];
   lists: { id: string; slug: string; title: string; itemCount: number; ownerHandle: string | null }[];
+  off: { barcode: string; name: string; brand: string | null; quantity: string | null }[];
 };
 
 type Filter = "all" | "products" | "lists";
 
-export function SearchBox() {
+export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [q, setQ] = useState(searchParams.get("q") ?? "");
@@ -25,12 +27,47 @@ export function SearchBox() {
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  // The product currently being imported/analysed (barcode + name), so we can show a full "analysing"
+  // screen instead of just a tiny button spinner during the ~10-30s Claude call.
+  const [analyzing, setAnalyzing] = useState<{ barcode: string; name: string } | null>(null);
+  const [offErr, setOffErr] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false); // "Show more" — reveal the rest of the products
   const first = useRef(true);
 
+  // Analyse a specific Open Food Facts product on demand: import it (analyse once, cache), then go
+  // to its page. Picking a candidate is exact, so we pass the barcode, not the query.
+  async function analyseCandidate(barcode: string, name: string) {
+    setAnalyzing({ barcode, name });
+    setOffErr(null);
+    try {
+      const res = await fetch("/api/off/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barcode }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok && data.slug) {
+        router.push(`/p/${data.slug}`);
+        return; // keep the analysing screen up through navigation (don't flash the list back)
+      }
+      setOffErr(
+        res.status === 404
+          ? "That product has no ingredient list on Open Food Facts."
+          : "We couldn't analyse that right now. Please try again in a moment.",
+      );
+      setAnalyzing(null);
+    } catch {
+      setOffErr("We couldn't analyse that right now. Please try again in a moment.");
+      setAnalyzing(null);
+    }
+  }
+
   useEffect(() => {
+    setOffErr(null); // a new query clears any prior OFF error
+    setExpanded(false); // a new query collapses back to the first page of products
     if (first.current) first.current = false;
     else {
-      const url = q.trim() ? `/discover?q=${encodeURIComponent(q.trim())}` : "/discover";
+      const url = q.trim() ? `${basePath}?q=${encodeURIComponent(q.trim())}` : basePath;
       router.replace(url, { scroll: false });
     }
 
@@ -46,31 +83,70 @@ export function SearchBox() {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         setHits(await res.json());
       } catch {
-        setHits({ products: [], lists: [] });
+        setHits({ products: [], lists: [], off: [] });
       }
       setSearched(true);
       setLoading(false);
     }, 250);
     return () => clearTimeout(t);
-  }, [q, router]);
+  }, [q, router, basePath]);
 
-  const nP = hits?.products.length ?? 0;
+  // Catalog products (ready to view) + OFF candidates (analyse on tap) are ONE product list — the user
+  // shouldn't have to care which is which. Catalog first (we already have them), then OFF.
+  const nCatalog = hits?.products.length ?? 0;
+  const nOff = hits?.off?.length ?? 0;
+  const nProducts = nCatalog + nOff;
   const nL = hits?.lists.length ?? 0;
-  const empty = searched && !loading && nP === 0 && nL === 0;
+  const empty = searched && !loading && nProducts === 0 && nL === 0;
   const showLists = filter !== "products" && nL > 0;
-  const showProducts = filter !== "lists" && nP > 0;
+  const showProducts = filter !== "lists" && nProducts > 0;
+
+  // Catalog + OFF as ONE ordered product list (catalog first). "Show more" reveals past the first page.
+  const INITIAL_PRODUCTS = 6;
+  const productItems = hits
+    ? [
+        ...hits.products.map((p) => ({
+          type: "catalog" as const, key: p.id, name: p.name, brand: p.brand, slug: p.slug, quantity: null as string | null, barcode: "",
+        })),
+        ...hits.off.map((c) => ({
+          type: "off" as const, key: c.barcode, name: c.name, brand: c.brand, slug: "", quantity: c.quantity, barcode: c.barcode,
+        })),
+      ]
+    : [];
+  const visibleProducts = expanded ? productItems : productItems.slice(0, INITIAL_PRODUCTS);
 
   return (
     <div>
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
+        disabled={analyzing !== null}
         aria-label="Search products and lists"
         placeholder="Search products and lists…"
-        className="w-full rounded-full border border-line bg-paper px-5 py-3 text-ink shadow-card outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20"
+        className="w-full rounded-full border border-line bg-paper px-5 py-3 text-ink shadow-card outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20 disabled:opacity-60"
       />
 
-      {loading && (
+      {/* Analysing screen — a full, animated state while the ~10-30s import + Claude call runs, so it
+          never feels frozen. Stays up through the redirect to the product page. */}
+      {analyzing && (
+        <div className="mt-12 flex flex-col items-center gap-5 text-center animate-fade-in" role="status" aria-live="polite">
+          <span className="relative flex h-14 w-14 items-center justify-center" aria-hidden>
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-natural/20" />
+            <span className="absolute inline-flex h-9 w-9 animate-pulse rounded-full bg-natural/15" />
+            <span className="relative h-7 w-7 animate-spin rounded-full border-2 border-line border-t-natural" />
+          </span>
+          <div>
+            <p className="font-display text-[22px] leading-tight text-ink">
+              Analysing {analyzing.name}…
+            </p>
+            <p className="mt-1.5 text-sm text-muted">
+              This takes a few seconds — we&rsquo;re reading the label and explaining every ingredient.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!analyzing && loading && (
         <p className="mt-4 flex items-center gap-2 text-sm text-muted">
           <span
             aria-hidden
@@ -80,12 +156,12 @@ export function SearchBox() {
         </p>
       )}
 
-      {searched && !loading && hits && (nP > 0 || nL > 0) && (
+      {!analyzing && searched && !loading && hits && (nProducts > 0 || nL > 0) && (
         <div className="mt-5 animate-fade-in">
           <p className="text-sm tabular-nums text-muted">
-            {nP + nL} {nP + nL === 1 ? "result" : "results"}
+            {nProducts + nL} {nProducts + nL === 1 ? "result" : "results"}
             {" · "}
-            {nL} {nL === 1 ? "list" : "lists"}, {nP} {nP === 1 ? "product" : "products"}
+            {nL} {nL === 1 ? "list" : "lists"}, {nProducts} {nProducts === 1 ? "product" : "products"}
           </p>
 
           {/* Segmented filter — active pill = ink fill (D-G5 §4). */}
@@ -142,28 +218,48 @@ export function SearchBox() {
                 Products
               </h2>
               <ul className="mt-2 max-w-[760px] overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
-                {hits.products.map((p) => (
-                  <ProductRow key={p.id} slug={p.slug} name={p.name} brand={p.brand} />
-                ))}
+                {visibleProducts.map((it) =>
+                  it.type === "catalog" ? (
+                    // Already analysed — open instantly.
+                    <ProductRow key={it.key} slug={it.slug} name={it.name} brand={it.brand} />
+                  ) : (
+                    // From Open Food Facts — tapping analyses it, then opens (same list, no separate step).
+                    <ProductRow
+                      key={it.key}
+                      name={it.name}
+                      brand={it.brand}
+                      meta={[it.brand, it.quantity].filter(Boolean).join(" · ") || undefined}
+                      onClick={() => analyseCandidate(it.barcode, it.name)}
+                    />
+                  ),
+                )}
               </ul>
+              {!expanded && nProducts > INITIAL_PRODUCTS && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded(true)}
+                  className="mt-3 text-sm font-medium text-natural hover:underline"
+                >
+                  Show {nProducts - INITIAL_PRODUCTS} more
+                </button>
+              )}
+              {offErr && (
+                <p className="mt-2 text-sm text-processed" role="alert">
+                  {offErr}
+                </p>
+              )}
             </>
           )}
         </div>
       )}
 
-      {empty && (
+      {!analyzing && empty && (
         <div className="mt-5 max-w-[640px] animate-fade-in rounded-2xl border border-line bg-paper p-5 shadow-card">
           <p className="text-sm text-ink">No matches for &quot;{q.trim()}&quot;.</p>
           <p className="mt-1 text-sm text-muted">
-            Try a product name or a retailer. Or paste the product link on the home tool and
-            we&apos;ll read the label for you.
+            We couldn&rsquo;t find it in our catalog or on Open Food Facts — try a more specific name or
+            brand.
           </p>
-          <Link
-            href="/"
-            className="mt-3 inline-block rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-paper transition hover:bg-ink/85"
-          >
-            Analyse a product link
-          </Link>
         </div>
       )}
     </div>

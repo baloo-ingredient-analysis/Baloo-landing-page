@@ -15,7 +15,8 @@
     "db:seed": "npx -y tsx scripts/seed-dev.ts",
     "db:seed-supply": "npx -y tsx scripts/seed-supply.ts",
     "db:check": "npx -y tsx scripts/check-db.ts",
-    "db:embeddings": "npx -y tsx scripts/backfill-embeddings.ts"
+    "db:embeddings": "npx -y tsx scripts/backfill-embeddings.ts",
+    "db:seed-off": "npx -y tsx scripts/seed-off.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",

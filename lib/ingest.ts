@@ -58,8 +58,11 @@ export async function ingestAnalysis(
     });
 
     // Record this retailer's listing as an offer (Order P1). A second retailer scanning the same
-    // product converges on the same product row with a distinct offer — the dedup, live.
-    await upsertOffer(dbi, { productId: product.id, retailer: input.retailer, url: input.url });
+    // product converges on the same product row with a distinct offer — the dedup, live. Skip when
+    // there's no retailer (OFF-sourced products, OFF2): a null/null offer is meaningless.
+    if (input.retailer) {
+      await upsertOffer(dbi, { productId: product.id, retailer: input.retailer, url: input.url });
+    }
 
     // The canonical analysis is by definition complete once we ingest it.
     await dbi
