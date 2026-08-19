@@ -324,3 +324,53 @@ async function runOffSearch(q: string, countryTag: string | null): Promise<OffCa
   rows.sort((a, b) => b.pop - a.pop || b.completeness - a.completeness || a.i - b.i);
   return rows.map((r) => r.c);
 }
+
+// A raw OFF hit for the side-by-side comparison tool — carries the diagnostic fields the filter would
+// normally act on (so we can SEE why a row would be kept or dropped).
+export type OffRawCandidate = OffCandidate & {
+  completeness: number;
+  hasIngredients: boolean; // states_tags includes en:ingredients-completed
+  lang: string;
+};
+
+/** UNFILTERED OFF search (comparison tool, per Jitain): exactly what search-a-licious returns for the
+ *  query, in OFF's own rank order — NO quality gate, NO dedup, NO country scope. The counterpart to
+ *  `searchOffCandidates`, so we can judge how messy the raw data is vs our filtered pipeline. Only floor:
+ *  a row needs a barcode + name to render at all. */
+export async function searchOffCandidatesRaw(query: string, limit = 25): Promise<OffRawCandidate[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const url =
+    `${OFF_SEARCH}?q=${encodeURIComponent(q)}` +
+    `&page_size=${Math.min(Math.max(limit, 1), 50)}` +
+    `&fields=code,product_name,product_name_en,brands,quantity,lang,states_tags,completeness,popularity_key`;
+  const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
+  if (!data || !Array.isArray(data.hits)) return [];
+
+  const out: OffRawCandidate[] = [];
+  for (const h of data.hits) {
+    const barcode = String(h.code ?? "").replace(/\D/g, "");
+    const name = String(h.product_name_en || h.product_name || "").replace(/\s+/g, " ").trim();
+    if (barcode.length < 8 || !name) continue; // still need something to show
+
+    const brands = h.brands;
+    const brand = Array.isArray(brands)
+      ? (typeof brands[0] === "string" ? brands[0] : null)
+      : firstOf(brands);
+    const quantity = typeof h.quantity === "string" && h.quantity.trim() ? h.quantity.trim() : null;
+    const states = Array.isArray(h.states_tags) ? (h.states_tags as unknown[]) : [];
+    const completeness = typeof h.completeness === "number" ? h.completeness : 0;
+    const lang = typeof h.lang === "string" ? h.lang : "";
+    out.push({
+      barcode,
+      name,
+      brand,
+      quantity,
+      completeness,
+      hasIngredients: states.includes("en:ingredients-completed"),
+      lang,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
