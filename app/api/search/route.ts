@@ -39,7 +39,7 @@ export async function GET(req: Request) {
 
   // Don't show an OFF candidate we already have in the catalog (dedupe by barcode).
   const known = new Set(products.map((p) => p.barcode).filter(Boolean));
-  const off = offRaw.filter((c) => !known.has(c.barcode)).slice(0, 6);
+  const off = offRaw.filter((c) => !known.has(c.barcode)).slice(0, 12);
 
   return NextResponse.json({
     products: products.map((p) => ({ id: p.id, name: p.name, brand: p.brand, slug: p.slug })),
