@@ -253,13 +253,15 @@ const COUNTRY_TAG: Record<string, string> = {
   MX: "mexico", AR: "argentina", CO: "colombia", CL: "chile",
 };
 
-/** Search OFF by name → deduped product candidates. Two things make this robust across ALL brands:
+/** Search OFF by name → deduped product candidates. Three things make this robust across ALL brands:
  *  (1) we search the viewer's local market AND globally, then merge local-first — so local brands
  *  (Hacendado) surface for a generic query while international brands (Terrasana, mostly non-Spanish on
- *  OFF) are still fully covered; (2) NO language filter — a Dutch/French product is kept, and its
- *  ingredient names are translated to English during analysis. We only require a COMPLETE ingredient
- *  list, and rank by popularity so the canonical entry wins and junk sinks. Hydrate a choice via
- *  getOffProductByBarcode. */
+ *  OFF) are still fully covered; (2) a PRECISE brand-scoped pass (`brands_tags:"…"`) that leads the
+ *  results when the query is a multi-word brand — free-text alone is noisy there ("casa tarradellas"
+ *  matches the token "casa" everywhere: ~3400 false hits vs ~70 real ones, so the real products get
+ *  buried); (3) NO language filter — a Dutch/French product is kept, and its ingredient names are
+ *  translated to English during analysis. We only require a COMPLETE ingredient list, and rank by
+ *  popularity so the canonical entry wins and junk sinks. Hydrate a choice via getOffProductByBarcode. */
 export async function searchOffCandidates(
   query: string,
   limit = 5,
@@ -269,15 +271,22 @@ export async function searchOffCandidates(
   if (q.length < 2) return [];
   const localTag = country ? COUNTRY_TAG[country.toUpperCase()] ?? null : null;
 
-  // Local + global in parallel, then merge local-first — a soft geo preference, not a hard filter.
-  const [local, global] = await Promise.all([
-    localTag ? runOffSearch(q, `en:${localTag}`) : Promise.resolve([] as OffCandidate[]),
-    runOffSearch(q, null),
+  // Three passes in parallel: precise brand-scoped, local free-text, global free-text.
+  const [brand, local, global] = await Promise.all([
+    runOffSearch(q, { brand: true }),
+    localTag ? runOffSearch(q, { countryTag: `en:${localTag}` }) : Promise.resolve([] as OffCandidate[]),
+    runOffSearch(q, {}),
   ]);
+
+  // Lead with the brand set ONLY when the query is a multi-word brand that actually resolves to real
+  // products — that's the precision case. For single-token or non-brand queries, free-text already
+  // matches the brand field well, so keep the local-first order and just append any brand extras.
+  const brandLeads = /\s/.test(q) && brand.length >= 3;
+  const merged = brandLeads ? [...brand, ...local, ...global] : [...local, ...global, ...brand];
 
   const out: OffCandidate[] = [];
   const seen = new Set<string>();
-  for (const c of [...local, ...global]) {
+  for (const c of merged) {
     const key = normalizeName(c.name);
     if (!key || seen.has(key)) continue;
     seen.add(key);
@@ -287,13 +296,20 @@ export async function searchOffCandidates(
   return out;
 }
 
-/** One OFF search pass (optionally scoped to a country), quality-filtered + popularity-ranked. Returns
- *  all passing candidates; the caller merges + dedupes across the local and global passes. */
-async function runOffSearch(q: string, countryTag: string | null): Promise<OffCandidate[]> {
-  // Country scoping is a Lucene filter INSIDE q — the &countries_tags= query param does not filter.
-  const filter = countryTag ? ` countries_tags:"${countryTag}"` : "";
+/** One OFF search pass, quality-filtered + popularity-ranked. `brand:true` runs a precise fielded
+ *  `brands_tags:"<normalized>"` query; otherwise free-text, optionally scoped to a country. Returns all
+ *  passing candidates; the caller merges + dedupes across passes. */
+async function runOffSearch(
+  query: string,
+  opts: { countryTag?: string | null; brand?: boolean } = {},
+): Promise<OffCandidate[]> {
+  // Country scoping (and the brand field) are Lucene clauses INSIDE q — the &countries_tags= query
+  // param does not filter.
+  const lucene = opts.brand
+    ? `brands_tags:"${normalizeBrandTag(query)}"`
+    : query + (opts.countryTag ? ` countries_tags:"${opts.countryTag}"` : "");
   const url =
-    `${OFF_SEARCH}?q=${encodeURIComponent(q + filter)}` +
+    `${OFF_SEARCH}?q=${encodeURIComponent(lucene)}` +
     `&page_size=25&fields=code,product_name,product_name_en,brands,quantity,states_tags,completeness,popularity_key`;
   const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
   if (!data || !Array.isArray(data.hits)) return [];
