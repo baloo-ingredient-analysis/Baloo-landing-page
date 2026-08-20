@@ -18,17 +18,16 @@ type FilteredHit = {
   products: { id: string; name: string; brand: string | null; slug: string }[];
   off: { barcode: string; name: string; brand: string | null; quantity: string | null }[];
 };
-type RawHit = {
-  off: {
-    barcode: string;
-    name: string;
-    brand: string | null;
-    quantity: string | null;
-    completeness: number;
-    hasIngredients: boolean;
-    lang: string;
-  }[];
+type RawRow = {
+  barcode: string;
+  name: string;
+  brand: string | null;
+  quantity: string | null;
+  completeness: number;
+  hasIngredients: boolean;
+  lang: string;
 };
+type RawHit = { off: RawRow[]; total: number; queried: string };
 type CommercialResult = {
   barcode: string;
   found: boolean;
@@ -44,6 +43,7 @@ export function OffCompare() {
   const [q, setQ] = useState("");
   const [filtered, setFiltered] = useState<FilteredHit | null>(null);
   const [raw, setRaw] = useState<RawHit | null>(null);
+  const [brandRaw, setBrandRaw] = useState<RawHit | null>(null);
   const [commercial, setCommercial] = useState<CommercialHit | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -83,6 +83,7 @@ export function OffCompare() {
     if (q.trim().length < 2) {
       setFiltered(null);
       setRaw(null);
+      setBrandRaw(null);
       setCommercial(null);
       setSearched(false);
       setLoading(false);
@@ -91,13 +92,16 @@ export function OffCompare() {
     setLoading(true);
     const t = setTimeout(async () => {
       const enc = encodeURIComponent(q.trim());
-      // Filtered + raw in parallel (same query is the whole point of the comparison).
-      const [f, r] = await Promise.all([
+      // Filtered + raw (free-text) + raw (brand-scoped) in parallel — the brand experiment compares
+      // free-text q against a fielded brands_tags query on the SAME term.
+      const [f, r, br] = await Promise.all([
         fetch(`/api/search?q=${enc}`).then((res) => res.json()).catch(() => ({ products: [], off: [] })),
-        fetch(`/api/search/raw?q=${enc}`).then((res) => res.json()).catch(() => ({ off: [] })),
+        fetch(`/api/search/raw?q=${enc}`).then((res) => res.json()).catch(() => ({ off: [], total: 0, queried: "" })),
+        fetch(`/api/search/raw?q=${enc}&mode=brand`).then((res) => res.json()).catch(() => ({ off: [], total: 0, queried: "" })),
       ]);
       setFiltered(f);
       setRaw(r);
+      setBrandRaw(br);
       // Then look the raw barcodes up in the paid DB (depends on r) — the third panel.
       const barcodes = (r?.off ?? []).map((x: RawHit["off"][number]) => x.barcode);
       const comm: CommercialHit | null = barcodes.length
@@ -129,6 +133,7 @@ export function OffCompare() {
       ]
     : [];
   const rawItems = raw?.off ?? [];
+  const brandItems = brandRaw?.off ?? [];
   const commByBarcode = new Map((commercial?.results ?? []).map((r) => [r.barcode, r]));
 
   if (analyzing) {
@@ -167,7 +172,7 @@ export function OffCompare() {
       )}
 
       {searched && !loading && (
-        <div className="mt-6 grid gap-8 lg:grid-cols-3">
+        <div className="mt-6 grid gap-8 md:grid-cols-2">
           {/* 1 · Filtered pipeline */}
           <section>
             <div className="flex items-baseline justify-between gap-3">
@@ -192,13 +197,18 @@ export function OffCompare() {
             )}
           </section>
 
-          {/* 2 · Raw OFF */}
+          {/* 2 · Raw OFF (free-text) */}
           <section>
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Raw Open Food Facts</h2>
-              <span className="text-xs tabular-nums text-muted">{rawItems.length} returned</span>
+              <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Raw OFF · free-text</h2>
+              <span className="text-xs tabular-nums text-muted">
+                {rawItems.length} of {(raw?.total ?? 0).toLocaleString()}
+              </span>
             </div>
-            <p className="mt-1 text-xs text-muted">Unfiltered — no gate, no dedup, no country. Warts and all.</p>
+            <p className="mt-1 text-xs text-muted">
+              <code className="rounded bg-canvas px-1 py-0.5 text-[12px]">q={q.trim()}</code> — matches any token,
+              anywhere. Noisy on multi-word brands.
+            </p>
             {rawItems.length ? (
               <ul className="mt-3 overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
                 {rawItems.map((c) => (
@@ -227,7 +237,48 @@ export function OffCompare() {
             )}
           </section>
 
-          {/* 3 · Commercial DB — same barcodes, looked up in the paid source */}
+          {/* 3 · Brand-scoped OFF — the experiment: fielded brands_tags query on the same term */}
+          <section>
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-natural">Raw OFF · brand-scoped</h2>
+              <span className="text-xs tabular-nums text-muted">
+                {brandItems.length} of {(brandRaw?.total ?? 0).toLocaleString()}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              <code className="rounded bg-canvas px-1 py-0.5 text-[12px]">{brandRaw?.queried || "brands_tags:…"}</code>{" "}
+              — precise brand match (normalized).
+            </p>
+            {brandItems.length ? (
+              <ul className="mt-3 overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
+                {brandItems.map((c) => (
+                  <ProductRow
+                    key={c.barcode}
+                    name={c.name}
+                    brand={c.brand}
+                    meta={
+                      [
+                        [c.brand, c.quantity].filter(Boolean).join(" · "),
+                        c.lang ? c.lang.toUpperCase() : null,
+                        `${Math.round(c.completeness * 100)}% complete`,
+                        c.hasIngredients ? null : "no ingredient list",
+                      ]
+                        .filter(Boolean)
+                        .join("  ·  ") || undefined
+                    }
+                    onClick={() => analyse(c.barcode, c.name)}
+                  />
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 rounded-2xl border border-line bg-paper p-4 text-sm text-muted shadow-card">
+                No products under that brand tag — the query may not be a brand, or OFF normalizes it
+                differently.
+              </p>
+            )}
+          </section>
+
+          {/* 4 · Commercial DB — same barcodes, looked up in the paid source */}
           <section>
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">

@@ -333,20 +333,46 @@ export type OffRawCandidate = OffCandidate & {
   lang: string;
 };
 
+/** A raw OFF search result — the candidates PLUS the total count OFF reports for the query (so the
+ *  /compare tool can show "178 in OFF, showing 25" and compare recall/precision across query modes). */
+export type OffRawResult = { total: number; candidates: OffRawCandidate[]; queried: string };
+
+/** Normalise a brand name to OFF's `brands_tags` slug: accents folded, lowercased, non-alphanumerics
+ *  collapsed to dashes ("Casa Tarradellas" -> "casa-tarradellas", "Nestlé" -> "nestle"). This is the
+ *  key to a PRECISE brand search — the brand-search experiment (Jitain's Possibility 1/2). */
+export function normalizeBrandTag(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // strip diacritics
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 /** UNFILTERED OFF search (comparison tool, per Jitain): exactly what search-a-licious returns for the
- *  query, in OFF's own rank order — NO quality gate, NO dedup, NO country scope. The counterpart to
- *  `searchOffCandidates`, so we can judge how messy the raw data is vs our filtered pipeline. Only floor:
- *  a row needs a barcode + name to render at all. */
-export async function searchOffCandidatesRaw(query: string, limit = 25): Promise<OffRawCandidate[]> {
-  const q = query.trim();
-  if (q.length < 2) return [];
+ *  query, in OFF's own rank order — NO quality gate, NO dedup, NO country scope. `mode` picks the query
+ *  shape being compared:
+ *    • "text"  — free-text `q=<query>` (what the live pipeline uses).
+ *    • "brand" — fielded `q=brands_tags:"<normalized>"`: precise brand match. On multi-word brands
+ *                free-text is noisy (matches the token "casa" everywhere → thousands of false hits),
+ *                while the brand tag returns only that brand's products.
+ *  Only floor: a row needs a barcode + name to render. */
+export async function searchOffRaw(
+  query: string,
+  mode: "text" | "brand" = "text",
+  limit = 25,
+): Promise<OffRawResult> {
+  const raw = query.trim();
+  if (raw.length < 2) return { total: 0, candidates: [], queried: "" };
+  const lucene = mode === "brand" ? `brands_tags:"${normalizeBrandTag(raw)}"` : raw;
   const url =
-    `${OFF_SEARCH}?q=${encodeURIComponent(q)}` +
+    `${OFF_SEARCH}?q=${encodeURIComponent(lucene)}` +
     `&page_size=${Math.min(Math.max(limit, 1), 50)}` +
     `&fields=code,product_name,product_name_en,brands,quantity,lang,states_tags,completeness,popularity_key`;
-  const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
-  if (!data || !Array.isArray(data.hits)) return [];
+  const data = (await offFetch(url)) as { hits?: Record<string, unknown>[]; count?: number } | null;
+  if (!data || !Array.isArray(data.hits)) return { total: 0, candidates: [], queried: lucene };
 
+  const total = typeof data.count === "number" ? data.count : data.hits.length;
   const out: OffRawCandidate[] = [];
   for (const h of data.hits) {
     const barcode = String(h.code ?? "").replace(/\D/g, "");
@@ -372,5 +398,5 @@ export async function searchOffCandidatesRaw(query: string, limit = 25): Promise
     });
     if (out.length >= limit) break;
   }
-  return out;
+  return { total, candidates: out, queried: lucene };
 }

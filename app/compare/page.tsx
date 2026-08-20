@@ -23,9 +23,9 @@ export default function ComparePage() {
               Filtered vs raw
             </h1>
             <p className="mt-4 text-[17px] leading-relaxed text-muted">
-              One search, three sources. Our filtered pipeline (what users see), the raw Open Food Facts
-              response (no gate, no dedup, no country), and a paid barcode DB looked up on the same
-              products — so we can judge whose ingredient data is actually cleaner.
+              One search, four views. Our filtered pipeline (what users see), raw OFF free-text search,
+              raw OFF <em>brand-scoped</em> search (the recall/precision experiment), and a paid barcode
+              DB looked up on the same products — to judge which query and which source give the best data.
             </p>
           </div>
 
