@@ -30,6 +30,9 @@ export type IngestInput = {
   ingredients: Ingredient[];
   product_summary?: string | null;
   nutrition?: Nutrition | null;
+  // Sales markets (OFF countries_tags, humanised). Drives the ES/UK market gate in search. OFF-sourced
+  // products carry it; the paste/retailer flows leave it null (unknown → never hidden).
+  countries?: string[] | null;
 };
 
 export async function ingestAnalysis(
@@ -54,6 +57,7 @@ export async function ingestAnalysis(
       brand: input.brand ?? null,
       barcode: input.barcode ?? null,
       retailer: input.retailer ?? null,
+      countries: input.countries ?? null,
       source: "user_scan",
     });
 

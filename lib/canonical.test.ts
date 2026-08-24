@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeName, canonicalKey, productSlug, ingredientKey } from "./canonical";
+import { normalizeName, canonicalKey, productSlug, ingredientKey, productDedupKey } from "./canonical";
 
 describe("normalizeName", () => {
   it("lowercases, strips punctuation, and collapses whitespace", () => {
@@ -9,6 +9,13 @@ describe("normalizeName", () => {
   it("strips accents (NFKD)", () => {
     expect(normalizeName("Café")).toBe("cafe");
     expect(normalizeName("Cocá Cola")).toBe("coca cola");
+  });
+  it("strips mid-word accents without splitting the word (the zéro bug)", () => {
+    // é = e + U+0301; must become "zero", never "ze ro" (the combining mark must be dropped, not
+    // turned into a space). Critical for Spanish/French product names.
+    expect(normalizeName("Coca-cola zéro")).toBe("coca cola zero");
+    expect(normalizeName("José")).toBe("jose");
+    expect(normalizeName("azúcar")).toBe("azucar");
   });
   it("empty-ish input normalises to empty string", () => {
     expect(normalizeName("!!!")).toBe("");
@@ -51,5 +58,41 @@ describe("ingredientKey", () => {
   it("normalises so the same ingredient maps to one cache row", () => {
     expect(ingredientKey("Water")).toBe("water");
     expect(ingredientKey("Sea Salt")).toBe(ingredientKey("  sea   salt "));
+  });
+});
+
+describe("productDedupKey (search-display dedup: collapse the same product, keep different ones)", () => {
+  const key = (name: string, brand?: string | null) => productDedupKey({ name, brand });
+
+  it("collapses size/format/case/accent variants of the SAME product", () => {
+    const canonical = key("Coca Cola Zero", "Coca-Cola");
+    for (const [n, b] of [
+      ["Coca Cola Zero 1,5l", "Coca-Cola"],
+      ["Coca Cola Zero - 330 ml", "Coca-Cola"],
+      ["COCA COLA ZERO", "coca cola"],
+      ["Coca-cola zéro", "Coca-Cola zero"], // accented + brand-field spelling drift
+      ["Coca cola zero", "Coca cola zero"],
+    ] as const) {
+      expect(key(n, b)).toBe(canonical);
+    }
+  });
+
+  it("folds ES/EN label words so the same product across languages collapses", () => {
+    // "Coca-Cola zero azúcar" (ES) and "Coca Cola Zero Sugar" (EN) are one product.
+    expect(key("Coca-Cola zero azúcar", "Coca-Cola")).toBe(key("Coca Cola Zero Sugar", "Coca-Cola"));
+  });
+
+  it("keeps genuinely different products separate (distinct names)", () => {
+    const zero = key("Coca Cola Zero", "Coca-Cola");
+    expect(key("Coca Cola Zero Sugar", "Coca-Cola")).not.toBe(zero); // different product line
+    expect(key("Coca-Cola", "Coca-Cola")).not.toBe(zero); // regular ≠ zero
+    expect(key("Nutella Biscuits", "Nutella")).not.toBe(key("Nutella", "Nutella")); // spread ≠ biscuits
+  });
+
+  it("collapses ONE product stored under different brand spellings (name-only key)", () => {
+    // The same "Nutella" listed with brand Nutella / Ferrero / FerreroNutella is one product.
+    const a = key("Nutella", "Nutella");
+    expect(key("Nutella", "Ferrero")).toBe(a);
+    expect(key("Nutella", "FerreroNutella")).toBe(a);
   });
 });

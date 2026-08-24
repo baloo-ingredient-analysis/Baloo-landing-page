@@ -78,6 +78,13 @@
       "when": 1785914978045,
       "tag": "0010_exotic_metal_master",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787568325437,
+      "tag": "0011_goofy_maggott",
+      "breakpoints": true
     }
   ]
 }

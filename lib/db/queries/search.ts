@@ -12,6 +12,7 @@ import { listItems, lists, profiles, products, saves, votes, type Product } from
 import { sql } from "drizzle-orm";
 import { toVectorLiteral } from "../../embeddings";
 import { productAvailability, blendGeoRank } from "../../region";
+import { isBetaMarket } from "../../openfoodfacts";
 import { GEO_WEIGHTS } from "../../config";
 import type { ListWithCountsAndOwner } from "./lists";
 
@@ -23,7 +24,7 @@ export type SearchResults = {
 // Cosine distance (pgvector <=> ) above this is treated as "not really related" and dropped, so a
 // query with no close products doesn't pull in junk. 0 = identical, 2 = opposite; ~0.2–0.5 is a good
 // match. Tunable once there's real catalog volume.
-const SEMANTIC_MAX_DISTANCE = 0.7;
+const SEMANTIC_MAX_DISTANCE = 0.5;
 
 // Reciprocal-rank fusion: merge several ranked lists into one. An item ranked high in EITHER list
 // scores well, so exact keyword hits and semantic hits both surface. k=60 is the standard constant.
@@ -83,10 +84,13 @@ export async function searchAll(
       .limit(candidateN);
   }
 
-  const relevanceRanked =
+  // ES/UK market gate (mirrors the OFF search gate): hide catalog products KNOWN to be sold only in
+  // other markets (a Finnish-market Coke that was analysed earlier). Unknown market → kept.
+  const fused =
     queryEmbedding && queryEmbedding.length
-      ? fuseByRank([keywordProducts, semanticProducts]).slice(0, limitEach)
-      : keywordProducts.slice(0, limitEach);
+      ? fuseByRank([keywordProducts, semanticProducts])
+      : keywordProducts;
+  const relevanceRanked = fused.filter((p) => isBetaMarket(p.countries)).slice(0, limitEach);
 
   // GR4: light geo tiebreak on the visible page — reorders near-equal relevance, never overrides it.
   const productRows = country

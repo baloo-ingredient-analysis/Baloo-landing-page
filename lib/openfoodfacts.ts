@@ -9,7 +9,7 @@
 // so search just serves the existing catalog when OFF is unreachable.
 
 import type { Nutrition } from "./schema";
-import { normalizeName } from "./canonical";
+import { productDedupKey } from "./canonical";
 
 const OFF_BASE = "https://world.openfoodfacts.org";
 const USER_AGENT = "Baloo/1.0 (https://baloo.life; ingredient analysis)";
@@ -242,6 +242,18 @@ export type OffCandidate = { barcode: string; name: string; brand: string | null
 
 const OFF_SEARCH = "https://search.openfoodfacts.org/search";
 
+// Beta markets: Spain + UK ONLY. Two shapes: raw OFF `countries_tags` (for search hits) and the
+// humanised form `cleanTags` stores on a product (`products.countries`). Keep them in lockstep.
+export const BETA_MARKET_TAGS = ["en:spain", "en:united-kingdom"];
+export const BETA_MARKET_SLUGS = ["spain", "united kingdom"];
+
+/** True when a product's markets include a beta market. Unknown/empty → true: we don't HIDE products
+ *  we have no market data for (e.g. a user scan); only ones we KNOW are foreign (a Finnish Coke). */
+export function isBetaMarket(countries: string[] | null | undefined): boolean {
+  if (!countries || countries.length === 0) return true;
+  return countries.some((c) => BETA_MARKET_SLUGS.includes(c.trim().toLowerCase()));
+}
+
 // Map a viewer's ISO country (Vercel geo) to the OFF `countries_tags` slug (en:<slug>), so search is
 // scoped to the products actually sold where the user is — the same product's ingredients differ by
 // market, and a generic query like "pizza" should surface local brands (Casa Tarradellas), not the
@@ -287,7 +299,7 @@ export async function searchOffCandidates(
   const out: OffCandidate[] = [];
   const seen = new Set<string>();
   for (const c of merged) {
-    const key = normalizeName(c.name);
+    const key = productDedupKey(c);
     if (!key || seen.has(key)) continue;
     seen.add(key);
     out.push(c);
@@ -310,12 +322,15 @@ async function runOffSearch(
     : query + (opts.countryTag ? ` countries_tags:"${opts.countryTag}"` : "");
   const url =
     `${OFF_SEARCH}?q=${encodeURIComponent(lucene)}` +
-    `&page_size=25&fields=code,product_name,product_name_en,brands,quantity,states_tags,completeness,popularity_key`;
+    `&page_size=25&fields=code,product_name,product_name_en,product_name_es,brands,quantity,states_tags,completeness,popularity_key,countries_tags`;
   const data = (await offFetch(url)) as { hits?: Record<string, unknown>[] } | null;
   if (!data || !Array.isArray(data.hits)) return [];
 
-  // QUALITY GATE: require a COMPLETE ingredient list (so Analyse never dead-ends) and drop empty/garbage
-  // records. NO language filter — foreign products are kept and translated during analysis.
+  // QUALITY GATE: require a COMPLETE ingredient list (so Analyse never dead-ends), drop empty/garbage
+  // records, AND require the product to be sold in a BETA MARKET (Spain or UK). The beta serves ES/UK
+  // only, so foreign-market clones (a Finnish/German/Chinese Coke Zero) are dropped rather than shown
+  // with unfamiliar recipes. Search hits carry raw `countries_tags` ("en:finland") — require an
+  // explicit ES/UK tag (no market tag at all → drop; an OFF product missing its market is junk here).
   const rows: { c: OffCandidate; pop: number; completeness: number; i: number }[] = [];
   data.hits.forEach((h, i) => {
     const states = Array.isArray(h.states_tags) ? (h.states_tags as unknown[]) : [];
@@ -323,8 +338,18 @@ async function runOffSearch(
     const completeness = typeof h.completeness === "number" ? h.completeness : 0;
     if (completeness < 0.35) return; // near-empty record → skip
 
+    // Hide only KNOWN-foreign products (tagged, but not a beta market) — a Finnish Coke. An OFF product
+    // with NO country tag is kept (unknown → don't hide): OFF's tagging is patchy, and dropping every
+    // untagged product wrongly buries Spanish brands (Casa Tarradellas) whose entries lack the tag.
+    // Same rule as the catalog gate (isBetaMarket), just on raw tags.
+    const ctags = Array.isArray(h.countries_tags) ? (h.countries_tags as unknown[]).map(String) : [];
+    if (ctags.length > 0 && !ctags.some((t) => BETA_MARKET_TAGS.includes(t))) return; // known-foreign
+
     const barcode = String(h.code ?? "").replace(/\D/g, "");
-    const name = String(h.product_name_en || h.product_name || "").replace(/\s+/g, " ").trim();
+    // Prefer an ES/EN product name so the card reads cleanly; fall back to the default name.
+    const name = String(h.product_name_en || h.product_name_es || h.product_name || "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (barcode.length < 8 || !name || name.toLowerCase() === "undefined") return;
 
     const brands = h.brands;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { searchAll } from "@/lib/db/queries/search";
 import { searchOffCandidates } from "@/lib/openfoodfacts";
+import { productDedupKey } from "@/lib/canonical";
 import { embedText, embeddingsEnabled } from "@/lib/embeddings";
 import { checkLimit, clientIp, tooMany } from "@/lib/ratelimit";
 
@@ -37,12 +38,30 @@ export async function GET(req: Request) {
     searchOffCandidates(q, 12, country),
   ]);
 
-  // Don't show an OFF candidate we already have in the catalog (dedupe by barcode).
+  // Collapse near-duplicate SKUs of the SAME product across the unified list (catalog first, then OFF)
+  // so size/format/case/accent variants of one drink don't flood a query. Catalog wins — it has the
+  // full breakdown. `seen` accumulates across both sources; OFF is also deduped by barcode against the
+  // catalog. Genuinely different products keep distinct names, so they still show separately.
+  const seen = new Set<string>();
+  const dedupProducts = products.filter((p) => {
+    const k = productDedupKey({ name: p.name, brand: p.brand });
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   const known = new Set(products.map((p) => p.barcode).filter(Boolean));
-  const off = offRaw.filter((c) => !known.has(c.barcode)).slice(0, 12);
+  const off: typeof offRaw = [];
+  for (const c of offRaw) {
+    if (known.has(c.barcode)) continue;
+    const k = productDedupKey(c);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    off.push(c);
+    if (off.length >= 12) break;
+  }
 
   return NextResponse.json({
-    products: products.map((p) => ({ id: p.id, name: p.name, brand: p.brand, slug: p.slug })),
+    products: dedupProducts.map((p) => ({ id: p.id, name: p.name, brand: p.brand, slug: p.slug })),
     lists: lists.map((l) => ({
       id: l.id,
       slug: l.slug,
