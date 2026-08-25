@@ -63,8 +63,27 @@ export async function GET(req: Request) {
     if (off.length >= 12) break;
   }
 
+  // Rank by how much of the query each result actually matches (name + brand), so the closest products
+  // lead within each group — e.g. the "…Zero" variants above "…Energy"/regular for "coca cola zero".
+  // Stable: equal coverage keeps the source relevance/popularity order, and a brand-only query ("oatly")
+  // ties every hit at full coverage → no-op.
+  const coverage = (name: string, brand?: string | null) => {
+    if (!qTokens.size) return 1;
+    const hay = new Set(normalizeName(`${name} ${brand ?? ""}`).split(" "));
+    let n = 0;
+    for (const t of qTokens) if (hay.has(t)) n++;
+    return n / qTokens.size;
+  };
+  const byCoverage = <T extends { name: string; brand?: string | null }>(rows: T[]): T[] =>
+    rows
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => coverage(b.r.name, b.r.brand) - coverage(a.r.name, a.r.brand) || a.i - b.i)
+      .map((x) => x.r);
+  const rankedProducts = byCoverage(dedupProducts);
+  const rankedOff = byCoverage(off);
+
   return NextResponse.json({
-    products: dedupProducts.map((p) => ({ id: p.id, name: p.name, brand: p.brand, slug: p.slug })),
+    products: rankedProducts.map((p) => ({ id: p.id, name: p.name, brand: p.brand, slug: p.slug })),
     lists: lists.map((l) => ({
       id: l.id,
       slug: l.slug,
@@ -74,6 +93,6 @@ export async function GET(req: Request) {
       likeCount: l.likeCount, // L8: likes are public; saveCount stays server-side (private signal)
       ownerHandle: l.ownerHandle,
     })),
-    off, // [{ barcode, name, brand }]
+    off: rankedOff, // [{ barcode, name, brand }]
   });
 }

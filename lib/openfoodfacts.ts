@@ -351,6 +351,9 @@ async function runOffSearch(
       .replace(/\s+/g, " ")
       .trim();
     if (barcode.length < 8 || !name || name.toLowerCase() === "undefined") return;
+    // Drop products the label itself marks as no longer sold — a shopper can't buy them, so they're
+    // noise in search (e.g. "…- DESCATALOGADO"). Cross-market wording for "discontinued".
+    if (/\b(descatalogad|discontinued|no disponible|obsolet|retir[ée]|ausverkauft|vergriffen)\w*/i.test(name)) return;
 
     const brands = h.brands;
     const brand = Array.isArray(brands)

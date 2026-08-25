@@ -38,7 +38,11 @@ const SIZE_TOKENS =
 const ES_EN_SYNONYM: Record<string, string> = {
   azucar: "sugar", cero: "zero", sin: "without", con: "with", cafeina: "caffeine",
   descafeinado: "decaf", lima: "lime", limon: "lemon", naranja: "orange", fresa: "strawberry",
-  sabor: "flavour", bebida: "drink", refresco: "soda",
+  sabor: "flavour", bebida: "drink", boisson: "drink", refresco: "soda",
+  // Common food nouns across the markets we serve (ES/FR/DE) → one English token, so cross-language
+  // listings of the same product fold ("bebida de avena" ≈ "boisson à l'avoine" ≈ "oat drink").
+  avena: "oat", avoine: "oat", hafer: "oat", leche: "milk", lait: "milk", milch: "milk",
+  galleta: "biscuit", galletas: "biscuit", queso: "cheese", chocolate: "chocolate",
 };
 
 // Generic packaging/marketing filler that NEVER identifies a product — dropped from the key so listings
@@ -49,6 +53,9 @@ const FILLER_WORDS = new Set([
   "edition", "edicion", "classic", "clasico", "premium", "bio", "organic", "organico", "ecologico",
   "eco", "uht", "pack", "formato", "ahorro", "receta", "style", "estilo", "long", "life", "the",
   "flavour", "flavoured", "flavored", "gout", "gusto",
+  // Articles/prepositions that only glue a name together ("bebida DE avena", "boisson À L'avoine") —
+  // never product identity. Dropped so cross-language names line up after the food-noun fold above.
+  "de", "del", "la", "el", "le", "les", "du", "des", "lo", "los", "las",
 ]);
 
 export function productDedupKey(
@@ -73,7 +80,9 @@ export function productDedupKey(
     .split(" ")
     .filter(Boolean)
     .map((w) => ES_EN_SYNONYM[w] ?? w)
-    .filter((w) => !FILLER_WORDS.has(w) && !ignoreTokens?.has(w));
+    // Drop filler, the query's own words, and stray single LETTERS (apostrophe/abbreviation debris like
+    // the "l" in "l'avoine" or "à") — never identity. Single digits are kept (a real "7 Up" survives).
+    .filter((w) => !FILLER_WORDS.has(w) && !ignoreTokens?.has(w) && !(w.length === 1 && !/\d/.test(w)));
   // If a name is ALL filler, keep it rather than collapsing to empty (fall back to the raw tokens).
   const meaningful = tokens.length
     ? tokens

@@ -108,6 +108,15 @@ describe("productDedupKey (search-display dedup: collapse the same product, keep
     expect(key("Pringles Original")).not.toBe(key("Pringles")); // "original" is NOT filler
   });
 
+  it("folds cross-language food nouns and stray single letters (oat-drink twins)", () => {
+    const oatDrink = key("Oat Drink");
+    expect(key("Bebida de avena")).toBe(oatDrink); // ES
+    expect(key("Boisson à l'avoine")).toBe(oatDrink); // FR — apostrophe debris ("l", "à") dropped
+    expect(key("Hafer Drink")).toBe(oatDrink); // DE
+    // a distinctive word still separates real variants
+    expect(key("Avena cacao")).not.toBe(oatDrink);
+  });
+
   it("ignores the query's own tokens so the brand-in-name doesn't split a product", () => {
     const q = new Set(["oatly"]);
     expect(productDedupKey({ name: "Oatly Oat Drink Barista" }, q)).toBe(
