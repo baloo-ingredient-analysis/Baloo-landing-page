@@ -41,17 +41,44 @@ const ES_EN_SYNONYM: Record<string, string> = {
   sabor: "flavour", bebida: "drink", refresco: "soda",
 };
 
-export function productDedupKey(input: { name: string; brand?: string | null }): string {
+// Generic packaging/marketing filler that NEVER identifies a product — dropped from the key so listings
+// that differ only by these words collapse ("Barista" vs "Barista Edition vs "Barista Edition Long
+// Life"). Cross-language, and deliberately CONSERVATIVE: distinctive words that really separate real
+// products ("original", "natural", flavour names) are NOT here, so different variants stay apart.
+const FILLER_WORDS = new Set([
+  "edition", "edicion", "classic", "clasico", "premium", "bio", "organic", "organico", "ecologico",
+  "eco", "uht", "pack", "formato", "ahorro", "receta", "style", "estilo", "long", "life", "the",
+  "flavour", "flavoured", "flavored", "gout", "gusto",
+]);
+
+export function productDedupKey(
+  input: { name: string; brand?: string | null },
+  ignoreTokens?: Set<string>,
+): string {
   // Name-only (brand deliberately excluded): OFF/catalog store ONE product under many brand spellings
   // ("Nutella" as brand Nutella / Ferrero / FerreroNutella), so keying on brand splits identical
   // products into separate rows. The name already carries the identity for a search, so we key on the
   // size-stripped, ES→EN-folded name alone — three "Nutella" listings collapse to one. Trade-off: two
   // different makers sharing a generic name ("Yogur Natural") also fold; the size/synonym folding keeps
   // it from being too broad, and distinctive names still separate real variants ("Nutella Biscuits").
-  return normalizeName(input.name.toLowerCase().replace(SIZE_TOKENS, " "))
+  //
+  // Tokens are SORTED (order-independent): "Oat Drink Barista Edition" and "Barista Edition Oat Drink"
+  // are the same product written in a different word order, so they must key the same. This only ever
+  // merges names with the IDENTICAL word SET — different flavours (Doritos "BBQ" vs "Nacho") differ by
+  // a distinctive word, so their sets differ and they stay separate.
+  // `ignoreTokens` = the query's own words. In a search for "oatly", every hit contains "oatly", so it
+  // carries no identity for THAT query — dropping it lets "Oatly Oat Drink Barista" and "Oat Drink
+  // Barista" collapse. The empty-name fallback below stops it from over-merging into one blank key.
+  const tokens = normalizeName(input.name.toLowerCase().replace(SIZE_TOKENS, " "))
     .split(" ")
+    .filter(Boolean)
     .map((w) => ES_EN_SYNONYM[w] ?? w)
-    .join(" ");
+    .filter((w) => !FILLER_WORDS.has(w) && !ignoreTokens?.has(w));
+  // If a name is ALL filler, keep it rather than collapsing to empty (fall back to the raw tokens).
+  const meaningful = tokens.length
+    ? tokens
+    : normalizeName(input.name.toLowerCase().replace(SIZE_TOKENS, " ")).split(" ").filter(Boolean);
+  return meaningful.sort().join(" ");
 }
 
 // barcode when we have one (the OFF/Go-UPC source, later); else a normalised brand+name key.

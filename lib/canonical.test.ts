@@ -95,4 +95,23 @@ describe("productDedupKey (search-display dedup: collapse the same product, keep
     expect(key("Nutella", "Ferrero")).toBe(a);
     expect(key("Nutella", "FerreroNutella")).toBe(a);
   });
+
+  it("is order-independent (same word set, different order → same key)", () => {
+    expect(key("Oat Drink Barista Edition")).toBe(key("Barista Edition Oat Drink"));
+    // but a different word SET (a real flavour word) stays separate
+    expect(key("Doritos BBQ")).not.toBe(key("Doritos Nacho"));
+  });
+
+  it("drops generic packaging/marketing filler but keeps distinctive words", () => {
+    expect(key("Oat Drink Barista Edition Long Life")).toBe(key("Oat Drink Barista"));
+    expect(key("Pringles Sabor Original")).toBe(key("Pringles Original")); // sabor→flavour→filler
+    expect(key("Pringles Original")).not.toBe(key("Pringles")); // "original" is NOT filler
+  });
+
+  it("ignores the query's own tokens so the brand-in-name doesn't split a product", () => {
+    const q = new Set(["oatly"]);
+    expect(productDedupKey({ name: "Oatly Oat Drink Barista" }, q)).toBe(
+      productDedupKey({ name: "Oat Drink Barista" }, q),
+    );
+  });
 });

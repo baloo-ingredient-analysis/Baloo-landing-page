@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { searchAll } from "@/lib/db/queries/search";
 import { searchOffCandidates } from "@/lib/openfoodfacts";
-import { productDedupKey } from "@/lib/canonical";
+import { productDedupKey, normalizeName } from "@/lib/canonical";
 import { embedText, embeddingsEnabled } from "@/lib/embeddings";
 import { checkLimit, clientIp, tooMany } from "@/lib/ratelimit";
 
@@ -42,9 +42,12 @@ export async function GET(req: Request) {
   // so size/format/case/accent variants of one drink don't flood a query. Catalog wins — it has the
   // full breakdown. `seen` accumulates across both sources; OFF is also deduped by barcode against the
   // catalog. Genuinely different products keep distinct names, so they still show separately.
+  // The query's own words carry no identity for THIS search (every "oatly" hit says "oatly"), so we
+  // strip them before deduping — collapsing "Oatly Oat Drink Barista" into "Oat Drink Barista".
+  const qTokens = new Set(normalizeName(q).split(" ").filter(Boolean));
   const seen = new Set<string>();
   const dedupProducts = products.filter((p) => {
-    const k = productDedupKey({ name: p.name, brand: p.brand });
+    const k = productDedupKey({ name: p.name, brand: p.brand }, qTokens);
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
@@ -53,7 +56,7 @@ export async function GET(req: Request) {
   const off: typeof offRaw = [];
   for (const c of offRaw) {
     if (known.has(c.barcode)) continue;
-    const k = productDedupKey(c);
+    const k = productDedupKey(c, qTokens);
     if (seen.has(k)) continue;
     seen.add(k);
     off.push(c);
