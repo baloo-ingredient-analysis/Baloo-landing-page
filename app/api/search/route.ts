@@ -69,9 +69,14 @@ export async function GET(req: Request) {
   // analysed), and equal-coverage items otherwise keep their source relevance/popularity order. The
   // `rank` we emit lets the client interleave the two lists it renders. Brand-only query → all tie → the
   // existing catalog-first order is preserved.
-  const coverage = (name: string, brand?: string | null) => {
+  // Coverage = fraction of query tokens present in a field. We rank by NAME coverage first, then BRAND
+  // coverage — so a real "Nutella…"-named product beats a jam that only has "Nutella" in its (often
+  // mislabeled) brand field, demoting that brand-only junk below the fold. Pure brand queries (oatly,
+  // casa tarradellas — nothing has the brand in the name) tie at name-cov 0 / brand-cov 1, so their
+  // existing order is preserved. Catalog wins remaining ties (instant result) via the stable index.
+  const cov = (text?: string | null) => {
     if (!qTokens.size) return 1;
-    const hay = new Set(normalizeName(`${name} ${brand ?? ""}`).split(" "));
+    const hay = new Set(normalizeName(text ?? "").split(" "));
     let n = 0;
     for (const t of qTokens) if (hay.has(t)) n++;
     return n / qTokens.size;
@@ -79,8 +84,8 @@ export async function GET(req: Request) {
   const combined = [...dedupProducts, ...off]; // catalog indices first → they win ties via stable sort
   const rankOf = new Map<number, number>();
   combined
-    .map((r, i) => ({ i, cov: coverage(r.name, r.brand) }))
-    .sort((a, b) => b.cov - a.cov || a.i - b.i)
+    .map((r, i) => ({ i, nameCov: cov(r.name), brandCov: cov(r.brand) }))
+    .sort((a, b) => b.nameCov - a.nameCov || b.brandCov - a.brandCov || a.i - b.i)
     .forEach((o, r) => rankOf.set(o.i, r));
 
   return NextResponse.json({
