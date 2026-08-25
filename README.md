@@ -1,9 +1,11 @@
 # Baloo
 
-**Know what's in your food.** Paste a supermarket product link and Baloo streams back a calm,
-plain-language breakdown of every ingredient — what it is, why it's in *that* product, a
-Natural/Processed tag, and any listed %. From there, products can be saved into shareable lists and
-discovered through the people who curate them.
+**Know what's in your food.** Search a product by name — or paste a supermarket link — and Baloo
+returns a calm, plain-language breakdown of every ingredient: what it is, why it's in *that* product, a
+Natural/Processed tag, and any listed %. The homepage **is** a search engine over a catalog filled from
+[Open Food Facts](https://world.openfoodfacts.org) (retailer scraping is a dead end — most sites block
+us or don't publish the barcode). From there, products can be saved into shareable lists and discovered
+through the people who curate them.
 
 Baloo **explains, it never scores.** No health score, no rating, no traffic lights — ever. That
 guardrail is the whole point, and it's enforced in [`PRODUCT.md`](PRODUCT.md) and
@@ -37,6 +39,9 @@ keys to switch on the real pipeline and the community features.
 | `npm run db:generate` | Generate a Drizzle migration from `lib/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations to `DATABASE_URL` |
 | `npm run db:seed` | Seed demo data (products, users, lists) |
+| `npm run db:seed-off` | Bulk-import popular products from Open Food Facts (dry-run by default) |
+| `npm run db:embeddings` | Backfill product embeddings for semantic search (needs `OPENAI_API_KEY`) |
+| `npm run db:countries` | Backfill `products.countries` (sales markets) from OFF — powers the ES/UK gate |
 | `npm run db:check` | Read-only assertions against the live DB |
 
 ## Environment variables
@@ -50,6 +55,7 @@ All server-side unless noted. Full annotated list in [`.env.example`](.env.examp
 | `DATABASE_URL` | Postgres (accounts, lists, catalog) | Optional — no DB → tool-only mode |
 | `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | Supabase Auth (client) | Public **by design** (safety is RLS, not key secrecy) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-side ingestion/admin | Optional (with `DATABASE_URL`) |
+| `OPENAI_API_KEY` | AI semantic search embeddings (`text-embedding-3-small`) | Optional — keyword-only search without it |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | URL cache + the homepage board | Optional |
 | `LOOPS_API_KEY` | Email capture | Optional |
 
@@ -58,19 +64,25 @@ deliberate exception — the Supabase model makes them public and relies on Row-
 
 ## How it works (at a glance)
 
+**Primary — search (Open Food Facts catalog):**
 ```
-Paste URL ─▶ /api/extract ─▶ Firecrawl scrape ─▶ Claude extract ─▶ header + ordered ingredients
+Search text ─▶ /api/search ─▶ catalog (pgvector semantic + keyword) + live OFF candidates
+                   │            ─▶ general filters: dedup · ES/UK market gate · relevance rank
+                   ▼
+             pick a result ─▶ known → product page instantly
+                           ─▶ OFF candidate → /api/off/lookup ─▶ analyse once ─▶ product page
+```
+
+**Secondary — paste a link (for name/image; retailer scraping mostly blocked):**
+```
+Paste URL ─▶ /api/extract ─▶ Firecrawl scrape ─▶ Claude extract ─▶ /api/analyze (Claude streamObject)
                   │                                                         │
-          (L1 Redis cache, URL-keyed)                            /api/analyze ─▶ Claude streamObject
-          (L2 Postgres, identity-keyed:                                   │
-           known product → skip analysis)                        cards stream to the client
-                                                                          │
-                                                          persisted to the catalog (product page, lists)
+          (L1 Redis cache, URL-keyed · L2 Postgres, identity-keyed)  cards stream to the client
 ```
 
 A successful analysis is stored **once** per real product (deduped on a canonical key) and reused
 everywhere — the product page, other retailers' listings, and any list it's added to. The full model
-is documented in **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**.
+(including the search-quality filters) is documented in **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**.
 
 ## Documentation map
 

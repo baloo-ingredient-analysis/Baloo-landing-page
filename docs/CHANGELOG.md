@@ -7,6 +7,35 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### `/compare` diagnostics + search-quality pipeline + ES/UK market gate — `feat/off-compare`
+The internal **`/compare`** tool (four side-by-side views of one query — our filtered pipeline, raw OFF
+free-text, raw OFF brand-scoped, and a paid barcode DB via BarcodeNest/Chomp) drove a round of search
+quality work. Tested finding: for a **Spain/UK beta, free OFF + our own filtering / brand detection /
+translation beats the paid barcode DBs** (BarcodeNest is OFF repackaged; Chomp is US-focused and thinner
+on EU brands). One criterion applied to every product — no per-brand logic.
+- **General product dedup** (`lib/canonical.ts` `productDedupKey`, `app/api/search/route.ts`): collapse
+  listings of the *same* product across catalog + OFF — size/format/case/accent stripping, ES→EN label
+  folding, a **name-only** key (one product stored under many brand spellings — "Nutella" as
+  Nutella/Ferrero/FerreroNutella — folds to one), order-independent tokens, generic filler-word removal,
+  and query-token ignore (the searched brand carries no identity for that query). Fixes a real
+  `normalizeName` bug: a mid-word accent was replaced by a *space* ("zéro" → "ze ro"), breaking every
+  accented Spanish/French canonical key — diacritics are now dropped ("zéro" → "zero").
+- **Spain/UK market gate**: `products.countries` (migration `0011`), filled from OFF at ingest. OFF
+  search + catalog search hide products *known* to be sold only in other markets (a Finnish-market Coke)
+  while keeping untagged ones (unknown → not hidden). `npm run db:countries` backfills existing rows.
+- **Relevance, junk & language**: cross-group ranking by query coverage (a strong OFF match can lead a
+  weak catalog one; catalog wins ties, since its result is instant); drop discontinued products
+  ("…DESCATALOGADO" / no disponible / …); fold cross-language food nouns (avena/avoine/hafer → oat).
+  Semantic distance floor tightened `0.7 → 0.5` to cut loosely-related catalog matches.
+- **Composite "base" wording** (`lib/prompts.ts`): when the label names the Base as a single made food
+  it doesn't break down ("Greek Style Natural Yoghurt (Milk)"), the analysis now says so — stops a
+  Processed base reading as a mystery (Luna bug #5/#15). Shared prompt, both analysis paths.
+- **Housekeeping**: migration `0010` made idempotent so `db:migrate` reconciles cleanly (its tracker had
+  fallen behind the live schema); **DESIGN.md** type ramp expanded to document the shipped ~10-step
+  scale. A semantic result-clustering experiment was prototyped and **removed** — on OFF's inconsistent
+  data it wrongly merged distinct products (Casa Tarradellas pizza flavours) without reliably folding
+  true twins. On `feat/off-compare`; not yet merged.
+
 ### Open Food Facts catalog + search-first (OFF1–OFF4) — `feat/off-catalog`
 - **The web stops scraping retailers and sources products from Open Food Facts.** Tested finding:
   Tesco/Kroger hard-block us, and even reachable sites (Ocado/Target) never publish the barcode, and

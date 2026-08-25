@@ -45,6 +45,26 @@ Jitain call, not made unilaterally. The dual-intent box already routes text sear
 Make search the primary homepage action (the dual-intent box already exists); the paste-link path
 becomes the secondary "add by name/image". Verify end to end; update ARCHITECTURE.md + CHANGELOG.md.
 
+## Search-quality layer (`feat/off-compare`)
+OFF's crowd-sourced data is inconsistent (one product under many brand/name spellings, patchy country
+tags, discontinued entries), so `/api/search` cleans the merged catalog+OFF result with **one set of
+general, brand-agnostic filters** (no per-brand logic) — tuned against the internal **`/compare`** tool
+(filtered pipeline vs raw OFF free-text vs raw OFF brand-scoped vs a paid barcode DB, BarcodeNest/Chomp).
+
+- **Dedup** (`lib/canonical.ts` `productDedupKey`): strip size/format/case/accents, fold ES→EN label
+  words, key on the **name only** (brand fields disagree), sort tokens (order-independent), drop generic
+  filler and the query's own tokens. `normalizeName` drops combining diacritics (`zéro`→`zero`).
+- **ES/UK market gate**: `products.countries` (migration `0011`, from OFF `countries_tags` at ingest;
+  backfill `npm run db:countries`). Hide products *known* to be sold only elsewhere; keep untagged ones.
+- **Rank / junk / language**: cross-group ranking by query coverage (strong OFF match can lead a weak
+  catalog one, catalog wins ties); drop discontinued ("…DESCATALOGADO"); fold cross-language food nouns
+  (avena/avoine/hafer→oat). Semantic distance floor `0.7 → 0.5`.
+- **Tested conclusion**: for a Spain/UK beta, **free OFF + this layer beats the paid barcode DBs** —
+  BarcodeNest is OFF repackaged; Chomp is US-focused and thinner on EU brands. Paying doesn't buy cleaner
+  or broader data; the value is our layer on top. Revisit Chomp only for a US/mainstream push.
+- A semantic result-clustering experiment was tried and removed: OFF names carry too little signal, so it
+  merged distinct products (pizza flavours) without reliably folding true twins.
+
 ## Notes
 - **Licensing:** OFF is ODbL (share-alike). Fine for the consumer web with attribution; **legal sign-off
   before any of it feeds a paid/B2B product** (Jitain — same gate as the old P6 note).
