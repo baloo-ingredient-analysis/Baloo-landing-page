@@ -137,7 +137,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
             <span className="relative h-7 w-7 animate-spin rounded-full border-2 border-line border-t-natural" />
           </span>
           <div>
-            <p className="font-display text-[22px] leading-tight text-ink">
+            <p className="font-display text-[23px] leading-tight text-ink">
               Analysing {analyzing.name}…
             </p>
             <p className="mt-1.5 text-sm text-muted">

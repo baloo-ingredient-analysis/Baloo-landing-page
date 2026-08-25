@@ -147,7 +147,7 @@ export function OffCompare() {
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-natural/20" />
           <span className="relative h-7 w-7 animate-spin rounded-full border-2 border-line border-t-natural" />
         </span>
-        <p className="font-display text-[22px] leading-tight text-ink">Analysing {analyzing.name}…</p>
+        <p className="font-display text-[23px] leading-tight text-ink">Analysing {analyzing.name}…</p>
       </div>
     );
   }
