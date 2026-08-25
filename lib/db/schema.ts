@@ -87,6 +87,10 @@ export const products = pgTable(
     analysisStatus: analysisStatusEnum("analysis_status").notNull().default("done"),
     analysedAt: timestamp("analysed_at", { withTimezone: true }),
     category: text("category"), // OFF/H1 taxonomy later; readies /c/[category]
+    // Sales markets (OFF countries_tags, humanised: "spain", "united kingdom"). The beta serves ES/UK
+    // only, so search hides products whose market is known and NOT one of those (a Finnish-market Coke
+    // never surfaces). NULL/empty = unknown (e.g. a user scan) → not hidden. Filled from OFF at ingest.
+    countries: text("countries").array(),
     createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     // Semantic search (SS1): OpenAI text-embedding-3-small vector of brand+name+summary+ingredients.

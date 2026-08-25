@@ -37,6 +37,7 @@ export async function upsertProductByCanonicalKey(
         retailer: values.retailer ?? null,
         barcode: values.barcode ?? null,
         imageUrl: values.imageUrl ?? null,
+        countries: values.countries ?? null,
       },
     })
     .returning();

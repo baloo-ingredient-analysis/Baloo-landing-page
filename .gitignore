@@ -14,3 +14,7 @@ next-env.d.ts
 # The manifest (skills-lock.json) IS committed so the install stays reproducible.
 .agents/
 .claude/skills/
+
+# Internal strategy notes — keep untracked/unpublished
+docs/DNS_AND_DOMAINS.md
+docs/WEB_MOBILE_CONVERGENCE.md

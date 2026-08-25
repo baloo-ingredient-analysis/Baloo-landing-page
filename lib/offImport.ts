@@ -56,6 +56,7 @@ export async function importOffMapped(dbi: Db, off: OffProduct): Promise<ImportR
     ingredients: analysis.ingredients,
     product_summary: analysis.product_summary ?? null,
     nutrition: off.nutrition ?? undefined,
+    countries: off.countries, // OFF sales markets → the ES/UK gate in search
   });
   if (!persisted) return { ok: false, reason: "analyse_failed" };
 

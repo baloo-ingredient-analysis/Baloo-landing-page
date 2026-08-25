@@ -14,12 +14,30 @@ colors:
   like: "#C24C4C"        # Order L8 — the one social colour; lists' Like heart only, never on food UI
   like-soft: "#F7E8E6"
 typography:
+  # The shipped ramp. There is no Tailwind fontSize scale yet, so sizes are arbitrary values in code
+  # (text-[Npx]); these are the intentional steps that documents them. Serif = Playfair (headings),
+  # Sans = Inter (text). Known one-offs still to snap to a step: 10, 28, 52, 58.
+  # displayLg — homepage + /compare h1 at ≥sm
+  displayLg:
+    fontFamily: "Playfair Display, Georgia, serif"
+    fontSize: "54px"
+    fontWeight: 400
+    lineHeight: 1.08
+    letterSpacing: "-0.01em"
+  # display — hero h1 base (bumps to displayLg at ≥sm)
   display:
     fontFamily: "Playfair Display, Georgia, serif"
-    fontSize: "36px"
+    fontSize: "40px"
     fontWeight: 400
-    lineHeight: 1.1
+    lineHeight: 1.08
     letterSpacing: "-0.01em"
+  # pageTitle — section h1 (feed, admin, profile)
+  pageTitle:
+    fontFamily: "Playfair Display, Georgia, serif"
+    fontSize: "30px"
+    fontWeight: 400
+    lineHeight: 1.15
+  # headline — loading / section headings
   headline:
     fontFamily: "Playfair Display, Georgia, serif"
     fontSize: "23px"
@@ -30,16 +48,35 @@ typography:
     fontSize: "19px"
     fontWeight: 400
     lineHeight: 1.3
+  # rowTitle — compact list-row product names (search, compare)
+  rowTitle:
+    fontFamily: "Playfair Display, Georgia, serif"
+    fontSize: "17px"
+    fontWeight: 400
+    lineHeight: 1.3
   body:
     fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.6
+  # small — dense UI, controls, chips, meta (the workhorse sans size)
+  small:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.5
+  # label — uppercase, tracked micro-label
   label:
     fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "12px"
     fontWeight: 600
     letterSpacing: "0.12em"
+  # micro — pills, tiny status/meta
+  micro:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "11px"
+    fontWeight: 500
+    lineHeight: 1.4
 rounded:
   lg: "8px"
   xl: "12px"

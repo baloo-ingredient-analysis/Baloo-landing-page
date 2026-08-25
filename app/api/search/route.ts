@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { searchAll } from "@/lib/db/queries/search";
 import { searchOffCandidates } from "@/lib/openfoodfacts";
+import { productDedupKey, normalizeName } from "@/lib/canonical";
 import { embedText, embeddingsEnabled } from "@/lib/embeddings";
 import { checkLimit, clientIp, tooMany } from "@/lib/ratelimit";
 
@@ -37,12 +38,60 @@ export async function GET(req: Request) {
     searchOffCandidates(q, 12, country),
   ]);
 
-  // Don't show an OFF candidate we already have in the catalog (dedupe by barcode).
+  // Collapse near-duplicate SKUs of the SAME product across the unified list (catalog first, then OFF)
+  // so size/format/case/accent variants of one drink don't flood a query. Catalog wins — it has the
+  // full breakdown. `seen` accumulates across both sources; OFF is also deduped by barcode against the
+  // catalog. Genuinely different products keep distinct names, so they still show separately.
+  // The query's own words carry no identity for THIS search (every "oatly" hit says "oatly"), so we
+  // strip them before deduping — collapsing "Oatly Oat Drink Barista" into "Oat Drink Barista".
+  const qTokens = new Set(normalizeName(q).split(" ").filter(Boolean));
+  const seen = new Set<string>();
+  const dedupProducts = products.filter((p) => {
+    const k = productDedupKey({ name: p.name, brand: p.brand }, qTokens);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   const known = new Set(products.map((p) => p.barcode).filter(Boolean));
-  const off = offRaw.filter((c) => !known.has(c.barcode)).slice(0, 12);
+  const off: typeof offRaw = [];
+  for (const c of offRaw) {
+    if (known.has(c.barcode)) continue;
+    const k = productDedupKey(c, qTokens);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    off.push(c);
+    if (off.length >= 12) break;
+  }
+
+  // CROSS-GROUP ranking by how much of the query each result matches (name + brand), so a strong OFF
+  // match can lead a weak catalog one — for "coca cola zero" the exact "…Zero" hits rank above regular
+  // Coca-Cola / "…Energy" regardless of source. Catalog wins TIES (its result is instant — already
+  // analysed), and equal-coverage items otherwise keep their source relevance/popularity order. The
+  // `rank` we emit lets the client interleave the two lists it renders. Brand-only query → all tie → the
+  // existing catalog-first order is preserved.
+  // Coverage = fraction of query tokens present in a field. We rank by NAME coverage first, then BRAND
+  // coverage — so a real "Nutella…"-named product beats a jam that only has "Nutella" in its (often
+  // mislabeled) brand field, demoting that brand-only junk below the fold. Pure brand queries (oatly,
+  // casa tarradellas — nothing has the brand in the name) tie at name-cov 0 / brand-cov 1, so their
+  // existing order is preserved. Catalog wins remaining ties (instant result) via the stable index.
+  const cov = (text?: string | null) => {
+    if (!qTokens.size) return 1;
+    const hay = new Set(normalizeName(text ?? "").split(" "));
+    let n = 0;
+    for (const t of qTokens) if (hay.has(t)) n++;
+    return n / qTokens.size;
+  };
+  const combined = [...dedupProducts, ...off]; // catalog indices first → they win ties via stable sort
+  const rankOf = new Map<number, number>();
+  combined
+    .map((r, i) => ({ i, nameCov: cov(r.name), brandCov: cov(r.brand) }))
+    .sort((a, b) => b.nameCov - a.nameCov || b.brandCov - a.brandCov || a.i - b.i)
+    .forEach((o, r) => rankOf.set(o.i, r));
 
   return NextResponse.json({
-    products: products.map((p) => ({ id: p.id, name: p.name, brand: p.brand, slug: p.slug })),
+    products: dedupProducts.map((p, i) => ({
+      id: p.id, name: p.name, brand: p.brand, slug: p.slug, rank: rankOf.get(i) ?? i,
+    })),
     lists: lists.map((l) => ({
       id: l.id,
       slug: l.slug,
@@ -52,6 +101,6 @@ export async function GET(req: Request) {
       likeCount: l.likeCount, // L8: likes are public; saveCount stays server-side (private signal)
       ownerHandle: l.ownerHandle,
     })),
-    off, // [{ barcode, name, brand }]
+    off: off.map((c, j) => ({ ...c, rank: rankOf.get(dedupProducts.length + j) ?? Infinity })), // [{ barcode, name, brand, rank }]
   });
 }

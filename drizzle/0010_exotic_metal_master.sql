@@ -3,5 +3,5 @@
 -- don't match semantic queries (keyword search still covers them). Drizzle generated the ALTER +
 -- index; the CREATE EXTENSION is hand-added (Drizzle doesn't manage extensions).
 CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
-ALTER TABLE "products" ADD COLUMN "embedding" vector(1536);--> statement-breakpoint
-CREATE INDEX "products_embedding_idx" ON "products" USING hnsw ("embedding" vector_cosine_ops);
+ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "embedding" vector(1536);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "products_embedding_idx" ON "products" USING hnsw ("embedding" vector_cosine_ops);

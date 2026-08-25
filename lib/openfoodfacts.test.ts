@@ -108,13 +108,28 @@ describe("parseOffIngredients", () => {
     expect(ing[3].percent).toBe("0.7%");
   });
 
-  it("REJECTS a product with no English/Spanish ingredient text (no i18n yet)", () => {
-    const greek = {
-      lang: "el",
-      ingredients: [{ text: "Ζάχαρη" }, { text: "Νερό" }],
-      ingredients_text: "Ζάχαρη, Νερό",
+  it("KEEPS a foreign-language product (names get translated to English at analysis)", () => {
+    // No i18n at search time, so we keep the foreign list verbatim and let the analysis model
+    // translate the names — foreign brands (Terrasana, Dutch) are covered, not dropped.
+    const dutch = {
+      lang: "nl",
+      ingredients: [{ text: "Suiker", percent: 20 }, { text: "Water" }],
+      ingredients_text: "Suiker 20%, Water",
     };
-    expect(parseOffIngredients(greek, "el")).toEqual([]); // not en/es, no en/es text → skipped
+    expect(parseOffIngredients(dutch, "nl")).toEqual([
+      { name: "Suiker", percent: "20%" },
+      { name: "Water", percent: null },
+    ]);
+  });
+
+  it("prefers English/Spanish text over the foreign structured array when available", () => {
+    const dutch = {
+      lang: "nl",
+      ingredients: [{ text: "Suiker" }, { text: "Water" }],
+      ingredients_text: "Suiker, Water",
+      ingredients_text_en: "Sugar, Water",
+    };
+    expect(parseOffIngredients(dutch, "nl").map((i) => i.name)).toEqual(["Sugar", "Water"]);
   });
 });
 

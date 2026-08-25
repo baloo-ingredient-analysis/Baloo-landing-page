@@ -173,6 +173,23 @@ no match; `npm run db:seed-off` bulk-imports popular products. Optional-infra: O
 just serves the existing catalog. ODbL (attribution; legal sign-off before paid/B2B use). Depth in
 `docs/OFF_CATALOG.md`.
 
+**Search-quality layer (`feat/off-compare`):** `/api/search` merges the catalog (`searchAll`) with live
+OFF candidates and applies one set of general, brand-agnostic filters (all in `lib/canonical.ts`
+`productDedupKey` + the route):
+- **Dedup** — collapse listings of the same product across sources: strip size/format/case/accents, fold
+  ES→EN label words, key on the **name only** (brand fields are inconsistent — "Nutella" as
+  Nutella/Ferrero/FerreroNutella), sort tokens (order-independent), drop generic filler + the query's own
+  tokens. `normalizeName` drops combining diacritics so accented spellings collapse (`zéro`→`zero`).
+- **ES/UK market gate** — hide products *known* to be sold only in other markets. Signal is
+  `products.countries` (OFF `countries_tags`, humanised; migration `0011`, filled at ingest via
+  `lib/offImport.ts`; backfill `npm run db:countries`). Unknown market → not hidden. `isBetaMarket()` is
+  the shared predicate; OFF search gates on the raw `countries_tags`.
+- **Rank / junk / language** — cross-group ranking by query coverage (a strong OFF match can lead a weak
+  catalog one; catalog wins ties via an emitted `rank` the client sorts on); discontinued products
+  dropped; cross-language food nouns folded (avena/avoine/hafer→oat). The internal **`/compare`** page
+  (`components/discover/OffCompare.tsx`) shows the filtered pipeline vs raw OFF (free-text and
+  brand-scoped) vs a paid barcode DB, for tuning these.
+
 ---
 
 ## 5. Auth & authorization
