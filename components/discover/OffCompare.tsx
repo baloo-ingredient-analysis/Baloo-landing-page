@@ -15,8 +15,8 @@ import { useRouter } from "next/navigation";
 import { ProductRow } from "@/components/ProductRow";
 
 type FilteredHit = {
-  products: { id: string; name: string; brand: string | null; slug: string }[];
-  off: { barcode: string; name: string; brand: string | null; quantity: string | null }[];
+  products: { id: string; name: string; brand: string | null; slug: string; rank?: number }[];
+  off: { barcode: string; name: string; brand: string | null; quantity: string | null; rank?: number }[];
 };
 type RawRow = {
   barcode: string;
@@ -121,16 +121,20 @@ export function OffCompare() {
   }, [q]);
 
   // Filtered panel = catalog first, then gated OFF (mirrors the live app's one unified list).
+  // Ordered by the server's cross-group `rank` (same as the live app) so the panel mirrors exactly what
+  // a user sees — a strong OFF match can lead a weak catalog one, catalog winning ties.
   const filteredItems = filtered
     ? [
         ...filtered.products.map((p) => ({
           key: `c:${p.id}`, name: p.name, brand: p.brand, slug: p.slug, barcode: "", meta: p.brand ?? undefined,
+          rank: p.rank ?? 0,
         })),
         ...filtered.off.map((c) => ({
           key: `o:${c.barcode}`, name: c.name, brand: c.brand, slug: "", barcode: c.barcode,
           meta: [c.brand, c.quantity].filter(Boolean).join(" · ") || undefined,
+          rank: c.rank ?? Number.MAX_SAFE_INTEGER,
         })),
-      ]
+      ].sort((a, b) => a.rank - b.rank)
     : [];
   const rawItems = raw?.off ?? [];
   const brandItems = brandRaw?.off ?? [];
