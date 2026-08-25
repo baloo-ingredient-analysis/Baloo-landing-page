@@ -12,9 +12,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ProductRow, RowChevron } from "@/components/ProductRow";
 
 type Hit = {
-  products: { id: string; name: string; brand: string | null; slug: string }[];
+  products: { id: string; name: string; brand: string | null; slug: string; rank?: number }[];
   lists: { id: string; slug: string; title: string; itemCount: number; ownerHandle: string | null }[];
-  off: { barcode: string; name: string; brand: string | null; quantity: string | null }[];
+  off: { barcode: string; name: string; brand: string | null; quantity: string | null; rank?: number }[];
 };
 
 type Filter = "all" | "products" | "lists";
@@ -101,17 +101,18 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
   const showLists = filter !== "products" && nL > 0;
   const showProducts = filter !== "lists" && nProducts > 0;
 
-  // Catalog + OFF as ONE ordered product list (catalog first). "Show more" reveals past the first page.
+  // Catalog + OFF as ONE product list, ordered by the server's cross-group `rank` (query relevance,
+  // catalog winning ties) so a strong OFF match can lead a weak catalog one. "Show more" reveals the rest.
   const INITIAL_PRODUCTS = 6;
   const productItems = hits
     ? [
         ...hits.products.map((p) => ({
-          type: "catalog" as const, key: p.id, name: p.name, brand: p.brand, slug: p.slug, quantity: null as string | null, barcode: "",
+          type: "catalog" as const, key: p.id, name: p.name, brand: p.brand, slug: p.slug, quantity: null as string | null, barcode: "", rank: p.rank ?? 0,
         })),
         ...hits.off.map((c) => ({
-          type: "off" as const, key: c.barcode, name: c.name, brand: c.brand, slug: "", quantity: c.quantity, barcode: c.barcode,
+          type: "off" as const, key: c.barcode, name: c.name, brand: c.brand, slug: "", quantity: c.quantity, barcode: c.barcode, rank: c.rank ?? Number.MAX_SAFE_INTEGER,
         })),
-      ]
+      ].sort((a, b) => a.rank - b.rank)
     : [];
   const visibleProducts = expanded ? productItems : productItems.slice(0, INITIAL_PRODUCTS);
 

@@ -63,10 +63,12 @@ export async function GET(req: Request) {
     if (off.length >= 12) break;
   }
 
-  // Rank by how much of the query each result actually matches (name + brand), so the closest products
-  // lead within each group — e.g. the "…Zero" variants above "…Energy"/regular for "coca cola zero".
-  // Stable: equal coverage keeps the source relevance/popularity order, and a brand-only query ("oatly")
-  // ties every hit at full coverage → no-op.
+  // CROSS-GROUP ranking by how much of the query each result matches (name + brand), so a strong OFF
+  // match can lead a weak catalog one — for "coca cola zero" the exact "…Zero" hits rank above regular
+  // Coca-Cola / "…Energy" regardless of source. Catalog wins TIES (its result is instant — already
+  // analysed), and equal-coverage items otherwise keep their source relevance/popularity order. The
+  // `rank` we emit lets the client interleave the two lists it renders. Brand-only query → all tie → the
+  // existing catalog-first order is preserved.
   const coverage = (name: string, brand?: string | null) => {
     if (!qTokens.size) return 1;
     const hay = new Set(normalizeName(`${name} ${brand ?? ""}`).split(" "));
@@ -74,16 +76,17 @@ export async function GET(req: Request) {
     for (const t of qTokens) if (hay.has(t)) n++;
     return n / qTokens.size;
   };
-  const byCoverage = <T extends { name: string; brand?: string | null }>(rows: T[]): T[] =>
-    rows
-      .map((r, i) => ({ r, i }))
-      .sort((a, b) => coverage(b.r.name, b.r.brand) - coverage(a.r.name, a.r.brand) || a.i - b.i)
-      .map((x) => x.r);
-  const rankedProducts = byCoverage(dedupProducts);
-  const rankedOff = byCoverage(off);
+  const combined = [...dedupProducts, ...off]; // catalog indices first → they win ties via stable sort
+  const rankOf = new Map<number, number>();
+  combined
+    .map((r, i) => ({ i, cov: coverage(r.name, r.brand) }))
+    .sort((a, b) => b.cov - a.cov || a.i - b.i)
+    .forEach((o, r) => rankOf.set(o.i, r));
 
   return NextResponse.json({
-    products: rankedProducts.map((p) => ({ id: p.id, name: p.name, brand: p.brand, slug: p.slug })),
+    products: dedupProducts.map((p, i) => ({
+      id: p.id, name: p.name, brand: p.brand, slug: p.slug, rank: rankOf.get(i) ?? i,
+    })),
     lists: lists.map((l) => ({
       id: l.id,
       slug: l.slug,
@@ -93,6 +96,6 @@ export async function GET(req: Request) {
       likeCount: l.likeCount, // L8: likes are public; saveCount stays server-side (private signal)
       ownerHandle: l.ownerHandle,
     })),
-    off: rankedOff, // [{ barcode, name, brand }]
+    off: off.map((c, j) => ({ ...c, rank: rankOf.get(dedupProducts.length + j) ?? Infinity })), // [{ barcode, name, brand, rank }]
   });
 }
