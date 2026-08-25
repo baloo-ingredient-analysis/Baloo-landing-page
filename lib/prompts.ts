@@ -76,6 +76,11 @@ For each ingredient, in the same order, return:
 - why_its_here: 2-3 sentences on the concrete role it plays in THIS product — the function it
   serves (e.g. texture, moisture, preservation, flavour, colour, emulsifying, fortification) and
   why a product like this one includes it. Tie it to this product, not to ingredients in general.
+  COMPOSITE BASE: when the label names the Base as a single made food that could itself be broken
+  into sub-ingredients but the label does NOT break it down (e.g. "Greek Style Natural Yoghurt
+  (Milk)", "Sponge", "Pastry", "Chocolate"), say so plainly here — note that the label lists it as
+  the base without a further breakdown, and briefly what such a base is usually made of. This keeps
+  a Processed base from reading as a mystery. State it as neutral context, never as a shortcoming.
 - percentage: the listed percentage (e.g. "1%") or null
 - percentage_note: if a percentage is present, whether that amount is meaningful or mainly
   cosmetic; otherwise null
