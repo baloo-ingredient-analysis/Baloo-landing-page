@@ -43,6 +43,8 @@ export function ListEditor({ initial }: { initial: Initial }) {
   const [searched, setSearched] = useState(false);
   const [pending, setPending] = useState<Pending[]>(initial.pending); // OFF picks analysing (persisted)
   const [save, setSave] = useState<Save>("idle");
+  const [recents, setRecents] = useState<SearchHit[]>([]); // owner's recently-added products (pre-typing)
+  const [focused, setFocused] = useState(false);
   const dragFrom = useRef<number | null>(null);
 
   const flashSaved = useCallback(() => {
@@ -95,6 +97,25 @@ export function ListEditor({ initial }: { initial: Initial }) {
     }, 250);
     return () => clearTimeout(t);
   }, [q]);
+
+  // Load the owner's recently-added products once, for the picker's pre-typing strip.
+  useEffect(() => {
+    let live = true;
+    fetch("/api/lists/recents")
+      .then((r) => (r.ok ? r.json() : { products: [] }))
+      .then((d) => {
+        if (!live) return;
+        setRecents(
+          (d.products ?? []).map((p: { id: string; name: string; brand: string | null; slug: string }) => ({
+            kind: "catalog" as const, id: p.id, name: p.name, brand: p.brand, slug: p.slug, barcode: "",
+          })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   async function addProduct(hit: SearchHit) {
     if (items.some((i) => i.productId === hit.id)) return;
@@ -310,11 +331,13 @@ export function ListEditor({ initial }: { initial: Initial }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 150)}
           aria-label="Add a product by name"
           placeholder="Add a product — search any product by name"
           className="w-full rounded-lg border border-line bg-canvas px-4 py-2.5 text-ink outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20"
         />
-        {q.trim().length >= 2 && (
+        {q.trim().length >= 2 ? (
           <div className="absolute z-10 mt-1.5 w-full overflow-hidden rounded-xl border border-line bg-paper shadow-hero">
             {results.length > 0 ? (
               <ul>
@@ -354,6 +377,37 @@ export function ListEditor({ initial }: { initial: Initial }) {
               )
             )}
           </div>
+        ) : (
+          // Pre-typing: the owner's recently-added products, one tap to add again (and, being their
+          // own products, this is the "own products first" view). Hidden once anything is typed.
+          focused &&
+          recents.filter((r) => !items.some((i) => i.productId === r.id)).length > 0 && (
+            <div className="absolute z-10 mt-1.5 w-full overflow-hidden rounded-xl border border-line bg-paper shadow-hero">
+              <p className="px-4 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Recent
+              </p>
+              <ul>
+                {recents
+                  .filter((r) => !items.some((i) => i.productId === r.id))
+                  .map((hit) => (
+                    <li key={hit.id}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()} // keep the input focused so the click lands
+                        onClick={() => addProduct(hit)}
+                        className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-canvas"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm text-ink">{hit.name}</span>
+                          {hit.brand && <span className="text-xs uppercase tracking-[0.08em] text-muted">{hit.brand}</span>}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted">Add</span>
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )
         )}
       </div>
 
