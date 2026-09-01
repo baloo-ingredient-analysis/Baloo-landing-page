@@ -7,13 +7,33 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### P3 — the list builder adds *any* product (analyse-and-add, async, persisted) — `feat/add-product` + `feat/list-async-add`
+The builder searched the **catalog only** — you could add a product only once it had been analysed.
+Now it uses the same OFF-backed `/api/search` as the homepage, so you can add **any** product, and the
+slow part (a Claude analysis on a brand-new product) never blocks you. Shipped in three slices (PRs #4–#6):
+- **Slice 1 — add anything.** Builder search → catalog hits add instantly; an Open Food Facts hit is
+  analysed on add (`/api/off/lookup`, which now also returns `productId`) and enters the catalog.
+- **Slice 2 — non-blocking + queued.** The OFF pick drops into the list immediately as an "Analysing…"
+  placeholder and resolves in the background — several can run at once and the builder stays usable.
+  Failure is no longer silent: the row flips to "couldn't analyse" with **Retry / Dismiss**.
+- **Slice 3 — persisted across reloads.** Placeholders live in a **separate `list_pending_items` table**
+  (migration `0013`, barcode-keyed, owner-only RLS) rather than making `list_items.product_id` nullable —
+  so every existing item/count/join/reorder path is untouched; a pending row is never a real item, never
+  public, never counted. Add an OFF pick, close the tab, and it still resolves; the editor **resumes**
+  in-flight analyses on mount (`getPendingItems`). Includes a fix for a real race where the fire-and-forget
+  item-save could be aborted by a quick reload (the item vanished): the save is now **confirmed before the
+  placeholder is dropped**, and the pending row is kept until then, so nothing can be lost.
+- **Editor controls off the top bar.** The owner's **Edit** (list page) and **Done** (editor) moved out of
+  the global `SiteHeader` to sit **with the list title** (Edit beside Share; Done in the title row) — list
+  controls belong with the list, not the app chrome. Merged to `main`; live in production.
+
 ### L3 — semantic search over public lists — `feat/list-search`
 Lists were keyword-only; now they're **hybrid semantic + keyword**, like products. `lists.embedding`
 (migration `0012`) is filled from **title + description** on create/update (`lib/db/queries/lists.ts`,
 best-effort, optional-infra) and backfilled by `npm run db:list-embeddings`. `searchAll` fuses the
 keyword (ILIKE) list ids with the pgvector-nearest public lists (reciprocal-rank), aggregates the
 winners, and restores the fused order. Verified: "morning meal ideas" surfaces the "Best breakfast"
-lists with no keyword overlap. Private lists are never embedded. On `feat/list-search`; not yet merged.
+lists with no keyword overlap. Private lists are never embedded. Merged to `main`; live in production.
 
 ### `/compare` diagnostics + search-quality pipeline + ES/UK market gate — `feat/off-compare`
 The internal **`/compare`** tool (four side-by-side views of one query — our filtered pipeline, raw OFF
@@ -42,7 +62,7 @@ on EU brands). One criterion applied to every product — no per-brand logic.
   fallen behind the live schema); **DESIGN.md** type ramp expanded to document the shipped ~10-step
   scale. A semantic result-clustering experiment was prototyped and **removed** — on OFF's inconsistent
   data it wrongly merged distinct products (Casa Tarradellas pizza flavours) without reliably folding
-  true twins. On `feat/off-compare`; not yet merged.
+  true twins. Merged to `main` (PR #1); live in production.
 
 ### Open Food Facts catalog + search-first (OFF1–OFF4) — `feat/off-catalog`
 - **The web stops scraping retailers and sources products from Open Food Facts.** Tested finding:
@@ -55,8 +75,8 @@ on EU brands). One criterion applied to every product — no per-brand logic.
   IP-rate-limited) + `npm run db:seed-off` (bulk-import popular UK/ES products, dry-run by default).
   **OFF4** `SearchBox` offers "Analyse from Open Food Facts" on a catalog miss → product page. Verified
   live: Nutella (barcode) and Nocilla (name) imported end to end with English breakdowns; 88 tests +
-  build green. ODbL — legal sign-off before any paid/B2B use. Docs: `docs/OFF_CATALOG.md`. On the
-  branch; not yet merged.
+  build green. ODbL — legal sign-off before any paid/B2B use. Docs: `docs/OFF_CATALOG.md`. Merged to
+  `main`; live in production.
 
 ### Geo-ranking (GR1–GR4)
 - Interest-first ranking with geo as a **soft multiplier** (`base × (1 + λ·geo)`), never a hard

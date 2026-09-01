@@ -72,7 +72,7 @@ retailer for a known product costs one scrape+extract, **zero** analyse calls, a
 ## 3. Data model (Postgres / Drizzle)
 
 Source of truth: [`lib/db/schema.ts`](../lib/db/schema.ts). Migrations generated into `drizzle/`
-(`0000`–`0007`). Client is **lazy**: `db()` in [`lib/db/index.ts`](../lib/db/index.ts) returns `null`
+(`0000`–`0013`). Client is **lazy**: `db()` in [`lib/db/index.ts`](../lib/db/index.ts) returns `null`
 without `DATABASE_URL`. Connects as `postgres` (via the transaction pooler, `prepare: false`), which
 **bypasses RLS** — so API routes enforce auth in code; RLS is defence-in-depth for any client path.
 
@@ -96,6 +96,12 @@ without `DATABASE_URL`. Connects as `postgres` (via the transaction pooler, `pre
 **Identity & social**
 - `profiles` — `id` is a **FK to `auth.users.id`** (Supabase Auth). Handle, display name, `is_admin`.
 - `lists` / `list_items` — user-curated collections; `slug`, public/private, ordered items.
+- `list_pending_items` (P3) — an OFF pick the owner added that's **still being analysed**
+  (analyse-and-add, ~a Claude pass). Kept in a **separate** table so `list_items` and every
+  count/join/reorder path stays untouched: a pending row is never a real item, never public, never
+  counted. Barcode-keyed per list, `status` ∈ {analysing, failed}, owner-only RLS. On success the editor
+  adds the real `list_items` row and deletes the pending one; the editor **resumes** in-flight rows on
+  mount, so an analysis survives a reload.
 - `follows` · `saves` · `votes` — the social graph and signals. Lists carry **two** signals
   (Order L8): a **Like** (public — a `votes` row with `target_type = 'list'`; count shown, feeds
   Popular/Explore ranking) and a **Save** (private — a `saves` row; goes to the owner's library, count
@@ -150,7 +156,7 @@ FKs to `CASCADE`** without re-reading that file.
 | Group | Routes |
 |---|---|
 | **Pipeline** | `extract`, `analyze`, `products/analyze` (background/retry engine), `products/search` |
-| **Content** | `lists`, `lists/[id]`, `lists/[id]/items`, `search` (hybrid: pgvector semantic + keyword), `board`, `nutrition-context`, `explain` (AI "explain this") |
+| **Content** | `lists`, `lists/[id]`, `lists/[id]/items` (POST also takes an OFF `{barcode,name,brand}` to queue an analyse-and-add) · `lists/[id]/items/pending` (PATCH status / DELETE a pending row), `search` (hybrid: pgvector semantic + keyword), `board`, `nutrition-context`, `explain` (AI "explain this") |
 | **Social** | `saves`, `votes`, `follows`, `comments`, `feed` |
 | **Moderation** | `reports`, `moderation` |
 | **Identity** | `me`, `profile`, `auth/callback` |
@@ -257,7 +263,7 @@ lib/
   nutrition.ts   all nutrition maths               profile.ts           UK reference intakes
   stats.ts       fire-and-forget scan logging (homepage board)          config.ts  model + limits
   region.ts      retailer→region availability math (Order L7) — Discover soft-ranks by "% you can buy"
-drizzle/         0000–0007 migrations + 0001_rls.sql (RLS policies)
+drizzle/         0000–0013 migrations + 0001_rls.sql (RLS policies)
 scripts/         seed-dev.ts · check-db.ts · make-admin.ts
 docs/            ARCHITECTURE.md (this) · CHANGELOG.md · templates/ · archive/
 ```
