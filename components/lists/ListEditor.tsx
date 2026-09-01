@@ -43,6 +43,8 @@ export function ListEditor({ initial }: { initial: Initial }) {
   const [searched, setSearched] = useState(false);
   const [pending, setPending] = useState<Pending[]>(initial.pending); // OFF picks analysing (persisted)
   const [save, setSave] = useState<Save>("idle");
+  const [recents, setRecents] = useState<SearchHit[]>([]); // owner's recently-added products (pre-typing)
+  const [recentsOpen, setRecentsOpen] = useState(false); // the "Recently added" strip is collapsed by default
   const dragFrom = useRef<number | null>(null);
 
   const flashSaved = useCallback(() => {
@@ -95,6 +97,25 @@ export function ListEditor({ initial }: { initial: Initial }) {
     }, 250);
     return () => clearTimeout(t);
   }, [q]);
+
+  // Load the owner's recently-added products once, for the picker's pre-typing strip.
+  useEffect(() => {
+    let live = true;
+    fetch("/api/lists/recents")
+      .then((r) => (r.ok ? r.json() : { products: [] }))
+      .then((d) => {
+        if (!live) return;
+        setRecents(
+          (d.products ?? []).map((p: { id: string; name: string; brand: string | null; slug: string }) => ({
+            kind: "catalog" as const, id: p.id, name: p.name, brand: p.brand, slug: p.slug, barcode: "",
+          })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   async function addProduct(hit: SearchHit) {
     if (items.some((i) => i.productId === hit.id)) return;
@@ -356,6 +377,59 @@ export function ListEditor({ initial }: { initial: Initial }) {
           </div>
         )}
       </div>
+
+      {/* Recently added (pre-typing): the owner's recent products, one tap to re-add a staple — and
+          being their own products, it doubles as "own products first". A collapsed-by-default toggle so
+          it never crowds the builder; in-list ones read "Added". Hidden once you start typing. */}
+      {q.trim().length < 2 && recents.length > 0 && (
+        <div className="mt-3 overflow-hidden rounded-xl border border-line bg-paper shadow-card">
+          <button
+            type="button"
+            onClick={() => setRecentsOpen((o) => !o)}
+            aria-expanded={recentsOpen}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-canvas"
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+              Recently added
+            </span>
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              className={`h-4 w-4 shrink-0 text-muted transition-transform ${recentsOpen ? "rotate-180" : ""}`}
+            >
+              <path d="M4 6l4 4 4-4" />
+            </svg>
+          </button>
+          {recentsOpen && (
+            <ul className="border-t border-line [&>li+li]:border-t [&>li+li]:border-line">
+              {recents.map((hit) => {
+                const already = items.some((i) => i.productId === hit.id);
+                return (
+                  <li key={hit.id}>
+                    <button
+                      type="button"
+                      disabled={already}
+                      onClick={() => addProduct(hit)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-canvas disabled:opacity-50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-ink">{hit.name}</span>
+                        {hit.brand && <span className="text-xs uppercase tracking-[0.08em] text-muted">{hit.brand}</span>}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted">{already ? "Added" : "Add"}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* In this list */}
       <h2 className="mt-6 text-xs font-semibold uppercase tracking-[0.12em] text-ink">In this list</h2>

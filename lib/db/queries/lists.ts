@@ -202,6 +202,33 @@ export async function deletePendingItem(dbi: Db, listId: string, barcode: string
     .where(and(eq(listPendingItems.listId, listId), eq(listPendingItems.barcode, barcode)));
 }
 
+// The builder's "recents" strip (P3): the products this owner has most recently added to ANY of
+// their lists, most-recent first, deduped to one row per product. Powers the picker before you type
+// so re-adding a staple is one tap — and because they're the owner's own products, this doubles as
+// "own products first". Excludes nothing; the client filters out what's already in the open list.
+export async function getRecentProductsForOwner(
+  dbi: Db,
+  ownerId: string,
+  limit = 8,
+): Promise<{ id: string; name: string; brand: string | null; slug: string }[]> {
+  const rows = await dbi
+    .select({
+      id: products.id,
+      name: products.name,
+      brand: products.brand,
+      slug: products.slug,
+      last: sql<string>`max(${listItems.createdAt})`,
+    })
+    .from(listItems)
+    .innerJoin(lists, eq(lists.id, listItems.listId))
+    .innerJoin(products, eq(products.id, listItems.productId))
+    .where(eq(lists.ownerId, ownerId))
+    .groupBy(products.id, products.name, products.brand, products.slug)
+    .orderBy(desc(sql`max(${listItems.createdAt})`))
+    .limit(limit);
+  return rows.map((r) => ({ id: r.id, name: r.name, brand: r.brand, slug: r.slug }));
+}
+
 export type ListWithItems = List & { items: (ListItem & { product: Product })[] };
 
 export async function getListBySlug(dbi: Db, slug: string): Promise<ListWithItems | null> {
