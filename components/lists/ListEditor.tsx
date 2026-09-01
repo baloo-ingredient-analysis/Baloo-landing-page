@@ -4,7 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ListCover } from "./ListCover";
 
 type Item = { productId: string; name: string; brand: string | null; slug: string; note: string };
-type SearchHit = { id: string; name: string; brand: string | null; slug: string };
+// A picker hit is either an analysed catalog product (add instantly) or a live Open Food Facts
+// candidate that must be analysed first (analyse-and-add). `barcode` is set only for OFF hits.
+type SearchHit = {
+  kind: "catalog" | "off";
+  id: string;
+  name: string;
+  brand: string | null;
+  slug: string;
+  barcode: string;
+};
 type Initial = {
   id: string;
   slug: string;
@@ -26,6 +35,7 @@ export function ListEditor({ initial }: { initial: Initial }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [searched, setSearched] = useState(false);
+  const [analysing, setAnalysing] = useState<string | null>(null); // barcode being analysed-and-added
   const [save, setSave] = useState<Save>("idle");
   const dragFrom = useRef<number | null>(null);
 
@@ -56,9 +66,22 @@ export function ListEditor({ initial }: { initial: Initial }) {
     }
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}`);
+        // The same OFF-backed search the homepage uses (catalog + live Open Food Facts, deduped +
+        // ranked), so the builder can add ANY product — not just ones already analysed. Catalog hits
+        // add instantly; OFF hits are analysed on add.
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         const data = await res.json();
-        setResults(data.products ?? []);
+        const cat: SearchHit[] = (data.products ?? []).map(
+          (p: { id: string; name: string; brand: string | null; slug: string }) => ({
+            kind: "catalog" as const, id: p.id, name: p.name, brand: p.brand, slug: p.slug, barcode: "",
+          }),
+        );
+        const off: SearchHit[] = (data.off ?? []).map(
+          (c: { barcode: string; name: string; brand: string | null }) => ({
+            kind: "off" as const, id: "", name: c.name, brand: c.brand, slug: "", barcode: c.barcode,
+          }),
+        );
+        setResults([...cat, ...off]); // catalog first — instant adds ahead of analyse-on-add
       } catch {
         setResults([]);
       }
@@ -79,6 +102,39 @@ export function ListEditor({ initial }: { initial: Initial }) {
       body: JSON.stringify({ productId: hit.id }),
     }).catch(() => {});
     flashSaved();
+  }
+
+  // OFF candidate: analyse it once (→ enters the catalog with a real productId), then add it. Slower
+  // than a catalog add (a Claude pass), so the row shows "Analysing…" until it resolves.
+  async function addOffCandidate(hit: SearchHit) {
+    if (analysing) return;
+    setAnalysing(hit.barcode);
+    try {
+      const res = await fetch("/api/off/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barcode: hit.barcode }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok && data.productId && !items.some((i) => i.productId === data.productId)) {
+        setItems((prev) => [
+          ...prev,
+          { productId: data.productId, name: hit.name, brand: hit.brand, slug: data.slug, note: "" },
+        ]);
+        setSave("saving");
+        await fetch(`/api/lists/${listId}/items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: data.productId }),
+        }).catch(() => {});
+        flashSaved();
+        setQ("");
+        setResults([]);
+      }
+    } catch {
+      /* leave the picker as-is; the user can retry */
+    }
+    setAnalysing(null);
   }
 
   async function removeProduct(productId: string) {
@@ -166,7 +222,7 @@ export function ListEditor({ initial }: { initial: Initial }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="Add a product by name"
-          placeholder="Add a product — search by name"
+          placeholder="Add a product — search any product by name"
           className="w-full rounded-lg border border-line bg-canvas px-4 py-2.5 text-ink outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20"
         />
         {q.trim().length >= 2 && (
@@ -174,20 +230,28 @@ export function ListEditor({ initial }: { initial: Initial }) {
             {results.length > 0 ? (
               <ul>
                 {results.map((hit) => {
-                  const already = items.some((i) => i.productId === hit.id);
+                  const already = hit.kind === "catalog" && items.some((i) => i.productId === hit.id);
+                  const busy = hit.kind === "off" && analysing === hit.barcode;
+                  const label = already
+                    ? "Added"
+                    : hit.kind === "off"
+                      ? busy
+                        ? "Analysing…"
+                        : "Analyse & add"
+                      : "Add";
                   return (
-                    <li key={hit.id}>
+                    <li key={hit.kind === "catalog" ? hit.id : hit.barcode}>
                       <button
                         type="button"
-                        disabled={already}
-                        onClick={() => addProduct(hit)}
+                        disabled={already || (hit.kind === "off" && analysing !== null)}
+                        onClick={() => (hit.kind === "catalog" ? addProduct(hit) : addOffCandidate(hit))}
                         className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-canvas disabled:opacity-50"
                       >
                         <span className="min-w-0">
                           <span className="block truncate text-sm text-ink">{hit.name}</span>
                           {hit.brand && <span className="text-xs uppercase tracking-[0.08em] text-muted">{hit.brand}</span>}
                         </span>
-                        <span className="shrink-0 text-xs text-muted">{already ? "Added" : "Add"}</span>
+                        <span className="shrink-0 text-xs text-muted">{label}</span>
                       </button>
                     </li>
                   );
