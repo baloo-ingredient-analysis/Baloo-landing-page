@@ -380,31 +380,35 @@ export function ListEditor({ initial }: { initial: Initial }) {
         ) : (
           // Pre-typing: the owner's recently-added products, one tap to add again (and, being their
           // own products, this is the "own products first" view). Hidden once anything is typed.
+          // In-list ones stay visible but read "Added" (disabled) — same as the search results, so the
+          // strip never mysteriously shows empty just because everything recent is already here.
           focused &&
-          recents.filter((r) => !items.some((i) => i.productId === r.id)).length > 0 && (
+          recents.length > 0 && (
             <div className="absolute z-10 mt-1.5 w-full overflow-hidden rounded-xl border border-line bg-paper shadow-hero">
               <p className="px-4 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                 Recent
               </p>
               <ul>
-                {recents
-                  .filter((r) => !items.some((i) => i.productId === r.id))
-                  .map((hit) => (
+                {recents.map((hit) => {
+                  const already = items.some((i) => i.productId === hit.id);
+                  return (
                     <li key={hit.id}>
                       <button
                         type="button"
+                        disabled={already}
                         onMouseDown={(e) => e.preventDefault()} // keep the input focused so the click lands
                         onClick={() => addProduct(hit)}
-                        className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-canvas"
+                        className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-canvas disabled:opacity-50"
                       >
                         <span className="min-w-0">
                           <span className="block truncate text-sm text-ink">{hit.name}</span>
                           {hit.brand && <span className="text-xs uppercase tracking-[0.08em] text-muted">{hit.brand}</span>}
                         </span>
-                        <span className="shrink-0 text-xs text-muted">Add</span>
+                        <span className="shrink-0 text-xs text-muted">{already ? "Added" : "Add"}</span>
                       </button>
                     </li>
-                  ))}
+                  );
+                })}
               </ul>
             </div>
           )
