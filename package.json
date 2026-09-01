@@ -16,6 +16,7 @@
     "db:seed-supply": "npx -y tsx scripts/seed-supply.ts",
     "db:check": "npx -y tsx scripts/check-db.ts",
     "db:embeddings": "npx -y tsx scripts/backfill-embeddings.ts",
+    "db:list-embeddings": "npx -y tsx scripts/backfill-list-embeddings.ts",
     "db:countries": "npx -y tsx scripts/backfill-countries.ts",
     "db:seed-off": "npx -y tsx scripts/seed-off.ts"
   },

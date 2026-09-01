@@ -6,7 +6,7 @@
 // Food Facts import brings real volume, the internals upgrade to generated tsvector columns +
 // GIN indexes without touching any caller.
 
-import { and, desc, eq, ilike, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import type { Db } from "../index";
 import { listItems, lists, profiles, products, saves, votes, type Product } from "../schema";
 import { sql } from "drizzle-orm";
@@ -39,6 +39,15 @@ export function fuseByRank(lists: Product[][], k = 60): Product[] {
     });
   }
   return [...score.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => byId.get(id)!);
+}
+
+// Same reciprocal-rank fusion over bare id lists (used for lists: keyword ids ⊕ semantic ids).
+function fuseIds(idLists: string[][], k = 60): string[] {
+  const score = new Map<string, number>();
+  for (const ids of idLists) {
+    ids.forEach((id, i) => score.set(id, (score.get(id) ?? 0) + 1 / (k + i + 1)));
+  }
+  return [...score.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
 }
 
 /**
@@ -101,24 +110,54 @@ export async function searchAll(
       )
     : relevanceRanked;
 
-  const listRows = await dbi
-    .select({
-      list: lists,
-      itemCount: sql<number>`count(distinct ${listItems.id})::int`,
-      saveCount: sql<number>`count(distinct ${saves.userId})::int`,
-      likeCount: sql<number>`(select count(*)::int from ${votes} v where v.target_type = 'list' and v.target_id = ${lists.id})`,
-      ownerHandle: profiles.handle,
-    })
-    .from(lists)
-    .leftJoin(listItems, eq(listItems.listId, lists.id))
-    .leftJoin(saves, eq(saves.listId, lists.id))
-    .innerJoin(profiles, eq(profiles.id, lists.ownerId))
-    .where(
-      and(eq(lists.isPublic, true), or(ilike(lists.title, pat), ilike(lists.description, pat))),
-    )
-    .groupBy(lists.id, profiles.handle)
-    .orderBy(desc(lists.updatedAt))
-    .limit(limitEach);
+  // Lists (L3): hybrid like products when an embedding is available — keyword (ILIKE title/description)
+  // fused with the pgvector-nearest PUBLIC lists. Keyword-only without an embedding (unchanged). We fuse
+  // ids first, then run ONE aggregation for the winners and restore the fused order.
+  const kwListIds = (
+    await dbi
+      .select({ id: lists.id })
+      .from(lists)
+      .where(and(eq(lists.isPublic, true), or(ilike(lists.title, pat), ilike(lists.description, pat))))
+      .orderBy(desc(lists.updatedAt))
+      .limit(candidateN)
+  ).map((r) => r.id);
+
+  let semListIds: string[] = [];
+  if (queryEmbedding && queryEmbedding.length) {
+    const vec = toVectorLiteral(queryEmbedding);
+    semListIds = (
+      await dbi
+        .select({ id: lists.id })
+        .from(lists)
+        .where(
+          sql`${lists.isPublic} = true and ${lists.embedding} is not null and (${lists.embedding} <=> ${vec}::vector) < ${SEMANTIC_MAX_DISTANCE}`,
+        )
+        .orderBy(sql`${lists.embedding} <=> ${vec}::vector`)
+        .limit(candidateN)
+    ).map((r) => r.id);
+  }
+
+  const fusedListIds = fuseIds([kwListIds, semListIds]).slice(0, limitEach);
+  const listAgg = fusedListIds.length
+    ? await dbi
+        .select({
+          list: lists,
+          itemCount: sql<number>`count(distinct ${listItems.id})::int`,
+          saveCount: sql<number>`count(distinct ${saves.userId})::int`,
+          likeCount: sql<number>`(select count(*)::int from ${votes} v where v.target_type = 'list' and v.target_id = ${lists.id})`,
+          ownerHandle: profiles.handle,
+        })
+        .from(lists)
+        .leftJoin(listItems, eq(listItems.listId, lists.id))
+        .leftJoin(saves, eq(saves.listId, lists.id))
+        .innerJoin(profiles, eq(profiles.id, lists.ownerId))
+        .where(inArray(lists.id, fusedListIds))
+        .groupBy(lists.id, profiles.handle)
+    : [];
+  const listOrder = new Map(fusedListIds.map((id, i) => [id, i]));
+  const listRows = listAgg.sort(
+    (a, b) => (listOrder.get(a.list.id) ?? 0) - (listOrder.get(b.list.id) ?? 0),
+  );
 
   return {
     products: productRows,

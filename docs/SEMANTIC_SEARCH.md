@@ -21,8 +21,12 @@ query ──▶ embed (OpenAI text-embedding-3-small, 1536-d)
   rows. NULL embeddings simply don't match semantically (keyword still covers them).
 - **Query:** `/api/search` embeds the query and passes it to `searchAll`, which fuses semantic +
   keyword product hits with **reciprocal-rank fusion** (an item strong in *either* ranks well). A
-  cosine-distance cutoff (`SEMANTIC_MAX_DISTANCE = 0.5`) drops clearly-unrelated hits. Lists stay
-  keyword-only.
+  cosine-distance cutoff (`SEMANTIC_MAX_DISTANCE = 0.5`) drops clearly-unrelated hits.
+- **Public lists are hybrid too (L3):** `lists.embedding vector(1536)` (migration 0012), embedded from
+  `title + description` on create/update (`lib/db/queries/lists.ts`, best-effort) + backfilled by
+  `scripts/backfill-list-embeddings.ts`. `searchAll` fuses keyword (title/description ILIKE) with the
+  pgvector-nearest public lists by id, then aggregates the winners — so "morning meal ideas" finds a
+  "Best breakfast" list. Private lists are never embedded.
 - **Provider:** OpenAI embeddings via the AI SDK (`@ai-sdk/openai`), isolated in `lib/embeddings.ts`
   so it's swappable (Voyage/Cohere). Claude has no embeddings API, so this is the one OpenAI
   touchpoint on the web.

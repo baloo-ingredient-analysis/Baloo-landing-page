@@ -210,8 +210,15 @@ export const lists = pgTable(
     coverUrl: text("cover_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // Semantic search over public lists (L3): OpenAI embedding of title + description. Filled on
+    // create/update and by the backfill; NULL rows just don't match semantic queries (keyword still
+    // covers them). Same optional-infra rule as products.embedding.
+    embedding: vector("embedding", { dimensions: 1536 }),
   },
-  (t) => [index("lists_owner_idx").on(t.ownerId)],
+  (t) => [
+    index("lists_owner_idx").on(t.ownerId),
+    index("lists_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
+  ],
 );
 
 export const listItems = pgTable(

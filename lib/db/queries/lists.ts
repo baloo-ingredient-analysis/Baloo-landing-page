@@ -26,6 +26,25 @@ import {
 } from "../../region";
 import type { Region } from "../../retailers";
 import { GEO_WEIGHTS } from "../../config";
+import { embedText, embeddingsEnabled, listEmbeddingText } from "../../embeddings";
+
+// Best-effort semantic embedding for a public list (L3). Optional-infra: a no-op without OPENAI_API_KEY,
+// and any failure is swallowed — embedding a list must NEVER break creating or editing it. Awaited so a
+// freshly created/edited list is searchable right away (list writes are infrequent, not a hot path).
+async function embedListRow(
+  dbi: Db,
+  listId: string,
+  title: string,
+  description: string | null,
+): Promise<void> {
+  if (!embeddingsEnabled()) return;
+  try {
+    const e = await embedText(listEmbeddingText({ title, description }));
+    if (e) await dbi.update(lists).set({ embedding: e }).where(eq(lists.id, listId));
+  } catch {
+    /* swallow — best-effort */
+  }
+}
 
 export async function createList(
   dbi: Db,
@@ -42,6 +61,7 @@ export async function createList(
       coverUrl: values.coverUrl ?? null,
     })
     .returning();
+  await embedListRow(dbi, row.id, row.title, row.description);
   return row;
 }
 
@@ -55,6 +75,10 @@ export async function updateList(
     .set({ ...patch, updatedAt: sql`now()` })
     .where(eq(lists.id, listId))
     .returning();
+  // Re-embed only when the words we embed actually changed.
+  if (row && (patch.title !== undefined || patch.description !== undefined)) {
+    await embedListRow(dbi, row.id, row.title, row.description);
+  }
   return row ?? null;
 }
 
