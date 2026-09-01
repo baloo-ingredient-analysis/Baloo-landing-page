@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ListCover } from "./ListCover";
 
@@ -276,6 +277,14 @@ export function ListEditor({ initial }: { initial: Initial }) {
             className="mt-1 w-full resize-none bg-transparent text-sm text-ink/80 outline-none placeholder:text-muted"
           />
         </div>
+        {/* Editing controls live WITH the list, not in the top bar. Everything autosaves, so "Done" is
+            simply "finished — take me to the list". */}
+        <Link
+          href={`/list/${initial.slug}`}
+          className="shrink-0 rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-paper transition hover:bg-ink/85"
+        >
+          Done
+        </Link>
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">

@@ -66,18 +66,8 @@ export default async function ListPage({ params }: Params) {
 
   return (
     <div className="relative flex min-h-screen flex-col">
-      <SiteHeader
-        action={
-          isOwner ? (
-            <Link
-              href={`/list/${list.slug}/edit`}
-              className="rounded-full border border-line bg-paper px-3.5 py-1.5 text-[13px] font-medium text-ink transition hover:border-ink/20"
-            >
-              Edit
-            </Link>
-          ) : undefined
-        }
-      />
+      {/* The owner's Edit control lives with the list header (next to Share), not in the top bar. */}
+      <SiteHeader />
       <main className="mx-auto flex w-full max-w-tool flex-1 flex-col px-5 pt-8">
 
         <section className="mt-8 animate-fade-in">
@@ -118,7 +108,15 @@ export default async function ListPage({ params }: Params) {
             <div className="flex shrink-0 items-center gap-2">
               {/* Two signals since L8: Like (public, feeds ranking) + Save (private library). You
                   don't like or save your own list, so both are hidden for the owner (V3 own-list
-                  cleanup); Share stays (growth loop). */}
+                  cleanup); Share stays (growth loop). The owner gets Edit right here by the title. */}
+              {isOwner && (
+                <Link
+                  href={`/list/${list.slug}/edit`}
+                  className="rounded-full border border-line bg-paper px-3.5 py-1.5 text-[13px] font-medium text-ink transition hover:border-ink/20"
+                >
+                  Edit
+                </Link>
+              )}
               {!isOwner && (
                 <LikePill listId={list.id} initialLiked={viewerLiked} initialCount={likeCount} />
               )}

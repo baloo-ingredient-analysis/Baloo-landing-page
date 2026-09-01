@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { db } from "@/lib/db";
 import { getListBySlug, getPendingItems } from "@/lib/db/queries/lists";
 import { getSessionUser } from "@/lib/auth";
@@ -44,16 +43,8 @@ export default async function EditListPage({ params }: Params) {
 
   return (
     <div className="relative flex min-h-screen flex-col">
-      <SiteHeader
-        action={
-          <Link
-            href={`/list/${list.slug}`}
-            className="rounded-full border border-line bg-paper px-3.5 py-1.5 text-[13px] font-medium text-ink transition hover:border-ink/20"
-          >
-            Done
-          </Link>
-        }
-      />
+      {/* List controls (Done/Edit) live with the list itself, not in the top bar — see ListEditor. */}
+      <SiteHeader />
       <main className="mx-auto flex w-full max-w-tool flex-1 flex-col px-5 pt-8">
         <ListEditor initial={initial} />
       </main>
