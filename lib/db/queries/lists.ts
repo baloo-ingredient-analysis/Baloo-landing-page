@@ -6,6 +6,7 @@ import { and, asc, desc, eq, inArray, max, notInArray, sql } from "drizzle-orm";
 import type { Db } from "../index";
 import {
   listItems,
+  listPendingItems,
   lists,
   offers,
   profiles,
@@ -14,6 +15,7 @@ import {
   products,
   type List,
   type ListItem,
+  type ListPendingItem,
   type Product,
 } from "../schema";
 import {
@@ -152,6 +154,52 @@ export async function reorderListItems(
     }
   });
   await touch(dbi, listId);
+}
+
+// ── Pending items (P3 analyse-and-add) ─────────────────────────────────────────────────────────
+// A background OFF analysis, persisted so it survives a reload. Separate from list_items so no real
+// item/count/join path is affected. Keyed by (list_id, barcode). Never public — owner-only (RLS+API).
+export async function addPendingItem(
+  dbi: Db,
+  listId: string,
+  values: { barcode: string; name: string; brand: string | null },
+): Promise<ListPendingItem | null> {
+  const [row] = await dbi
+    .insert(listPendingItems)
+    .values({ listId, barcode: values.barcode, name: values.name, brand: values.brand, status: "analysing" })
+    // Re-adding the same barcode just re-arms it (e.g. a retry after a prior fail).
+    .onConflictDoUpdate({
+      target: [listPendingItems.listId, listPendingItems.barcode],
+      set: { status: "analysing", name: values.name, brand: values.brand },
+    })
+    .returning();
+  return row ?? null;
+}
+
+export async function getPendingItems(dbi: Db, listId: string): Promise<ListPendingItem[]> {
+  return dbi
+    .select()
+    .from(listPendingItems)
+    .where(eq(listPendingItems.listId, listId))
+    .orderBy(asc(listPendingItems.createdAt));
+}
+
+export async function setPendingItemStatus(
+  dbi: Db,
+  listId: string,
+  barcode: string,
+  status: "analysing" | "failed",
+): Promise<void> {
+  await dbi
+    .update(listPendingItems)
+    .set({ status })
+    .where(and(eq(listPendingItems.listId, listId), eq(listPendingItems.barcode, barcode)));
+}
+
+export async function deletePendingItem(dbi: Db, listId: string, barcode: string): Promise<void> {
+  await dbi
+    .delete(listPendingItems)
+    .where(and(eq(listPendingItems.listId, listId), eq(listPendingItems.barcode, barcode)));
 }
 
 export type ListWithItems = List & { items: (ListItem & { product: Product })[] };

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ListCover } from "./ListCover";
 
@@ -25,6 +26,7 @@ type Initial = {
   description: string;
   isPublic: boolean;
   items: Item[];
+  pending: Pending[];
 };
 type Save = "idle" | "saving" | "saved";
 
@@ -39,7 +41,7 @@ export function ListEditor({ initial }: { initial: Initial }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [searched, setSearched] = useState(false);
-  const [pending, setPending] = useState<Pending[]>([]); // OFF picks analysing in the background
+  const [pending, setPending] = useState<Pending[]>(initial.pending); // OFF picks analysing (persisted)
   const [save, setSave] = useState<Save>("idle");
   const dragFrom = useRef<number | null>(null);
 
@@ -80,11 +82,11 @@ export function ListEditor({ initial }: { initial: Initial }) {
             kind: "catalog" as const, id: p.id, name: p.name, brand: p.brand, slug: p.slug, barcode: "",
           }),
         );
-        const off: SearchHit[] = (data.off ?? []).map(
-          (c: { barcode: string; name: string; brand: string | null }) => ({
+        const off: SearchHit[] = (data.off ?? [])
+          .filter((c: { barcode?: string }) => !!c.barcode) // analyse-and-add needs a barcode
+          .map((c: { barcode: string; name: string; brand: string | null }) => ({
             kind: "off" as const, id: "", name: c.name, brand: c.brand, slug: "", barcode: c.barcode,
-          }),
-        );
+          }));
         setResults([...cat, ...off]); // catalog first — instant adds ahead of analyse-on-add
       } catch {
         setResults([]);
@@ -108,10 +110,28 @@ export function ListEditor({ initial }: { initial: Initial }) {
     flashSaved();
   }
 
+  // Persist a pending row's state server-side so an in-flight (or failed) analysis survives a reload.
+  const patchPending = useCallback(
+    (barcode: string, status: "analysing" | "failed") =>
+      fetch(`/api/lists/${listId}/items/pending`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barcode, status }),
+      }).catch(() => {}),
+    [listId],
+  );
+  const deletePendingRow = useCallback(
+    (barcode: string) =>
+      fetch(`/api/lists/${listId}/items/pending?barcode=${encodeURIComponent(barcode)}`, {
+        method: "DELETE",
+      }).catch(() => {}),
+    [listId],
+  );
+
   // Analyse one OFF pick in the background: /api/off/lookup runs the Claude pass once (or reuses a
   // known product), so it can take ~a minute. We don't block on it — the item sits in the list as an
   // "Analysing…" placeholder and resolves into a real product when it lands (idempotent on the server,
-  // so a duplicate is harmless). On failure it flips to a "couldn't analyse" state with retry/dismiss.
+  // so a duplicate is harmless). On failure it flips to a persisted "couldn't analyse" state.
   const resolveOff = useCallback(
     async (p: { barcode: string; name: string; brand: string | null }) => {
       try {
@@ -122,29 +142,40 @@ export function ListEditor({ initial }: { initial: Initial }) {
         });
         const data = await res.json();
         if (!res.ok || !data.ok || !data.productId) throw new Error("analyse_failed");
-        setPending((prev) => prev.filter((x) => x.barcode !== p.barcode));
+        // Persist the real item and CONFIRM it saved BEFORE dropping the placeholder. (The bug: this
+        // write was fire-and-forget and the placeholder was removed immediately, so a reload racing the
+        // request lost BOTH the item and the placeholder.) Keeping the pending row until the save is
+        // confirmed means a reload simply resumes and re-saves — nothing can vanish.
+        setSave("saving");
+        const saved = await fetch(`/api/lists/${listId}/items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: data.productId }),
+        })
+          .then((r) => r.ok)
+          .catch(() => false);
+        if (!saved) throw new Error("save_failed"); // keep the pending row; fall to the failed state
         setItems((prev) =>
           prev.some((i) => i.productId === data.productId)
             ? prev
             : [...prev, { productId: data.productId, name: p.name, brand: p.brand, slug: data.slug, note: "" }],
         );
-        setSave("saving");
-        await fetch(`/api/lists/${listId}/items`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId: data.productId }),
-        }).catch(() => {});
+        setPending((prev) => prev.filter((x) => x.barcode !== p.barcode));
+        await deletePendingRow(p.barcode); // the real item now stands in for it
         flashSaved();
       } catch {
         setPending((prev) => prev.map((x) => (x.barcode === p.barcode ? { ...x, status: "failed" } : x)));
+        void patchPending(p.barcode, "failed");
       }
     },
-    [listId, flashSaved],
+    [listId, flashSaved, deletePendingRow, patchPending],
   );
 
-  // OFF candidate from the picker: queue it (non-blocking) and clear the search. The builder stays
-  // usable and several picks can analyse at once.
-  function addOffCandidate(hit: SearchHit) {
+  // OFF candidate from the picker: persist a placeholder (so it survives a reload), then queue the
+  // analysis. The builder stays usable and several picks can run at once. We AWAIT the placeholder
+  // write before starting the analysis so a reload always finds the row to resume.
+  async function addOffCandidate(hit: SearchHit) {
+    if (!hit.barcode) return; // no barcode → can't analyse-and-add
     if (pending.some((p) => p.barcode === hit.barcode && p.status === "analysing")) return;
     setPending((prev) => [
       ...prev.filter((p) => p.barcode !== hit.barcode),
@@ -152,17 +183,40 @@ export function ListEditor({ initial }: { initial: Initial }) {
     ]);
     setQ("");
     setResults([]);
+    const queued = await fetch(`/api/lists/${listId}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ barcode: hit.barcode, name: hit.name, brand: hit.brand ?? "" }),
+    })
+      .then((r) => r.ok)
+      .catch(() => false);
+    if (!queued) {
+      // Couldn't even persist the placeholder — show the failed state instead of a ghost that vanishes.
+      setPending((prev) => prev.map((x) => (x.barcode === hit.barcode ? { ...x, status: "failed" } : x)));
+      return;
+    }
     void resolveOff(hit);
   }
 
   function retryPending(p: Pending) {
     setPending((prev) => prev.map((x) => (x.barcode === p.barcode ? { ...x, status: "analysing" } : x)));
+    void patchPending(p.barcode, "analysing");
     void resolveOff(p);
   }
 
   function dismissPending(barcode: string) {
     setPending((prev) => prev.filter((p) => p.barcode !== barcode));
+    void deletePendingRow(barcode);
   }
+
+  // Resume any analysis a previous session left in flight (tab closed mid-analyse). Runs once; the
+  // lookup is idempotent, so a since-completed one resolves instantly.
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current) return;
+    resumed.current = true;
+    for (const p of initial.pending) if (p.status === "analysing") void resolveOff(p);
+  }, [initial.pending, resolveOff]);
 
   async function removeProduct(productId: string) {
     setItems((prev) => prev.filter((i) => i.productId !== productId));
@@ -223,6 +277,14 @@ export function ListEditor({ initial }: { initial: Initial }) {
             className="mt-1 w-full resize-none bg-transparent text-sm text-ink/80 outline-none placeholder:text-muted"
           />
         </div>
+        {/* Editing controls live WITH the list, not in the top bar. Everything autosaves, so "Done" is
+            simply "finished — take me to the list". */}
+        <Link
+          href={`/list/${initial.slug}`}
+          className="shrink-0 rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-paper transition hover:bg-ink/85"
+        >
+          Done
+        </Link>
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">

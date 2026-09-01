@@ -242,6 +242,31 @@ export const listItems = pgTable(
   ],
 );
 
+// Pending list items (P3): an Open Food Facts pick the owner added that is still being analysed
+// (analyse-and-add takes a Claude pass, ~a minute). Kept in a SEPARATE table so `list_items` — and
+// every count/join/reorder path built on it — stays exactly as before: a pending row is never a real
+// item, never public, never counted. On success the owner's editor adds the real `list_items` row and
+// deletes this one; on failure it flips to 'failed' (retry/dismiss). Persisted so an in-flight analysis
+// survives a reload (the editor resumes 'analysing' rows on mount). Owner-only (RLS + API).
+export const listPendingItems = pgTable(
+  "list_pending_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    listId: uuid("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+    barcode: text("barcode").notNull(), // the OFF barcode being analysed (natural key within a list)
+    name: text("name").notNull(), // display label while it resolves
+    brand: text("brand"),
+    status: text("status").notNull().default("analysing"), // 'analysing' | 'failed'
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("list_pending_items_list_barcode_uq").on(t.listId, t.barcode),
+    index("list_pending_items_list_idx").on(t.listId),
+  ],
+);
+
 // ── Social graph & engagement ────────────────────────────────────────────────────────────────
 export const follows = pgTable(
   "follows",
@@ -375,6 +400,7 @@ export type Ingredient = typeof ingredients.$inferSelect;
 export type NutritionRow = typeof nutrition.$inferSelect;
 export type List = typeof lists.$inferSelect;
 export type ListItem = typeof listItems.$inferSelect;
+export type ListPendingItem = typeof listPendingItems.$inferSelect;
 export type ProductSave = typeof productSaves.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Report = typeof reports.$inferSelect;
