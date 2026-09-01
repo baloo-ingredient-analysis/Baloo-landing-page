@@ -81,11 +81,11 @@ export function ListEditor({ initial }: { initial: Initial }) {
             kind: "catalog" as const, id: p.id, name: p.name, brand: p.brand, slug: p.slug, barcode: "",
           }),
         );
-        const off: SearchHit[] = (data.off ?? []).map(
-          (c: { barcode: string; name: string; brand: string | null }) => ({
+        const off: SearchHit[] = (data.off ?? [])
+          .filter((c: { barcode?: string }) => !!c.barcode) // analyse-and-add needs a barcode
+          .map((c: { barcode: string; name: string; brand: string | null }) => ({
             kind: "off" as const, id: "", name: c.name, brand: c.brand, slug: "", barcode: c.barcode,
-          }),
-        );
+          }));
         setResults([...cat, ...off]); // catalog first — instant adds ahead of analyse-on-add
       } catch {
         setResults([]);
@@ -141,18 +141,25 @@ export function ListEditor({ initial }: { initial: Initial }) {
         });
         const data = await res.json();
         if (!res.ok || !data.ok || !data.productId) throw new Error("analyse_failed");
-        setPending((prev) => prev.filter((x) => x.barcode !== p.barcode));
+        // Persist the real item and CONFIRM it saved BEFORE dropping the placeholder. (The bug: this
+        // write was fire-and-forget and the placeholder was removed immediately, so a reload racing the
+        // request lost BOTH the item and the placeholder.) Keeping the pending row until the save is
+        // confirmed means a reload simply resumes and re-saves — nothing can vanish.
+        setSave("saving");
+        const saved = await fetch(`/api/lists/${listId}/items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: data.productId }),
+        })
+          .then((r) => r.ok)
+          .catch(() => false);
+        if (!saved) throw new Error("save_failed"); // keep the pending row; fall to the failed state
         setItems((prev) =>
           prev.some((i) => i.productId === data.productId)
             ? prev
             : [...prev, { productId: data.productId, name: p.name, brand: p.brand, slug: data.slug, note: "" }],
         );
-        setSave("saving");
-        await fetch(`/api/lists/${listId}/items`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId: data.productId }),
-        }).catch(() => {});
+        setPending((prev) => prev.filter((x) => x.barcode !== p.barcode));
         await deletePendingRow(p.barcode); // the real item now stands in for it
         flashSaved();
       } catch {
@@ -163,9 +170,11 @@ export function ListEditor({ initial }: { initial: Initial }) {
     [listId, flashSaved, deletePendingRow, patchPending],
   );
 
-  // OFF candidate from the picker: persist a placeholder (so it survives a reload), queue the analysis
-  // (non-blocking), and clear the search. The builder stays usable and several picks can run at once.
-  function addOffCandidate(hit: SearchHit) {
+  // OFF candidate from the picker: persist a placeholder (so it survives a reload), then queue the
+  // analysis. The builder stays usable and several picks can run at once. We AWAIT the placeholder
+  // write before starting the analysis so a reload always finds the row to resume.
+  async function addOffCandidate(hit: SearchHit) {
+    if (!hit.barcode) return; // no barcode → can't analyse-and-add
     if (pending.some((p) => p.barcode === hit.barcode && p.status === "analysing")) return;
     setPending((prev) => [
       ...prev.filter((p) => p.barcode !== hit.barcode),
@@ -173,11 +182,18 @@ export function ListEditor({ initial }: { initial: Initial }) {
     ]);
     setQ("");
     setResults([]);
-    void fetch(`/api/lists/${listId}/items`, {
+    const queued = await fetch(`/api/lists/${listId}/items`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ barcode: hit.barcode, name: hit.name, brand: hit.brand ?? "" }),
-    }).catch(() => {});
+    })
+      .then((r) => r.ok)
+      .catch(() => false);
+    if (!queued) {
+      // Couldn't even persist the placeholder — show the failed state instead of a ghost that vanishes.
+      setPending((prev) => prev.map((x) => (x.barcode === hit.barcode ? { ...x, status: "failed" } : x)));
+      return;
+    }
     void resolveOff(hit);
   }
 
