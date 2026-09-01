@@ -44,6 +44,7 @@ export function ListEditor({ initial }: { initial: Initial }) {
   const [pending, setPending] = useState<Pending[]>(initial.pending); // OFF picks analysing (persisted)
   const [save, setSave] = useState<Save>("idle");
   const [recents, setRecents] = useState<SearchHit[]>([]); // owner's recently-added products (pre-typing)
+  const [recentsOpen, setRecentsOpen] = useState(false); // the "Recently added" strip is collapsed by default
   const dragFrom = useRef<number | null>(null);
 
   const flashSaved = useCallback(() => {
@@ -377,35 +378,56 @@ export function ListEditor({ initial }: { initial: Initial }) {
         )}
       </div>
 
-      {/* Recent (pre-typing): the owner's recently-added products. Rendered INLINE (not a focus-gated
-          dropdown) so it's reliably visible whenever you haven't typed — one tap to re-add a staple,
-          and being your own products it doubles as "own products first". In-list ones read "Added". */}
+      {/* Recently added (pre-typing): the owner's recent products, one tap to re-add a staple — and
+          being their own products, it doubles as "own products first". A collapsed-by-default toggle so
+          it never crowds the builder; in-list ones read "Added". Hidden once you start typing. */}
       {q.trim().length < 2 && recents.length > 0 && (
         <div className="mt-3 overflow-hidden rounded-xl border border-line bg-paper shadow-card">
-          <p className="px-4 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-            Recent
-          </p>
-          <ul className="[&>li+li]:border-t [&>li+li]:border-line">
-            {recents.map((hit) => {
-              const already = items.some((i) => i.productId === hit.id);
-              return (
-                <li key={hit.id}>
-                  <button
-                    type="button"
-                    disabled={already}
-                    onClick={() => addProduct(hit)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-canvas disabled:opacity-50"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm text-ink">{hit.name}</span>
-                      {hit.brand && <span className="text-xs uppercase tracking-[0.08em] text-muted">{hit.brand}</span>}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted">{already ? "Added" : "Add"}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <button
+            type="button"
+            onClick={() => setRecentsOpen((o) => !o)}
+            aria-expanded={recentsOpen}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-canvas"
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+              Recently added
+            </span>
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              className={`h-4 w-4 shrink-0 text-muted transition-transform ${recentsOpen ? "rotate-180" : ""}`}
+            >
+              <path d="M4 6l4 4 4-4" />
+            </svg>
+          </button>
+          {recentsOpen && (
+            <ul className="border-t border-line [&>li+li]:border-t [&>li+li]:border-line">
+              {recents.map((hit) => {
+                const already = items.some((i) => i.productId === hit.id);
+                return (
+                  <li key={hit.id}>
+                    <button
+                      type="button"
+                      disabled={already}
+                      onClick={() => addProduct(hit)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-canvas disabled:opacity-50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-ink">{hit.name}</span>
+                        {hit.brand && <span className="text-xs uppercase tracking-[0.08em] text-muted">{hit.brand}</span>}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted">{already ? "Added" : "Add"}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
 
