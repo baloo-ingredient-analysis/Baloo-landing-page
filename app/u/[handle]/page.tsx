@@ -43,9 +43,14 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   // L5c: a profile with no public lists is private — don't leak its name/bio to crawlers or social.
   const publicLists = await getPublicListsByOwnerWithCounts(data.dbi, data.profile.id);
   if (publicLists.length === 0) return { title: "Baloo" };
+  const title = `@${data.profile.handle} — Baloo`;
+  const description = data.profile.bio ?? `${data.profile.displayName}'s lists on Baloo.`;
+  const ogImage = `/api/og/profile/${data.profile.handle}`;
   return {
-    title: `@${data.profile.handle} — Baloo`,
-    description: data.profile.bio ?? `${data.profile.displayName}'s lists on Baloo.`,
+    title,
+    description,
+    openGraph: { title, description, images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage] },
   };
 }
 
@@ -124,7 +129,11 @@ export default async function ProfilePage({ params, searchParams }: Params) {
             <div className="flex shrink-0 items-center gap-2">
               {/* Nothing public to share until the profile is public (L5c). */}
               {publicCount > 0 && (
-                <ShareButton path={`/u/${profile.handle}`} title={profile.displayName} />
+                <ShareButton
+                  path={`/u/${profile.handle}`}
+                  title={profile.displayName}
+                  cardPath={`/api/og/profile/${profile.handle}`}
+                />
               )}
               <FollowButton profileId={profile.id} initialFollowing={viewerFollows} />
             </div>

@@ -6,6 +6,7 @@ import { getProductForPage } from "@/lib/db/queries/products";
 import { ResultsView } from "@/components/ResultsView";
 import { SiteHeader } from "@/components/SiteHeader";
 import { AddToList } from "@/components/lists/AddToList";
+import { ShareButton } from "@/components/lists/ShareButton";
 import { PantryButton } from "@/components/engagement/PantryButton";
 import { CommentThread } from "@/components/engagement/CommentThread";
 import { getSessionUser } from "@/lib/auth";
@@ -31,7 +32,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!data) return { title: "Baloo" };
   const title = `${data.product.name} — Baloo`;
   const description = data.summary ?? `What's in ${data.product.name}: every ingredient explained.`;
-  return { title, description, openGraph: { title, description } };
+  const ogImage = `/api/og/product/${slug}`;
+  return {
+    title,
+    description,
+    openGraph: { title, description, images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage] },
+  };
 }
 
 export default async function ProductPage({ params }: Params) {
@@ -66,6 +73,7 @@ export default async function ProductPage({ params }: Params) {
     <>
       <PantryButton productId={data.product.id} initialSaved={viewerSavedProduct} />
       <AddToList productId={data.product.id} />
+      <ShareButton path={`/p/${slug}`} title={data.product.name} cardPath={`/api/og/product/${slug}`} />
     </>
   );
 
