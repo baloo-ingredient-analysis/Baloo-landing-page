@@ -36,5 +36,10 @@ export async function POST(req: Request) {
     const status = result.reason === "not_found" || result.reason === "no_ingredients" ? 404 : 503;
     return NextResponse.json({ ok: false, reason: result.reason }, { status });
   }
-  return NextResponse.json({ ok: true, slug: result.slug, reused: result.reused });
+  return NextResponse.json({
+    ok: true,
+    slug: result.slug,
+    productId: result.productId, // so the list builder can add it straight away (P3 analyse-and-add)
+    reused: result.reused,
+  });
 }
