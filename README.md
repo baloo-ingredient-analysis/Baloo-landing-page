@@ -41,6 +41,7 @@ keys to switch on the real pipeline and the community features.
 | `npm run db:seed` | Seed demo data (products, users, lists) |
 | `npm run db:seed-off` | Bulk-import popular products from Open Food Facts (dry-run by default) |
 | `npm run db:embeddings` | Backfill product embeddings for semantic search (needs `OPENAI_API_KEY`) |
+| `npm run db:list-embeddings` | Backfill public-list embeddings for semantic list search (needs `OPENAI_API_KEY`) |
 | `npm run db:countries` | Backfill `products.countries` (sales markets) from OFF — powers the ES/UK gate |
 | `npm run db:check` | Read-only assertions against the live DB |
 

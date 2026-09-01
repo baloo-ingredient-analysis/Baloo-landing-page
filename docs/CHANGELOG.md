@@ -7,6 +7,14 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### L3 — semantic search over public lists — `feat/list-search`
+Lists were keyword-only; now they're **hybrid semantic + keyword**, like products. `lists.embedding`
+(migration `0012`) is filled from **title + description** on create/update (`lib/db/queries/lists.ts`,
+best-effort, optional-infra) and backfilled by `npm run db:list-embeddings`. `searchAll` fuses the
+keyword (ILIKE) list ids with the pgvector-nearest public lists (reciprocal-rank), aggregates the
+winners, and restores the fused order. Verified: "morning meal ideas" surfaces the "Best breakfast"
+lists with no keyword overlap. Private lists are never embedded. On `feat/list-search`; not yet merged.
+
 ### `/compare` diagnostics + search-quality pipeline + ES/UK market gate — `feat/off-compare`
 The internal **`/compare`** tool (four side-by-side views of one query — our filtered pipeline, raw OFF
 free-text, raw OFF brand-scoped, and a paid barcode DB via BarcodeNest/Chomp) drove a round of search

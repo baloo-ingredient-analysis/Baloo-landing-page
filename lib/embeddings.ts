@@ -65,6 +65,19 @@ export function productEmbeddingText(input: {
   return parts.join(". ").slice(0, 8000);
 }
 
+/**
+ * The text we embed for a public list (L3): its title + description — the curator's own words for the
+ * theme, which is what a searcher's intent ("kids cereals without junk") matches against. Item names
+ * are deliberately left out: they change as items are added, and the title/description carry the theme
+ * and are what exists at create time. Capped so a long description can't blow the input budget.
+ */
+export function listEmbeddingText(input: { title: string; description?: string | null }): string {
+  const parts = [input.title, input.description].filter(
+    (s): s is string => typeof s === "string" && s.trim().length > 0,
+  );
+  return parts.join(". ").slice(0, 8000);
+}
+
 /** pgvector literal for a raw SQL query: [0.1,0.2,…]. */
 export function toVectorLiteral(vec: number[]): string {
   return `[${vec.join(",")}]`;
