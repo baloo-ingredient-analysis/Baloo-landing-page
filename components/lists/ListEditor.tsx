@@ -25,6 +25,7 @@ type Initial = {
   description: string;
   isPublic: boolean;
   items: Item[];
+  pending: Pending[];
 };
 type Save = "idle" | "saving" | "saved";
 
@@ -39,7 +40,7 @@ export function ListEditor({ initial }: { initial: Initial }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [searched, setSearched] = useState(false);
-  const [pending, setPending] = useState<Pending[]>([]); // OFF picks analysing in the background
+  const [pending, setPending] = useState<Pending[]>(initial.pending); // OFF picks analysing (persisted)
   const [save, setSave] = useState<Save>("idle");
   const dragFrom = useRef<number | null>(null);
 
@@ -108,10 +109,28 @@ export function ListEditor({ initial }: { initial: Initial }) {
     flashSaved();
   }
 
+  // Persist a pending row's state server-side so an in-flight (or failed) analysis survives a reload.
+  const patchPending = useCallback(
+    (barcode: string, status: "analysing" | "failed") =>
+      fetch(`/api/lists/${listId}/items/pending`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barcode, status }),
+      }).catch(() => {}),
+    [listId],
+  );
+  const deletePendingRow = useCallback(
+    (barcode: string) =>
+      fetch(`/api/lists/${listId}/items/pending?barcode=${encodeURIComponent(barcode)}`, {
+        method: "DELETE",
+      }).catch(() => {}),
+    [listId],
+  );
+
   // Analyse one OFF pick in the background: /api/off/lookup runs the Claude pass once (or reuses a
   // known product), so it can take ~a minute. We don't block on it — the item sits in the list as an
   // "Analysing…" placeholder and resolves into a real product when it lands (idempotent on the server,
-  // so a duplicate is harmless). On failure it flips to a "couldn't analyse" state with retry/dismiss.
+  // so a duplicate is harmless). On failure it flips to a persisted "couldn't analyse" state.
   const resolveOff = useCallback(
     async (p: { barcode: string; name: string; brand: string | null }) => {
       try {
@@ -134,16 +153,18 @@ export function ListEditor({ initial }: { initial: Initial }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ productId: data.productId }),
         }).catch(() => {});
+        await deletePendingRow(p.barcode); // the real item now stands in for it
         flashSaved();
       } catch {
         setPending((prev) => prev.map((x) => (x.barcode === p.barcode ? { ...x, status: "failed" } : x)));
+        void patchPending(p.barcode, "failed");
       }
     },
-    [listId, flashSaved],
+    [listId, flashSaved, deletePendingRow, patchPending],
   );
 
-  // OFF candidate from the picker: queue it (non-blocking) and clear the search. The builder stays
-  // usable and several picks can analyse at once.
+  // OFF candidate from the picker: persist a placeholder (so it survives a reload), queue the analysis
+  // (non-blocking), and clear the search. The builder stays usable and several picks can run at once.
   function addOffCandidate(hit: SearchHit) {
     if (pending.some((p) => p.barcode === hit.barcode && p.status === "analysing")) return;
     setPending((prev) => [
@@ -152,17 +173,33 @@ export function ListEditor({ initial }: { initial: Initial }) {
     ]);
     setQ("");
     setResults([]);
+    void fetch(`/api/lists/${listId}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ barcode: hit.barcode, name: hit.name, brand: hit.brand ?? "" }),
+    }).catch(() => {});
     void resolveOff(hit);
   }
 
   function retryPending(p: Pending) {
     setPending((prev) => prev.map((x) => (x.barcode === p.barcode ? { ...x, status: "analysing" } : x)));
+    void patchPending(p.barcode, "analysing");
     void resolveOff(p);
   }
 
   function dismissPending(barcode: string) {
     setPending((prev) => prev.filter((p) => p.barcode !== barcode));
+    void deletePendingRow(barcode);
   }
+
+  // Resume any analysis a previous session left in flight (tab closed mid-analyse). Runs once; the
+  // lookup is idempotent, so a since-completed one resolves instantly.
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current) return;
+    resumed.current = true;
+    for (const p of initial.pending) if (p.status === "analysing") void resolveOff(p);
+  }, [initial.pending, resolveOff]);
 
   async function removeProduct(productId: string) {
     setItems((prev) => prev.filter((i) => i.productId !== productId));

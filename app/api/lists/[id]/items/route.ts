@@ -5,6 +5,7 @@ import { checkLimit, tooMany, MAX_ITEMS_PER_LIST } from "@/lib/ratelimit";
 import { db, type Db } from "@/lib/db";
 import {
   addListItem,
+  addPendingItem,
   countListItems,
   getListById,
   removeListItem,
@@ -44,12 +45,24 @@ export async function POST(req: Request, { params }: Params) {
       { status: 409 },
     );
   }
-  let body: { productId?: string; note?: string };
+  let body: { productId?: string; note?: string; barcode?: string; name?: string; brand?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
+
+  // Pending (analyse-and-add) path: an OFF pick still being analysed. Persist a placeholder so the
+  // analysis survives a reload; the editor attaches the real product (a normal add) once it resolves.
+  if (!body.productId && body.barcode && body.name) {
+    const pending = await addPendingItem(g.dbi, g.listId, {
+      barcode: body.barcode,
+      name: body.name,
+      brand: body.brand?.trim() || null,
+    });
+    return NextResponse.json({ pending });
+  }
+
   if (!body.productId) return NextResponse.json({ error: "bad_request" }, { status: 400 });
 
   const item = await addListItem(g.dbi, g.listId, body.productId, body.note?.trim() || undefined);

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { getListBySlug } from "@/lib/db/queries/lists";
+import { getListBySlug, getPendingItems } from "@/lib/db/queries/lists";
 import { getSessionUser } from "@/lib/auth";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ListEditor } from "@/components/lists/ListEditor";
@@ -18,6 +18,9 @@ export default async function EditListPage({ params }: Params) {
   const user = await getSessionUser();
   if (!user || user.id !== list.ownerId) notFound();
 
+  // Background OFF analyses in flight (or failed) for this list — the editor resumes/retries them.
+  const pending = dbi ? await getPendingItems(dbi, list.id) : [];
+
   const initial = {
     id: list.id,
     slug: list.slug,
@@ -30,6 +33,12 @@ export default async function EditListPage({ params }: Params) {
       brand: i.product.brand,
       slug: i.product.slug,
       note: i.note ?? "",
+    })),
+    pending: pending.map((p) => ({
+      barcode: p.barcode,
+      name: p.name,
+      brand: p.brand,
+      status: p.status === "failed" ? ("failed" as const) : ("analysing" as const),
     })),
   };
 
