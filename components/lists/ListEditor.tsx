@@ -14,6 +14,10 @@ type SearchHit = {
   slug: string;
   barcode: string;
 };
+// An OFF pick being analysed in the background. It shows in the list right away as a placeholder
+// ("Analysing…") and either resolves into a real Item or flips to "failed" (retry/dismiss) — the
+// builder stays fully usable while several run at once. Keyed by barcode.
+type Pending = { barcode: string; name: string; brand: string | null; status: "analysing" | "failed" };
 type Initial = {
   id: string;
   slug: string;
@@ -35,7 +39,7 @@ export function ListEditor({ initial }: { initial: Initial }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [searched, setSearched] = useState(false);
-  const [analysing, setAnalysing] = useState<string | null>(null); // barcode being analysed-and-added
+  const [pending, setPending] = useState<Pending[]>([]); // OFF picks analysing in the background
   const [save, setSave] = useState<Save>("idle");
   const dragFrom = useRef<number | null>(null);
 
@@ -104,23 +108,26 @@ export function ListEditor({ initial }: { initial: Initial }) {
     flashSaved();
   }
 
-  // OFF candidate: analyse it once (→ enters the catalog with a real productId), then add it. Slower
-  // than a catalog add (a Claude pass), so the row shows "Analysing…" until it resolves.
-  async function addOffCandidate(hit: SearchHit) {
-    if (analysing) return;
-    setAnalysing(hit.barcode);
-    try {
-      const res = await fetch("/api/off/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ barcode: hit.barcode }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok && data.productId && !items.some((i) => i.productId === data.productId)) {
-        setItems((prev) => [
-          ...prev,
-          { productId: data.productId, name: hit.name, brand: hit.brand, slug: data.slug, note: "" },
-        ]);
+  // Analyse one OFF pick in the background: /api/off/lookup runs the Claude pass once (or reuses a
+  // known product), so it can take ~a minute. We don't block on it — the item sits in the list as an
+  // "Analysing…" placeholder and resolves into a real product when it lands (idempotent on the server,
+  // so a duplicate is harmless). On failure it flips to a "couldn't analyse" state with retry/dismiss.
+  const resolveOff = useCallback(
+    async (p: { barcode: string; name: string; brand: string | null }) => {
+      try {
+        const res = await fetch("/api/off/lookup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ barcode: p.barcode }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok || !data.productId) throw new Error("analyse_failed");
+        setPending((prev) => prev.filter((x) => x.barcode !== p.barcode));
+        setItems((prev) =>
+          prev.some((i) => i.productId === data.productId)
+            ? prev
+            : [...prev, { productId: data.productId, name: p.name, brand: p.brand, slug: data.slug, note: "" }],
+        );
         setSave("saving");
         await fetch(`/api/lists/${listId}/items`, {
           method: "POST",
@@ -128,13 +135,33 @@ export function ListEditor({ initial }: { initial: Initial }) {
           body: JSON.stringify({ productId: data.productId }),
         }).catch(() => {});
         flashSaved();
-        setQ("");
-        setResults([]);
+      } catch {
+        setPending((prev) => prev.map((x) => (x.barcode === p.barcode ? { ...x, status: "failed" } : x)));
       }
-    } catch {
-      /* leave the picker as-is; the user can retry */
-    }
-    setAnalysing(null);
+    },
+    [listId, flashSaved],
+  );
+
+  // OFF candidate from the picker: queue it (non-blocking) and clear the search. The builder stays
+  // usable and several picks can analyse at once.
+  function addOffCandidate(hit: SearchHit) {
+    if (pending.some((p) => p.barcode === hit.barcode && p.status === "analysing")) return;
+    setPending((prev) => [
+      ...prev.filter((p) => p.barcode !== hit.barcode),
+      { barcode: hit.barcode, name: hit.name, brand: hit.brand, status: "analysing" },
+    ]);
+    setQ("");
+    setResults([]);
+    void resolveOff(hit);
+  }
+
+  function retryPending(p: Pending) {
+    setPending((prev) => prev.map((x) => (x.barcode === p.barcode ? { ...x, status: "analysing" } : x)));
+    void resolveOff(p);
+  }
+
+  function dismissPending(barcode: string) {
+    setPending((prev) => prev.filter((p) => p.barcode !== barcode));
   }
 
   async function removeProduct(productId: string) {
@@ -231,11 +258,11 @@ export function ListEditor({ initial }: { initial: Initial }) {
               <ul>
                 {results.map((hit) => {
                   const already = hit.kind === "catalog" && items.some((i) => i.productId === hit.id);
-                  const busy = hit.kind === "off" && analysing === hit.barcode;
+                  const queued = hit.kind === "off" && pending.some((p) => p.barcode === hit.barcode);
                   const label = already
                     ? "Added"
                     : hit.kind === "off"
-                      ? busy
+                      ? queued
                         ? "Analysing…"
                         : "Analyse & add"
                       : "Add";
@@ -243,7 +270,7 @@ export function ListEditor({ initial }: { initial: Initial }) {
                     <li key={hit.kind === "catalog" ? hit.id : hit.barcode}>
                       <button
                         type="button"
-                        disabled={already || (hit.kind === "off" && analysing !== null)}
+                        disabled={already || queued}
                         onClick={() => (hit.kind === "catalog" ? addProduct(hit) : addOffCandidate(hit))}
                         className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-canvas disabled:opacity-50"
                       >
@@ -270,11 +297,41 @@ export function ListEditor({ initial }: { initial: Initial }) {
 
       {/* In this list */}
       <h2 className="mt-6 text-xs font-semibold uppercase tracking-[0.12em] text-ink">In this list</h2>
-      {items.length === 0 ? (
+
+      {/* Background analyses (OFF picks). Placeholders that resolve into real items, or offer retry. */}
+      {pending.length > 0 && (
+        <ul className="mt-3 overflow-hidden rounded-2xl border border-dashed border-line bg-canvas [&>li+li]:border-t [&>li+li]:border-line">
+          {pending.map((p) => (
+            <li key={p.barcode} className="flex items-center gap-3 px-4 py-3 sm:px-5">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-base leading-tight text-ink/70">{p.name}</span>
+                {p.brand && <span className="text-xs uppercase tracking-[0.08em] text-muted">{p.brand}</span>}
+              </span>
+              {p.status === "analysing" ? (
+                <span className="shrink-0 animate-pulse text-xs text-muted" aria-live="polite">
+                  Analysing…
+                </span>
+              ) : (
+                <span className="flex shrink-0 items-center gap-3 text-xs">
+                  <span className="text-processed">Couldn&apos;t analyse</span>
+                  <button type="button" onClick={() => retryPending(p)} className="text-ink underline underline-offset-2 transition hover:text-natural">
+                    Retry
+                  </button>
+                  <button type="button" onClick={() => dismissPending(p.barcode)} className="text-muted transition hover:text-ink">
+                    Dismiss
+                  </button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {items.length === 0 && pending.length === 0 ? (
         <p className="mt-3 text-sm text-muted">
           Nothing added yet. Add the product above, or search — then drag to set the order.
         </p>
-      ) : (
+      ) : items.length === 0 ? null : (
         <ul className="mt-3 overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
           {items.map((item, i) => (
             <li
