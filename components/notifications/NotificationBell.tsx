@@ -13,7 +13,8 @@ import { profilePath } from "@/lib/profilePath";
 type NotificationActor = { handle: string; displayName: string };
 type Notification =
   | { kind: "followed"; ts: string; actor: NotificationActor }
-  | { kind: "liked_list" | "saved_list"; ts: string; actor: NotificationActor; list: { title: string; slug: string } };
+  | { kind: "liked_list" | "saved_list"; ts: string; actor: NotificationActor; list: { title: string; slug: string } }
+  | { kind: "replied"; ts: string; actor: NotificationActor; product: { slug: string; name: string } };
 
 export function NotificationBell() {
   const { available, user } = useAuth();
@@ -104,12 +105,17 @@ export function NotificationBell() {
           </p>
           {items.length === 0 && (
             <p className="px-4 py-6 text-center text-sm text-muted">
-              You&apos;re all caught up. Follows and likes on your lists show up here.
+              You&apos;re all caught up. Follows, replies, and likes on your lists show up here.
             </p>
           )}
           <ul className="max-h-[60vh] overflow-y-auto [&>li+li]:border-t [&>li+li]:border-line">
             {items.map((n, i) => {
-              const href = n.kind === "followed" ? profilePath(n.actor.handle) : `/list/${n.list.slug}`;
+              const href =
+                n.kind === "followed"
+                  ? profilePath(n.actor.handle)
+                  : n.kind === "replied"
+                    ? `/p/${n.product.slug}`
+                    : `/list/${n.list.slug}`;
               return (
                 <li key={`${n.kind}-${i}-${n.ts}`}>
                   <Link
@@ -121,6 +127,10 @@ export function NotificationBell() {
                       <span className="font-medium">@{n.actor.handle}</span>{" "}
                       {n.kind === "followed" ? (
                         "followed you"
+                      ) : n.kind === "replied" ? (
+                        <>
+                          replied to your comment on <span className="text-ink">{n.product.name}</span>
+                        </>
                       ) : (
                         <>
                           {n.kind === "liked_list" ? "liked" : "saved"}{" "}
