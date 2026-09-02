@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
+import { profilePath } from "@/lib/profilePath";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SettingsClient } from "./SettingsClient";
 
@@ -44,7 +45,7 @@ export default async function SettingsPage() {
               <p className="mt-2 text-sm text-muted">
                 Signed in as{" "}
                 <Link
-                  href={`/u/${auth.profile.handle}`}
+                  href={profilePath(auth.profile.handle)}
                   className="text-ink underline decoration-line underline-offset-2"
                 >
                   @{auth.profile.handle}

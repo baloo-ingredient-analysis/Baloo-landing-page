@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { profilePath } from "@/lib/profilePath";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useAuth } from "./useAuth";
 import { AuthModal, type AuthMode } from "./AuthModal";
@@ -59,7 +60,7 @@ export function AccountMenu() {
   // beside it opens the account menu (Settings / Sign out). Guests / handle-pending / signed-out keep
   // the single button (they have no profile page to link to).
   const hasProfile = !!(user && profile?.handle);
-  const profileHref = profile?.handle ? `/u/${profile.handle}?tab=lists` : "/";
+  const profileHref = profile?.handle ? profilePath(profile.handle, "lists") : "/";
 
   return (
     <div ref={rootRef} className="relative">

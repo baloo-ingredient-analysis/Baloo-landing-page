@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "../auth/useAuth";
+import { profilePath } from "@/lib/profilePath";
 
 type NotificationActor = { handle: string; displayName: string };
 type Notification =
@@ -108,7 +109,7 @@ export function NotificationBell() {
           )}
           <ul className="max-h-[60vh] overflow-y-auto [&>li+li]:border-t [&>li+li]:border-line">
             {items.map((n, i) => {
-              const href = n.kind === "followed" ? `/u/${n.actor.handle}` : `/list/${n.list.slug}`;
+              const href = n.kind === "followed" ? profilePath(n.actor.handle) : `/list/${n.list.slug}`;
               return (
                 <li key={`${n.kind}-${i}-${n.ts}`}>
                   <Link

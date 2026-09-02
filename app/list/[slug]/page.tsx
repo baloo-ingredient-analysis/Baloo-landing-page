@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { profilePath } from "@/lib/profilePath";
 import { db } from "@/lib/db";
 import { getListBySlug } from "@/lib/db/queries/lists";
 import { getProfileById } from "@/lib/db/queries/profiles";
@@ -94,7 +95,7 @@ export default async function ListPage({ params }: Params) {
                 ) : owner ? (
                   <>
                     by{" "}
-                    <Link href={`/u/${owner.handle}`} className="text-ink/70 underline decoration-line underline-offset-2 hover:text-ink">
+                    <Link href={profilePath(owner.handle)} className="text-ink/70 underline decoration-line underline-offset-2 hover:text-ink">
                       @{owner.handle}
                     </Link>
                   </>

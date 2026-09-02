@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { getProfileByHandle } from "@/lib/db/queries/profiles";
+import { getProfileByHandle, getProfileByOldHandle } from "@/lib/db/queries/profiles";
+import { profilePath } from "@/lib/profilePath";
 import {
   getListsByOwnerWithCounts,
   getPublicListsByOwnerWithCounts,
@@ -58,7 +59,13 @@ export default async function ProfilePage({ params, searchParams }: Params) {
   const { handle } = await params;
   const { tab } = await searchParams;
   const data = await load(handle);
-  if (!data) notFound();
+  if (!data) {
+    // A renamed handle (L5b): permanent-redirect an old handle to the owner's current profile.
+    const dbi = db();
+    const moved = dbi ? await getProfileByOldHandle(dbi, handle.toLowerCase()) : null;
+    if (moved) permanentRedirect(profilePath(moved.handle));
+    notFound();
+  }
   const { dbi, profile } = data;
 
   const viewer = await getSessionUser();
@@ -130,7 +137,7 @@ export default async function ProfilePage({ params, searchParams }: Params) {
               {/* Nothing public to share until the profile is public (L5c). */}
               {publicCount > 0 && (
                 <ShareButton
-                  path={`/u/${profile.handle}`}
+                  path={profilePath(profile.handle)}
                   title={profile.displayName}
                   cardPath={`/api/og/profile/${profile.handle}`}
                 />
@@ -163,7 +170,7 @@ export default async function ProfilePage({ params, searchParams }: Params) {
             <Link
               role="tab"
               aria-selected={activeTab === "pantry"}
-              href={`/u/${profile.handle}?tab=pantry`}
+              href={profilePath(profile.handle, "pantry")}
               className={tabCls(activeTab === "pantry")}
             >
               Pantry
@@ -172,7 +179,7 @@ export default async function ProfilePage({ params, searchParams }: Params) {
           <Link
             role="tab"
             aria-selected={activeTab === "lists"}
-            href={`/u/${profile.handle}?tab=lists`}
+            href={profilePath(profile.handle, "lists")}
             className={tabCls(activeTab === "lists")}
           >
             Lists

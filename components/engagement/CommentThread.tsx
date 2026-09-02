@@ -7,6 +7,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/useAuth";
+import { profilePath } from "@/lib/profilePath";
 import { AuthModal, type AuthMode } from "@/components/auth/AuthModal";
 import { UpvotePill } from "@/components/engagement/UpvotePill";
 import { Wordmark } from "@/components/Wordmark";
@@ -350,7 +351,7 @@ function CommentRow({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
-            <Link href={`/u/${comment.author.handle}`} className="font-semibold text-ink hover:underline">
+            <Link href={profilePath(comment.author.handle)} className="font-semibold text-ink hover:underline">
               @{comment.author.handle}
             </Link>
             <time className="text-xs tabular-nums text-muted" dateTime={comment.ts}>
