@@ -74,6 +74,7 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={toggle}
+        title={unread > 0 ? `Notifications — ${unread} unread` : "Notifications"}
         aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
         className="relative flex h-8 w-8 items-center justify-center rounded-full text-muted transition hover:bg-paper hover:text-ink"
