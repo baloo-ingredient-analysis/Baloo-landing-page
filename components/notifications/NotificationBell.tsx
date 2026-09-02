@@ -74,20 +74,26 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={toggle}
-        title={unread > 0 ? `Notifications — ${unread} unread` : "Notifications"}
         aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
-        className="relative flex h-8 w-8 items-center justify-center rounded-full text-muted transition hover:bg-paper hover:text-ink"
+        className="group relative flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-line/40 hover:text-ink"
       >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-[18px] w-[18px]">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-[18px] w-[18px]">
           <path d="M10 3a4 4 0 0 0-4 4c0 4-1.5 5-1.5 5h11S14 11 14 7a4 4 0 0 0-4-4Z" />
           <path d="M8.5 15.5a1.5 1.5 0 0 0 3 0" />
         </svg>
         {unread > 0 && (
-          <span className="absolute right-0.5 top-0.5 min-w-[15px] rounded-full bg-processed px-1 text-center text-[11px] font-semibold leading-[15px] text-paper">
+          <span className="absolute right-1 top-1 min-w-[15px] rounded-full bg-processed px-1 text-center text-[11px] font-semibold leading-[15px] text-paper">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
+        {/* Custom tooltip matching HeaderNav's icons (native `title` renders a differently-styled box). */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-0 top-full z-10 mt-1 whitespace-nowrap rounded-md bg-ink px-2 py-0.5 text-[11px] font-medium text-paper opacity-0 shadow-card transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+        >
+          Notifications
+        </span>
       </button>
 
       {open && (
