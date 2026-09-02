@@ -64,6 +64,9 @@ export const profiles = pgTable("profiles", {
   bio: text("bio"),
   // Moderation privilege (Order G9). Set via scripts/make-admin.ts; gates /admin + /api/moderation.
   isAdmin: boolean("is_admin").notNull().default(false),
+  // In-app notifications (N1): the moment the owner last opened their notifications. Anything newer
+  // (a follow, a like/save on their list) counts as unread. A single marker — no per-row read state.
+  notificationsSeenAt: timestamp("notifications_seen_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
