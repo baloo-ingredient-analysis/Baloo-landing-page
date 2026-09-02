@@ -18,6 +18,7 @@ export function ResultsView({
   productSummary,
   loading = false,
   actions,
+  availability,
 }: {
   productName: string;
   retailer: string;
@@ -29,6 +30,7 @@ export function ResultsView({
   productSummary?: string;
   loading?: boolean;
   actions?: React.ReactNode; // product-page actions (Save to pantry, Add to my list) under the title
+  availability?: React.ReactNode; // P4 "From X · also at Y, Z"; replaces the plain retailer line when set
 }) {
   const [tab, setTab] = useState<Tab>("ingredients");
   const empty = ingredients.length === 0;
@@ -43,22 +45,24 @@ export function ResultsView({
   return (
     <section className="mt-12 animate-fade-in">
       <header className="border-b border-line pb-5">
-        <p className="text-sm text-muted">
-          {retailer}
-          {sourceUrl && (
-            <>
-              {" · "}
-              <a
-                href={sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline decoration-line underline-offset-2 transition hover:text-ink"
-              >
-                View on retailer
-              </a>
-            </>
-          )}
-        </p>
+        {availability ?? (
+          <p className="text-sm text-muted">
+            {retailer}
+            {sourceUrl && (
+              <>
+                {" · "}
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-line underline-offset-2 transition hover:text-ink"
+                >
+                  View on retailer
+                </a>
+              </>
+            )}
+          </p>
+        )}
         <h2 className="mt-1.5 font-display text-2xl leading-tight text-ink sm:text-3xl">
           {productName}
         </h2>
