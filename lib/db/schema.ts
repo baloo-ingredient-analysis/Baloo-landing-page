@@ -70,6 +70,18 @@ export const profiles = pgTable("profiles", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Handle redirects (L5b): when someone changes their username, the OLD handle is kept here pointing
+// at their profile so `/@oldhandle` permanent-redirects to their current `/@newhandle` — shared links
+// never rot. Keyed by the old handle; all of a user's past handles point at the one profile, so
+// chained renames resolve to the current handle via the profile. Freed if someone later claims it.
+export const handleRedirects = pgTable("handle_redirects", {
+  oldHandle: text("old_handle").primaryKey(),
+  profileId: uuid("profile_id")
+    .notNull()
+    .references(() => profiles.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Catalog (canonical products + versioned analysis) ────────────────────────────────────────
 export const products = pgTable(
   "products",

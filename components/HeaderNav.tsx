@@ -9,6 +9,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/useAuth";
+import { profilePath } from "@/lib/profilePath";
 
 const stroke = {
   fill: "none",
@@ -64,7 +65,7 @@ function AdminIcon() {
 export function HeaderNav({ className = "" }: { className?: string }) {
   const pathname = usePathname() ?? "";
   const { profile } = useAuth();
-  const listsHref = profile?.handle ? `/u/${profile.handle}?tab=lists` : "/lists";
+  const listsHref = profile?.handle ? profilePath(profile.handle, "lists") : "/lists";
 
   const items = [
     { href: "/feed", label: "Following", icon: <FollowingIcon /> },

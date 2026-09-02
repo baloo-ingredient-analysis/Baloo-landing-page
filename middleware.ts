@@ -6,19 +6,34 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // Vanity profile URLs (L5a): serve `/@handle` from the real `/u/[handle]` page via an internal
+  // rewrite — the browser keeps the pretty `/@handle` (+ any ?tab=…). Handles can't contain "/", so
+  // only the first segment is the handle; anything deeper falls through to a 404 as before.
+  const { pathname } = request.nextUrl;
+  const rewriteUrl =
+    pathname.startsWith("/@") && pathname.length > 2
+      ? (() => {
+          const u = request.nextUrl.clone();
+          u.pathname = `/u/${pathname.slice(2)}`; // "/@foo" → "/u/foo"; query string preserved by clone
+          return u;
+        })()
+      : null;
+  const base = () =>
+    rewriteUrl ? NextResponse.rewrite(rewriteUrl, { request }) : NextResponse.next({ request });
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) return NextResponse.next();
+  if (!url || !key) return base();
 
-  let response = NextResponse.next({ request });
+  let response = base();
 
   const supabase = createServerClient(url, key, {
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (cookiesToSet) => {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        response = base(); // rebuild — preserving the rewrite — then re-attach refreshed cookies
         cookiesToSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, options),
         );

@@ -7,6 +7,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { coverCss, monogram } from "@/lib/cover";
+import { profilePath } from "@/lib/profilePath";
 import { ListCover } from "@/components/lists/ListCover";
 import { FollowButton } from "@/components/FollowButton";
 import type { FeedArticle, FeedPage } from "@/lib/db/queries/feed";
@@ -139,7 +140,7 @@ function Article({ article }: { article: FeedArticle }) {
           {monogram(article.actor.displayName)}
         </span>
         <p className="min-w-0 flex-1 text-sm leading-snug">
-          <Link href={`/u/${article.actor.handle}`} className="font-medium text-ink hover:underline">
+          <Link href={profilePath(article.actor.handle)} className="font-medium text-ink hover:underline">
             @{article.actor.handle}
           </Link>{" "}
           <span className="text-muted">
@@ -250,7 +251,7 @@ function EmptyState({
                 </span>
               </span>
               <span className="min-w-0 flex-1">
-                <Link href={`/u/${s.handle}`} className="block truncate font-display text-base text-ink hover:underline">
+                <Link href={profilePath(s.handle)} className="block truncate font-display text-base text-ink hover:underline">
                   {s.displayName}
                 </Link>
                 <span className="text-xs tabular-nums text-muted">

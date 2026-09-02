@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { profilePath } from "@/lib/profilePath";
 import { getCurrentProfile } from "@/lib/auth";
 import { SiteHeader } from "@/components/SiteHeader";
 
@@ -11,7 +12,7 @@ export const metadata: Metadata = { title: "Your lists — Baloo" };
 // and handle-pending states to the next step.
 export default async function MyListsPage() {
   const auth = await getCurrentProfile();
-  if (auth?.profile) redirect(`/u/${auth.profile.handle}?tab=lists`);
+  if (auth?.profile) redirect(profilePath(auth.profile.handle, "lists"));
 
   // Only signed-out / handle-pending users reach here (everyone else redirected to their profile).
   return (

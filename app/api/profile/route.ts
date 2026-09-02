@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getProfileByHandle, upsertProfile } from "@/lib/db/queries/profiles";
+import { changeHandle, getProfileByHandle, getProfileById, upsertProfile } from "@/lib/db/queries/profiles";
 import { validateHandle } from "@/lib/handle";
 
 // Handle setup / profile update (Order G2) — the first authenticated write in the codebase and
@@ -41,7 +41,14 @@ export async function POST(req: Request) {
     handle;
 
   try {
-    const profile = await upsertProfile(dbi, { id: user.id, handle, displayName });
+    // A real handle CHANGE (existing profile, different handle) goes through changeHandle so the old
+    // handle is kept as a permanent redirect (L5b). First-time setup / same-handle edits just upsert
+    // — upsertProfile deliberately never rewrites the handle on conflict.
+    const current = await getProfileById(dbi, user.id);
+    const profile =
+      current && current.handle !== handle
+        ? await changeHandle(dbi, user.id, current.handle, handle, displayName)
+        : await upsertProfile(dbi, { id: user.id, handle, displayName });
     return NextResponse.json({ profile });
   } catch (err) {
     // Unique-constraint race (two requests claiming one handle) lands here.
