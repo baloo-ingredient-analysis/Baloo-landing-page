@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getProductForPage } from "@/lib/db/queries/products";
+import { getOffersForProduct } from "@/lib/db/queries/offers";
 import { ResultsView } from "@/components/ResultsView";
+import { Availability } from "@/components/product/Availability";
 import { SiteHeader } from "@/components/SiteHeader";
 import { AddToList } from "@/components/lists/AddToList";
 import { ShareButton } from "@/components/lists/ShareButton";
@@ -51,10 +53,14 @@ export default async function ProductPage({ params }: Params) {
   // SSR-hydrated.
   const dbi = db()!; // load() already proved it exists
   const viewer = await getSessionUser();
-  const [thread, viewerSavedProduct] = await Promise.all([
+  const [thread, viewerSavedProduct, offers] = await Promise.all([
     getThread(dbi, data.product.id, { sort: "top", viewerId: viewer?.id ?? null }),
     viewer ? isProductSaved(dbi, viewer.id, data.product.id) : Promise.resolve(false),
+    getOffersForProduct(dbi, data.product.id), // P4 "also available at"
   ]);
+
+  // "From X · also at Y, Z" — the source retailer plus any other retailers carrying this product.
+  const availability = <Availability base={data.product.retailer ?? null} offers={offers} />;
 
   // One shared mapping (Order P2) so this page and the extract short-circuit can't drift apart.
   const ingredients: Partial<Ingredient>[] = storedIngredients(data);
@@ -94,6 +100,7 @@ export default async function ProductPage({ params }: Params) {
             productSummary={data.summary ?? undefined}
             loading={false}
             actions={productActions}
+            availability={availability}
           />
         ) : (
           // Catalog product not yet explained (e.g. seeded from Open Food Facts before its AI
@@ -102,9 +109,7 @@ export default async function ProductPage({ params }: Params) {
             <h1 className="font-display text-2xl leading-tight text-ink sm:text-3xl">
               {data.product.name}
             </h1>
-            {data.product.retailer && (
-              <p className="mt-1.5 text-sm text-muted">{data.product.retailer}</p>
-            )}
+            <div className="mt-1.5">{availability}</div>
             <div className="mt-4 flex flex-wrap items-center gap-2">{productActions}</div>
             <p className="mt-4 text-sm text-muted">
               We haven&apos;t broken this one down yet — its ingredient explanation is on the way.
