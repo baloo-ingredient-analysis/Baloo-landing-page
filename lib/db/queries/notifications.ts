@@ -6,9 +6,10 @@
 // Unread is a single marker (`profiles.notifications_seen_at`): anything newer is unread. Callers own
 // the db() null-guard + auth (owner-scoped by construction — everything is keyed to `userId`).
 
-import { and, desc, eq, gt, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "../index";
-import { follows, lists, profiles, saves, votes } from "../schema";
+import { comments, follows, lists, products, profiles, saves, votes } from "../schema";
 
 export type NotificationActor = { handle: string; displayName: string };
 export type Notification =
@@ -18,7 +19,8 @@ export type Notification =
       ts: string;
       actor: NotificationActor;
       list: { title: string; slug: string };
-    };
+    }
+  | { kind: "replied"; ts: string; actor: NotificationActor; product: { slug: string; name: string } };
 
 export async function markNotificationsSeen(dbi: Db, userId: string): Promise<void> {
   await dbi.update(profiles).set({ notificationsSeenAt: sql`now()` }).where(eq(profiles.id, userId));
@@ -83,6 +85,33 @@ export async function getNotifications(
       const list = listMap.get(r.listId);
       if (list) out.push({ kind: "saved_list", ts: r.ts.toISOString(), actor: { handle: r.handle, displayName: r.displayName }, list });
     }
+  }
+
+  // Replies to my comments. A reply's parent comment is mine → I'm the recipient (self-replies and
+  // hidden/tombstoned rows excluded). Links to the product where the discussion lives.
+  const parent = alias(comments, "parent_comment");
+  const replyRows = await dbi
+    .select({
+      ts: comments.createdAt,
+      handle: profiles.handle,
+      displayName: profiles.displayName,
+      slug: products.slug,
+      name: products.name,
+    })
+    .from(comments)
+    .innerJoin(parent, eq(comments.parentId, parent.id))
+    .innerJoin(profiles, eq(profiles.id, comments.userId))
+    .innerJoin(products, eq(products.id, comments.productId))
+    .where(and(eq(parent.userId, userId), ne(comments.userId, userId), isNull(comments.hiddenBy)))
+    .orderBy(desc(comments.createdAt))
+    .limit(limit);
+  for (const r of replyRows) {
+    out.push({
+      kind: "replied",
+      ts: r.ts.toISOString(),
+      actor: { handle: r.handle, displayName: r.displayName },
+      product: { slug: r.slug, name: r.name },
+    });
   }
 
   out.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
