@@ -8,6 +8,7 @@ import { getProfileById } from "@/lib/db/queries/profiles";
 import { getSessionUser } from "@/lib/auth";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ListCover } from "@/components/lists/ListCover";
+import { ListItems } from "@/components/lists/ListItems";
 import { ShareButton } from "@/components/lists/ShareButton";
 import { SavePill } from "@/components/engagement/SavePill";
 import { LikePill } from "@/components/engagement/LikePill";
@@ -154,34 +155,14 @@ export default async function ListPage({ params }: Params) {
             )}
           </div>
         ) : (
-          <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
-            {list.items.map((item, i) => (
-              <li key={item.id}>
-                <Link
-                  href={`/p/${item.product.slug}`}
-                  className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-canvas sm:px-5"
-                >
-                  <span className="w-6 shrink-0 font-display text-[15px] tabular-nums text-muted">
-                    {i + 1}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-display text-base leading-tight text-ink">
-                      {item.product.name}
-                    </span>
-                    {item.product.brand && (
-                      <span className="text-xs uppercase tracking-[0.08em] text-muted">
-                        {item.product.brand}
-                      </span>
-                    )}
-                    {item.note && <span className="mt-1 block text-sm text-muted">{item.note}</span>}
-                  </span>
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4 shrink-0 text-muted">
-                    <path d="M6 3.5L10.5 8 6 12.5" />
-                  </svg>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <ListItems
+            items={list.items.map((item) => ({
+              slug: item.product.slug,
+              name: item.product.name,
+              brand: item.product.brand,
+              note: item.note,
+            }))}
+          />
         )}
 
         <p className="mt-8 text-center text-xs text-muted">
