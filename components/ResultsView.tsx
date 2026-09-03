@@ -69,7 +69,8 @@ export function ResultsView({
         {actions && <div className="mt-4 flex flex-wrap items-center gap-2">{actions}</div>}
       </header>
 
-      {/* Tabs per the design handoff: Ingredients / Nutrition / Processing (Soon, disabled). */}
+      {/* Tabs: Ingredients / Nutrition. (A "Processing (Soon)" teaser lived here but was never built
+          and sits awkwardly with the score-free guardrail, so it's been removed.) */}
       <div role="tablist" aria-label="Result views" className="mt-1.5 flex gap-6 border-b border-line">
         <button
           role="tab"
@@ -90,18 +91,6 @@ export function ResultsView({
           className={tabClass(tab === "nutrition")}
         >
           Nutrition
-        </button>
-        <button
-          role="tab"
-          aria-selected={false}
-          disabled
-          aria-disabled
-          className="-mb-px flex cursor-not-allowed items-center gap-1.5 border-b-2 border-transparent py-3 text-[15px] font-medium text-muted opacity-50"
-        >
-          Processing
-          <span className="rounded-full bg-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-ink/70">
-            Soon
-          </span>
         </button>
       </div>
 
