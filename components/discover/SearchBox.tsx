@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProductRow, RowChevron } from "@/components/ProductRow";
+import { QuickView } from "@/components/product/QuickView";
 
 type Hit = {
   products: { id: string; name: string; brand: string | null; slug: string; rank?: number }[];
@@ -32,6 +33,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
   const [analyzing, setAnalyzing] = useState<{ barcode: string; name: string } | null>(null);
   const [offErr, setOffErr] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false); // "Show more" — reveal the rest of the products
+  const [quickSlug, setQuickSlug] = useState<string | null>(null); // catalog result open in the drawer
   const first = useRef(true);
 
   // Analyse a specific Open Food Facts product on demand: import it (analyse once, cache), then go
@@ -221,8 +223,8 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
               <ul className="mt-2 max-w-[760px] overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
                 {visibleProducts.map((it) =>
                   it.type === "catalog" ? (
-                    // Already analysed — open instantly.
-                    <ProductRow key={it.key} slug={it.slug} name={it.name} brand={it.brand} />
+                    // Already analysed — plain click peeks in the drawer; cmd/ctrl-click opens the page.
+                    <ProductRow key={it.key} slug={it.slug} name={it.name} brand={it.brand} onQuickView={setQuickSlug} />
                   ) : (
                     // From Open Food Facts — tapping analyses it, then opens (same list, no separate step).
                     <ProductRow
@@ -263,6 +265,8 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
           </p>
         </div>
       )}
+
+      <QuickView slug={quickSlug} onClose={() => setQuickSlug(null)} />
     </div>
   );
 }

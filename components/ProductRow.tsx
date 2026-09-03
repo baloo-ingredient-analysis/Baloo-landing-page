@@ -11,6 +11,7 @@ export function ProductRow({
   retailer,
   meta,
   onClick,
+  onQuickView,
 }: {
   slug?: string; // omit for a not-yet-analysed product (use onClick instead)
   name: string;
@@ -18,6 +19,7 @@ export function ProductRow({
   retailer?: string | null;
   meta?: string; // overrides the default brand·retailer join when a caller wants different text
   onClick?: () => void; // when set, the row is a button (analyse-on-tap) instead of a link
+  onQuickView?: (slug: string) => void; // catalog rows: plain left-click opens the quick-view drawer
 }) {
   const metaLine = meta ?? [brand, retailer].filter(Boolean).join(" · ");
   const cls = "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-canvas sm:px-5";
@@ -43,7 +45,20 @@ export function ProductRow({
           {inner}
         </button>
       ) : (
-        <Link href={`/p/${slug}`} className={cls}>
+        <Link
+          href={`/p/${slug}`}
+          onClick={
+            onQuickView && slug
+              ? (e) => {
+                  // Let modified / non-primary clicks navigate (open in new tab); plain click peeks.
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                  e.preventDefault();
+                  onQuickView(slug);
+                }
+              : undefined
+          }
+          className={cls}
+        >
           {inner}
         </Link>
       )}
