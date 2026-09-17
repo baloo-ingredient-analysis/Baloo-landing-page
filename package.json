@@ -18,7 +18,8 @@
     "db:embeddings": "npx -y tsx scripts/backfill-embeddings.ts",
     "db:list-embeddings": "npx -y tsx scripts/backfill-list-embeddings.ts",
     "db:countries": "npx -y tsx scripts/backfill-countries.ts",
-    "db:seed-off": "npx -y tsx scripts/seed-off.ts"
+    "db:seed-off": "npx -y tsx scripts/seed-off.ts",
+    "test:recognition": "npx -y tsx scripts/test-recognition.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",
