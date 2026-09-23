@@ -23,25 +23,30 @@ export type ThreadComment = {
 
 export type ThreadSort = "top" | "newest";
 
-export async function getCommentCount(dbi: Db, productId: string): Promise<number> {
+// A comment thread hangs off EITHER a product or a list (L-community). One target per call.
+export type CommentTarget = { productId: string } | { listId: string };
+const targetEq = (t: CommentTarget) =>
+  "productId" in t ? eq(comments.productId, t.productId) : eq(comments.listId, t.listId);
+
+export async function getCommentCount(dbi: Db, target: CommentTarget): Promise<number> {
   const [row] = await dbi
     .select({ n: sql<number>`count(*)::int` })
     .from(comments)
-    .where(eq(comments.productId, productId));
+    .where(targetEq(target));
   return row?.n ?? 0;
 }
 
-// The whole thread for a product, hydrated (author + vote count + viewer's vote), bulk — no N+1.
+// The whole thread for a product OR list, hydrated (author + vote count + viewer's vote), bulk — no N+1.
 export async function getThread(
   dbi: Db,
-  productId: string,
+  target: CommentTarget,
   opts: { sort: ThreadSort; viewerId?: string | null },
 ): Promise<ThreadComment[]> {
   const rows = await dbi
     .select({ c: comments, handle: profiles.handle, displayName: profiles.displayName })
     .from(comments)
     .innerJoin(profiles, eq(profiles.id, comments.userId))
-    .where(eq(comments.productId, productId));
+    .where(targetEq(target));
   if (rows.length === 0) return [];
 
   // Bulk vote hydration for every comment in the thread.
@@ -111,26 +116,28 @@ export async function getThread(
 // Post a comment or a reply. One-level cap enforced here as the last line of defence.
 export async function addComment(
   dbi: Db,
-  input: { userId: string; productId: string; body: string; parentId?: string | null },
+  input: { userId: string; target: CommentTarget; body: string; parentId?: string | null },
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const productId = "productId" in input.target ? input.target.productId : null;
+  const listId = "listId" in input.target ? input.target.listId : null;
   if (input.parentId) {
     const [parent] = await dbi
-      .select({ id: comments.id, parentId: comments.parentId, productId: comments.productId })
+      .select({
+        parentId: comments.parentId,
+        productId: comments.productId,
+        listId: comments.listId,
+      })
       .from(comments)
       .where(eq(comments.id, input.parentId))
       .limit(1);
-    if (!parent || parent.productId !== input.productId)
+    // The parent must live on the SAME target (can't reply across products/lists).
+    if (!parent || parent.productId !== productId || parent.listId !== listId)
       return { ok: false, error: "bad_parent" };
     if (parent.parentId) return { ok: false, error: "no_nested_replies" };
   }
   const [row] = await dbi
     .insert(comments)
-    .values({
-      userId: input.userId,
-      productId: input.productId,
-      body: input.body,
-      parentId: input.parentId ?? null,
-    })
+    .values({ userId: input.userId, productId, listId, body: input.body, parentId: input.parentId ?? null })
     .returning({ id: comments.id });
   return { ok: true, id: row.id };
 }
@@ -161,7 +168,9 @@ export async function deleteOwnComment(dbi: Db, id: string, userId: string): Pro
 export async function getCommentForExplain(
   dbi: Db,
   commentId: string,
-): Promise<{ productId: string; body: string } | null> {
+): Promise<{ productId: string | null; body: string } | null> {
+  // productId is null for a LIST comment — "Explain this" is product-grounded, so the caller treats a
+  // null product as "can't explain" (the UI already hides the affordance for list threads).
   const [row] = await dbi
     .select({ productId: comments.productId, body: comments.body })
     .from(comments)

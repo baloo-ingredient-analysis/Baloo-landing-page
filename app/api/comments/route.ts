@@ -2,21 +2,37 @@ import { NextResponse } from "next/server";
 import { requireUser, requireVerifiedUser, getSessionUser } from "@/lib/auth";
 import { checkLimit, tooMany } from "@/lib/ratelimit";
 import { db } from "@/lib/db";
-import { addComment, deleteOwnComment, getThread, type ThreadSort } from "@/lib/db/queries/comments";
+import {
+  addComment,
+  type CommentTarget,
+  deleteOwnComment,
+  getThread,
+  type ThreadSort,
+} from "@/lib/db/queries/comments";
 import { recordActivity } from "@/lib/db/queries/activity";
 
-// Product discussion (Order G8a). Reads are public; posting requires auth.
+// A comment thread targets a product OR a list. Exactly one id; product wins if both are somehow sent.
+function targetFrom(src: { productId?: string | null; listId?: string | null }): CommentTarget | null {
+  if (src.productId) return { productId: src.productId };
+  if (src.listId) return { listId: src.listId };
+  return null;
+}
+
+// Product/list discussion (Order G8a; L-community). Reads are public; posting requires a real account.
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const productId = url.searchParams.get("productId");
+  const target = targetFrom({
+    productId: url.searchParams.get("productId"),
+    listId: url.searchParams.get("listId"),
+  });
   const sort: ThreadSort = url.searchParams.get("sort") === "newest" ? "newest" : "top";
-  if (!productId) return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  if (!target) return NextResponse.json({ error: "bad_request" }, { status: 400 });
 
   const dbi = db();
   if (!dbi) return NextResponse.json({ comments: [] });
 
   const viewer = await getSessionUser();
-  const thread = await getThread(dbi, productId, { sort, viewerId: viewer?.id ?? null });
+  const thread = await getThread(dbi, target, { sort, viewerId: viewer?.id ?? null });
   return NextResponse.json({ comments: thread });
 }
 
@@ -28,20 +44,21 @@ export async function POST(req: Request) {
   const dbi = db();
   if (!dbi) return NextResponse.json({ error: "db_not_configured" }, { status: 503 });
 
-  let body: { productId?: string; body?: string; parentId?: string | null };
+  let body: { productId?: string; listId?: string; body?: string; parentId?: string | null };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
+  const target = targetFrom(body);
   const text = (body.body ?? "").trim();
-  if (!body.productId || text.length < 1 || text.length > 1000) {
+  if (!target || text.length < 1 || text.length > 1000) {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
 
   const res = await addComment(dbi, {
     userId: gate.user.id,
-    productId: body.productId,
+    target,
     body: text,
     parentId: body.parentId ?? null,
   });
@@ -50,8 +67,8 @@ export async function POST(req: Request) {
   await recordActivity(dbi, {
     actorId: gate.user.id,
     verb: "commented",
-    objectType: "product",
-    objectId: body.productId,
+    objectType: "productId" in target ? "product" : "list",
+    objectId: "productId" in target ? target.productId : target.listId,
   });
   return NextResponse.json({ id: res.id });
 }

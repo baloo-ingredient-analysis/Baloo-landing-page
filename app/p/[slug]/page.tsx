@@ -54,7 +54,7 @@ export default async function ProductPage({ params }: Params) {
   const dbi = db()!; // load() already proved it exists
   const viewer = await getSessionUser();
   const [thread, viewerSavedProduct, offers] = await Promise.all([
-    getThread(dbi, data.product.id, { sort: "top", viewerId: viewer?.id ?? null }),
+    getThread(dbi, { productId: data.product.id }, { sort: "top", viewerId: viewer?.id ?? null }),
     viewer ? isProductSaved(dbi, viewer.id, data.product.id) : Promise.resolve(false),
     getOffersForProduct(dbi, data.product.id), // P4 "also available at"
   ]);

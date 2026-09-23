@@ -353,9 +353,10 @@ export const comments = pgTable(
     // OTHER people wrote underneath them. Now the row survives as a scrubbed tombstone (body
     // cleared, hiddenBy 'author'), the thread tree stays intact, and the personal data is gone.
     userId: uuid("user_id").references(() => profiles.id, { onDelete: "set null" }),
-    productId: uuid("product_id")
-      .notNull()
-      .references(() => products.id, { onDelete: "cascade" }),
+    // A comment targets EITHER a product OR a list (L-community). Exactly one is set — enforced by a
+    // CHECK in the migration. product_id was NOT NULL until list comments landed; it's now nullable.
+    productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }),
+    listId: uuid("list_id").references(() => lists.id, { onDelete: "cascade" }),
     parentId: uuid("parent_id").references((): AnyPgColumn => comments.id, {
       onDelete: "cascade",
     }),
@@ -367,7 +368,7 @@ export const comments = pgTable(
     hiddenBy: text("hidden_by").$type<"author" | "moderator">(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("comments_product_idx").on(t.productId)],
+  (t) => [index("comments_product_idx").on(t.productId), index("comments_list_idx").on(t.listId)],
 );
 
 // The event log: powers the home feed (G6) and the graduated "on Baloo right now" board.
