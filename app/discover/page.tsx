@@ -76,52 +76,43 @@ export default async function DiscoverPage({
         </section>
 
         <section className="mt-12">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="font-display text-[23px] text-ink">Explore</h2>
-              {/* "Most popular in {window}" — ranked by likes + saves + comments within the window. */}
-              <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted">Most popular</span>
-              <div className="flex gap-1 rounded-full bg-canvas p-1">
-                {([
-                  { id: "week", label: "This week" },
-                  { id: "month", label: "This month" },
-                  { id: "all", label: "All time" },
-                ] as const).map((w) => (
-                  <Link
-                    key={w.id}
-                    href={`/discover?t=${w.id}&region=${region}`}
-                    scroll={false}
-                    aria-pressed={windowSel === w.id}
-                    className={`rounded-full px-3 py-1 text-[13px] font-medium transition ${
-                      windowSel === w.id ? "bg-paper text-ink shadow-card" : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    {w.label}
-                  </Link>
-                ))}
-              </div>
+          {/* Serif title carries the "most popular" meaning; one understated control row below holds the
+              time window + region as matching pills — no competing uppercase micro-labels (D-cohesion). */}
+          <h2 className="font-display text-[23px] text-ink">Most popular</h2>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex gap-1 rounded-full bg-canvas p-1">
+              {([
+                { id: "week", label: "This week" },
+                { id: "month", label: "This month" },
+                { id: "all", label: "All time" },
+              ] as const).map((w) => (
+                <Link
+                  key={w.id}
+                  href={`/discover?t=${w.id}&region=${region}`}
+                  scroll={false}
+                  aria-pressed={windowSel === w.id}
+                  className={`rounded-full px-3.5 py-1 text-[13px] font-medium transition ${
+                    windowSel === w.id ? "bg-paper text-ink shadow-card" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {w.label}
+                </Link>
+              ))}
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                Shopping in
-              </span>
-              <div className="flex gap-1 rounded-full bg-canvas p-1">
-                {REGIONS.map((r) => (
-                  <Link
-                    key={r.id}
-                    href={`/discover?region=${r.id}${windowSel !== "all" ? `&t=${windowSel}` : ""}`}
-                    scroll={false}
-                    aria-pressed={region === r.id}
-                    className={`rounded-full px-3 py-1 text-[13px] font-medium transition ${
-                      region === r.id
-                        ? "bg-paper text-ink shadow-card"
-                        : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    {r.label}
-                  </Link>
-                ))}
-              </div>
+            <div className="flex gap-1 rounded-full bg-canvas p-1">
+              {REGIONS.map((r) => (
+                <Link
+                  key={r.id}
+                  href={`/discover?region=${r.id}${windowSel !== "all" ? `&t=${windowSel}` : ""}`}
+                  scroll={false}
+                  aria-pressed={region === r.id}
+                  className={`rounded-full px-3.5 py-1 text-[13px] font-medium transition ${
+                    region === r.id ? "bg-paper text-ink shadow-card" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {r.label}
+                </Link>
+              ))}
             </div>
           </div>
           {explore.length === 0 ? (
