@@ -5,7 +5,9 @@ import { profilePath } from "@/lib/profilePath";
 import { db } from "@/lib/db";
 import { getListBySlug } from "@/lib/db/queries/lists";
 import { getProfileById } from "@/lib/db/queries/profiles";
+import { getThread } from "@/lib/db/queries/comments";
 import { getSessionUser } from "@/lib/auth";
+import { CommentThread } from "@/components/engagement/CommentThread";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ListCover } from "@/components/lists/ListCover";
 import { ListItems } from "@/components/lists/ListItems";
@@ -65,6 +67,9 @@ export default async function ListPage({ params }: Params) {
     viewer ? hasVoted(dbi, viewer.id, "list", list.id) : Promise.resolve(false),
     getVoteCount(dbi, "list", list.id),
   ]);
+
+  // List discussion (L-community): comments on the list itself, SSR-hydrated like the product page.
+  const thread = await getThread(dbi, { listId: list.id }, { sort: "top", viewerId: viewer?.id ?? null });
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -168,6 +173,8 @@ export default async function ListPage({ params }: Params) {
         <p className="mt-8 text-center text-xs text-muted">
           Every product explained — tap any item.
         </p>
+
+        <CommentThread listId={list.id} initial={thread} />
 
         <div className="mt-auto" />
       </main>

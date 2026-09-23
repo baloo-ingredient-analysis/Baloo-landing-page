@@ -113,6 +113,13 @@
       "when": 1788341197371,
       "tag": "0015_heavy_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790175306058,
+      "tag": "0016_green_elektra",
+      "breakpoints": true
     }
   ]
 }

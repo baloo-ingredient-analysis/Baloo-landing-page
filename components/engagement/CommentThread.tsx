@@ -40,6 +40,10 @@ function SparkGlyph({ className }: { className?: string }) {
 
 // "Explain this" fetch state (Order G8b). Signed-in only; re-tap collapses; result is cached
 // server-side so a second open is instant.
+// A thread targets a product or a list (mirror of the server type; kept local to avoid importing a
+// server query module into this client component).
+type CommentTarget = { productId: string } | { listId: string };
+
 type ExplainTarget = { commentId: string } | { productId: string };
 function useExplain(target: ExplainTarget, signedIn: boolean, onNeedAuth: () => void) {
   const [open, setOpen] = useState(false);
@@ -78,9 +82,11 @@ function useExplain(target: ExplainTarget, signedIn: boolean, onNeedAuth: () => 
 
 export function CommentThread({
   productId,
+  listId,
   initial,
 }: {
-  productId: string;
+  productId?: string;
+  listId?: string;
   initial: ThreadComment[];
 }) {
   const { available, user, profile, refresh } = useAuth();
@@ -91,9 +97,15 @@ export function CommentThread({
   const verified = !!user && !user.isAnonymous;
   const openAuth = () => setAuthMode(user?.isAnonymous ? "upgrade" : "signin");
 
+  // A thread hangs off a product OR a list. Product context also unlocks "Explain this" (G8b), which
+  // grounds on a single product — lists have none, so it's hidden there.
+  const target: CommentTarget = productId ? { productId } : { listId: listId as string };
+  const targetParams = productId ? `productId=${productId}` : `listId=${listId}`;
+  const canExplain = !!productId;
+
   async function reload(nextSort: ThreadSort = sort) {
     try {
-      const res = await fetch(`/api/comments?productId=${productId}&sort=${nextSort}`);
+      const res = await fetch(`/api/comments?${targetParams}&sort=${nextSort}`);
       const data = await res.json();
       setComments(data.comments ?? []);
     } catch {
@@ -133,8 +145,12 @@ export function CommentThread({
         )}
       </div>
       <p className="mt-1.5 text-sm text-muted">
-        Comments are opinions from the community. For a factual take, use{" "}
-        <span className="text-ink/70">Explain this</span> on any comment.
+        Comments are opinions from the community.
+        {canExplain && (
+          <>
+            {" "}For a factual take, use <span className="text-ink/70">Explain this</span> on any comment.
+          </>
+        )}
       </p>
 
       {/* Composer */}
@@ -147,7 +163,7 @@ export function CommentThread({
           const res = await fetch("/api/comments", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, body: text }),
+            body: JSON.stringify({ ...target, body: text }),
           });
           if (res.ok) await reload();
           else if (res.status === 403) openAuth(); // guest → prompt an upgrade
@@ -160,11 +176,9 @@ export function CommentThread({
         <div className="mt-6 rounded-xl border border-line bg-paper p-6 text-center">
           <p className="text-sm text-ink">No comments yet.</p>
           <p className="mt-1 text-sm text-muted">Be the first to share what you think.</p>
-          <ProductExplain
-            productId={productId}
-            signedIn={!!user}
-            onNeedAuth={openAuth}
-          />
+          {canExplain && productId && (
+            <ProductExplain productId={productId} signedIn={!!user} onNeedAuth={openAuth} />
+          )}
         </div>
       ) : (
         <ul className="mt-6">
@@ -172,7 +186,8 @@ export function CommentThread({
             <li key={c.id}>
               <CommentRow
                 comment={c}
-                productId={productId}
+                target={target}
+                canExplain={canExplain}
                 signedIn={verified}
                 onNeedAuth={openAuth}
                 onChanged={reload}
@@ -298,14 +313,16 @@ function Composer({
 
 function CommentRow({
   comment,
-  productId,
+  target,
+  canExplain,
   signedIn,
   onNeedAuth,
   onChanged,
   isReply = false,
 }: {
   comment: ThreadComment;
-  productId: string;
+  target: CommentTarget;
+  canExplain: boolean;
   signedIn: boolean;
   onNeedAuth: () => void;
   onChanged: () => Promise<void>;
@@ -331,7 +348,7 @@ function CommentRow({
           <ul className="mt-2 border-l border-line pl-4">
             {comment.replies.map((r) => (
               <li key={r.id}>
-                <CommentRow comment={r} productId={productId} signedIn={signedIn} onNeedAuth={onNeedAuth} onChanged={onChanged} isReply />
+                <CommentRow comment={r} target={target} canExplain={canExplain} signedIn={signedIn} onNeedAuth={onNeedAuth} onChanged={onChanged} isReply />
               </li>
             ))}
           </ul>
@@ -407,20 +424,22 @@ function CommentRow({
                 >
                   Reply
                 </button>
-                <button
-                  type="button"
-                  onClick={explain.toggle}
-                  aria-pressed={explain.open}
-                  className="flex items-center gap-1 text-[13px] font-medium text-muted transition hover:text-ink"
-                >
-                  <SparkGlyph className="h-3.5 w-3.5" />
-                  Explain this
-                </button>
+                {canExplain && (
+                  <button
+                    type="button"
+                    onClick={explain.toggle}
+                    aria-pressed={explain.open}
+                    className="flex items-center gap-1 text-[13px] font-medium text-muted transition hover:text-ink"
+                  >
+                    <SparkGlyph className="h-3.5 w-3.5" />
+                    Explain this
+                  </button>
+                )}
               </>
             )}
           </div>
 
-          {!isReply && explain.open && (
+          {!isReply && canExplain && explain.open && (
             <ExplainCard loading={explain.loading} error={explain.error} data={explain.data} onRetry={explain.load} />
           )}
 
@@ -437,7 +456,7 @@ function CommentRow({
                 const res = await fetch("/api/comments", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ productId, body: text, parentId: comment.id }),
+                  body: JSON.stringify({ ...target, body: text, parentId: comment.id }),
                 });
                 if (res.ok) await onChanged();
                 else if (res.status === 403) onNeedAuth(); // guest → prompt an upgrade
@@ -452,7 +471,8 @@ function CommentRow({
                 <li key={r.id}>
                   <CommentRow
                     comment={r}
-                    productId={productId}
+                    target={target}
+                    canExplain={canExplain}
                     signedIn={signedIn}
                     onNeedAuth={onNeedAuth}
                     onChanged={onChanged}
