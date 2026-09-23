@@ -5,6 +5,7 @@
 import { and, asc, desc, eq, inArray, max, notInArray, sql } from "drizzle-orm";
 import type { Db } from "../index";
 import {
+  comments,
   listItems,
   listPendingItems,
   lists,
@@ -368,16 +369,27 @@ export async function getPublicListsRecent(dbi: Db, limit = 12): Promise<ListWit
 // Following surface (/feed): their own lists and anyone they follow. Signed-out ranks everyone.
 // Region soft-rank (L7) is applied by the caller via withRegionAvailability. No "search/category
 // relevance" yet — no taxonomy exists; the SearchBox stays the finder until H1.
+// Discover time filter (Reddit-style "top of…"): week / month scope engagement to that window; all is
+// all-time with a recency decay so fresh lists still surface when the signal is thin.
+export type ExploreWindow = "week" | "month" | "all";
+
 export async function getExploreLists(
   dbi: Db,
-  opts: { limit?: number; excludeOwnerIds?: string[] } = {},
+  opts: { limit?: number; excludeOwnerIds?: string[]; window?: ExploreWindow } = {},
 ): Promise<ListWithCountsAndOwner[]> {
-  const { limit = 24, excludeOwnerIds = [] } = opts;
-  // likes + saves as engagement, minus a small penalty per day since last touch (recency decay).
+  const { limit = 24, excludeOwnerIds = [], window = "all" } = opts;
+  // Engagement = likes + saves + list comments. For week/month, each count is scoped to that window;
+  // all-time instead applies a gentle per-day recency decay off the last edit.
+  const days = window === "week" ? 7 : window === "month" ? 30 : null;
+  const since = days ? sql`and w.created_at > now() - (${days} * interval '1 day')` : sql``;
+  const decay = days
+    ? sql``
+    : sql`- (extract(epoch from (now() - ${lists.updatedAt})) / 86400.0) * 0.5`;
   const scoreExpr = sql<number>`(
-    (select count(*)::int from ${votes} v where v.target_type = 'list' and v.target_id = ${lists.id})
-    + (select count(*)::int from ${saves} s where s.list_id = ${lists.id})
-    - (extract(epoch from (now() - ${lists.updatedAt})) / 86400.0) * 0.5
+    (select count(*)::int from ${votes} w where w.target_type = 'list' and w.target_id = ${lists.id} ${since})
+    + (select count(*)::int from ${saves} w where w.list_id = ${lists.id} ${since})
+    + (select count(*)::int from ${comments} w where w.list_id = ${lists.id} and w.hidden_at is null ${since})
+    ${decay}
   )`;
   const where =
     excludeOwnerIds.length > 0
