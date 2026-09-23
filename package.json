@@ -21,7 +21,8 @@
     "db:seed-off": "npx -y tsx scripts/seed-off.ts",
     "test:recognition": "npx -y tsx scripts/test-recognition.ts",
     "stress:recognition": "npx -y tsx scripts/stress-recognition.ts",
-    "export:golden-set": "npx -y tsx scripts/export-golden-set.ts"
+    "export:golden-set": "npx -y tsx scripts/export-golden-set.ts",
+    "db:seed-community": "npx -y tsx scripts/seed-community.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",
