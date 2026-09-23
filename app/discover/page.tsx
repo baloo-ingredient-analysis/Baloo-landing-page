@@ -29,8 +29,9 @@ export default async function DiscoverPage({
 }) {
   const dbi = db();
   const sp = await searchParams;
-  // Time filter (L-community): top of week / month / all-time.
+  // Time filter (L-community): most popular in week / month / all-time.
   const windowSel: ExploreWindow = sp.t === "week" || sp.t === "month" ? sp.t : "all";
+  const windowLabel = windowSel === "week" ? "this week" : windowSel === "month" ? "this month" : "of all time";
 
   // Exclude what already lives in Following (/feed): your own lists + everyone you follow. Signed
   // out → no exclusions (rank everyone).
@@ -78,7 +79,8 @@ export default async function DiscoverPage({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="font-display text-[23px] text-ink">Explore</h2>
-              {/* Top of week / month / all-time — ranked by likes + saves + comments in the window. */}
+              {/* "Most popular in {window}" — ranked by likes + saves + comments within the window. */}
+              <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted">Most popular</span>
               <div className="flex gap-1 rounded-full bg-canvas p-1">
                 {([
                   { id: "week", label: "This week" },
@@ -133,7 +135,7 @@ export default async function DiscoverPage({
           ) : (
             <>
               <p className="mt-2 text-xs text-muted">
-                Lists from across the community, ranked by what people are keeping — and by what you
+                The most popular lists {windowLabel} — by likes, saves and comments, and by what you
                 can actually buy in the {region}.
               </p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
