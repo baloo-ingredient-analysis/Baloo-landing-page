@@ -3,7 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import { db } from "@/lib/db";
-import { getExploreLists, withRegionAvailability } from "@/lib/db/queries/lists";
+import { getExploreLists, withRegionAvailability, type ExploreWindow } from "@/lib/db/queries/lists";
 import { getRecentProducts } from "@/lib/db/queries/products";
 import { getFollowingIds } from "@/lib/db/queries/follows";
 import { getSessionUser } from "@/lib/auth";
@@ -25,9 +25,12 @@ export const metadata: Metadata = {
 export default async function DiscoverPage({
   searchParams,
 }: {
-  searchParams: Promise<{ region?: string }>;
+  searchParams: Promise<{ region?: string; t?: string }>;
 }) {
   const dbi = db();
+  const sp = await searchParams;
+  // Time filter (L-community): top of week / month / all-time.
+  const windowSel: ExploreWindow = sp.t === "week" || sp.t === "month" ? sp.t : "all";
 
   // Exclude what already lives in Following (/feed): your own lists + everyone you follow. Signed
   // out → no exclusions (rank everyone).
@@ -37,14 +40,13 @@ export default async function DiscoverPage({
 
   const [lists, products] = dbi
     ? await Promise.all([
-        getExploreLists(dbi, { limit: 24, excludeOwnerIds }),
+        getExploreLists(dbi, { limit: 24, excludeOwnerIds, window: windowSel }),
         getRecentProducts(dbi, 8),
       ])
     : [[], []];
 
   // Viewer region (Order L7): an explicit ?region wins, else Vercel geo, else US. Country-level
   // only — no PII, same privacy posture as the scan board. Explore is soft-ranked by it.
-  const sp = await searchParams;
   const geoRegion = countryToRegion((await headers()).get("x-vercel-ip-country"));
   const region: Region = sp.region === "US" || sp.region === "UK" ? sp.region : geoRegion ?? "US";
   const explore = dbi ? await withRegionAvailability(dbi, lists, region) : [];
@@ -74,7 +76,29 @@ export default async function DiscoverPage({
 
         <section className="mt-12">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-[23px] text-ink">Explore</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="font-display text-[23px] text-ink">Explore</h2>
+              {/* Top of week / month / all-time — ranked by likes + saves + comments in the window. */}
+              <div className="flex gap-1 rounded-full bg-canvas p-1">
+                {([
+                  { id: "week", label: "This week" },
+                  { id: "month", label: "This month" },
+                  { id: "all", label: "All time" },
+                ] as const).map((w) => (
+                  <Link
+                    key={w.id}
+                    href={`/discover?t=${w.id}&region=${region}`}
+                    scroll={false}
+                    aria-pressed={windowSel === w.id}
+                    className={`rounded-full px-3 py-1 text-[13px] font-medium transition ${
+                      windowSel === w.id ? "bg-paper text-ink shadow-card" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {w.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
                 Shopping in
@@ -83,7 +107,7 @@ export default async function DiscoverPage({
                 {REGIONS.map((r) => (
                   <Link
                     key={r.id}
-                    href={`/discover?region=${r.id}`}
+                    href={`/discover?region=${r.id}${windowSel !== "all" ? `&t=${windowSel}` : ""}`}
                     scroll={false}
                     aria-pressed={region === r.id}
                     className={`rounded-full px-3 py-1 text-[13px] font-medium transition ${
@@ -100,9 +124,11 @@ export default async function DiscoverPage({
           </div>
           {explore.length === 0 ? (
             <p className="mt-3 text-sm text-muted">
-              {viewer
-                ? "You're following everyone with a public list right now — check your feed, or paste a product link on the home tool to start a list of your own."
-                : "No public lists yet. Paste a product link on the home tool to analyse a product, then add it to your first list."}
+              {windowSel !== "all"
+                ? `Nothing's picked up ${windowSel === "week" ? "this week" : "this month"} yet — try All time.`
+                : viewer
+                  ? "You're following everyone with a public list right now — check your feed, or paste a product link on the home tool to start a list of your own."
+                  : "No public lists yet. Paste a product link on the home tool to analyse a product, then add it to your first list."}
             </p>
           ) : (
             <>
