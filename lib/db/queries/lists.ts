@@ -336,6 +336,17 @@ export async function getPopularListsThisWeek(
     }));
 }
 
+// Sitemap (SEO): public lists only — slug + last edit as lastmod.
+export async function getPublicListSitemapEntries(
+  dbi: Db,
+): Promise<{ slug: string; lastmod: Date }[]> {
+  const rows = await dbi
+    .select({ slug: lists.slug, updatedAt: lists.updatedAt })
+    .from(lists)
+    .where(eq(lists.isPublic, true));
+  return rows.map((r) => ({ slug: r.slug, lastmod: r.updatedAt }));
+}
+
 // Public discovery feed (Order G5 expands the G4 stub with the owner handle for cards).
 export async function getPublicListsRecent(dbi: Db, limit = 12): Promise<ListWithCountsAndOwner[]> {
   const rows = await dbi

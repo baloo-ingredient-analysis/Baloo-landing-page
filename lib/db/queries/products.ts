@@ -114,6 +114,18 @@ export async function getRecentProducts(dbi: Db, limit = 8): Promise<Product[]> 
   return dbi.select().from(products).orderBy(desc(products.createdAt)).limit(limit);
 }
 
+// Sitemap (SEO): every ANALYSED product's slug + last-modified. 'done' only — a pending/placeholder
+// page is thin content we don't want to invite crawlers to yet (it graduates in once analysis lands).
+export async function getProductSitemapEntries(
+  dbi: Db,
+): Promise<{ slug: string; lastmod: Date }[]> {
+  const rows = await dbi
+    .select({ slug: products.slug, analysedAt: products.analysedAt, createdAt: products.createdAt })
+    .from(products)
+    .where(eq(products.analysisStatus, "done"));
+  return rows.map((r) => ({ slug: r.slug, lastmod: r.analysedAt ?? r.createdAt }));
+}
+
 // Product picker search (Order G4) — powers the editor's "Add via search". Name match, newest
 // first. (G5 upgrades this to full-text over brand/name + lists.)
 export async function searchProducts(dbi: Db, q: string, limit = 10): Promise<Product[]> {

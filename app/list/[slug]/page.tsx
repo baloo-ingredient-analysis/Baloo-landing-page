@@ -45,6 +45,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title,
     description,
+    alternates: { canonical: `/list/${slug}` },
     openGraph: { title, description, images: [{ url: `/api/og/list/${slug}`, width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description, images: [`/api/og/list/${slug}`] },
   };

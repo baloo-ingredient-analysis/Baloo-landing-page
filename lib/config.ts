@@ -2,6 +2,25 @@
 
 export const MODEL = "claude-sonnet-4-6";
 
+// The ONE absolute base URL for every SEO surface — canonical tags, the sitemap, Open Graph images
+// and JSON-LD — so they can never disagree. No trailing slash.
+// Resolution order:
+//   1. NEXT_PUBLIC_SITE_URL  — the explicit override. Set this to the real domain the day it's
+//      decided (e.g. https://baloo.life); every URL below follows on the next deploy, no code change.
+//   2. VERCEL_PROJECT_PRODUCTION_URL — Vercel's PRODUCTION domain, set automatically even during a
+//      preview build, so canonicals always point at production and never at a per-branch preview.
+//   3. localhost — local dev.
+// This is why an undecided domain does NOT block SEO work: the code ships now against (2), and (1)
+// flips it over later from the Vercel dashboard alone.
+export function siteUrl(): string {
+  const raw =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : "http://localhost:3000");
+  return raw.replace(/\/+$/, "");
+}
+
 // Cache time-to-live: 7 days, per the brief.
 export const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
