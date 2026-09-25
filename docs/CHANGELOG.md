@@ -7,6 +7,27 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### SEO foundation — product pages become the acquisition channel — `feat/seo-foundation`
+Product pages carried a title/description/OG image but none of the crawl signals search needs. Added
+the full baseline, all off **one** base URL (`siteUrl()` in `lib/config.ts`, resolving
+`NEXT_PUBLIC_SITE_URL` → Vercel production domain → localhost) so an **undecided domain doesn't block
+it** — the code ships now against the current prod URL and flips to the real domain with one env-var
+change, no redeploy of code:
+- **`metadataBase`** (`app/layout.tsx`) — canonical + OG/Twitter image URLs are now absolute (they
+  were resolving against localhost).
+- **Canonical tags** on `/p/[slug]`, `/list/[slug]`, `/u/[handle]` (the profile canonical is the pretty
+  `/@handle`, never the rewritten `/u/…`).
+- **`app/sitemap.ts`** — DB-backed: static routes + every analysed product, public list, and public
+  profile (58 URLs on the current catalog). ISR `revalidate = 3600`; degrades to static-only with no DB.
+  `app/robots.ts` now points crawlers at it.
+- **JSON-LD** on the product page (`lib/seo.ts`): schema.org `Product` + `BreadcrumbList`. Kept
+  **score-free by design — no `aggregateRating`/`review`/`Offer`** (no ratings, no beta pricing); emits
+  only the honest entity. Unit-tested (`lib/seo.test.ts`).
+Verified against the live catalog: sitemap lists all four route kinds, product pages carry canonical +
+both JSON-LD blocks with the OG-card image fallback, robots.txt advertises the sitemap. No schema
+changes. **Note for the team:** hold the Search Console sitemap submission until the domain is decided,
+so Google doesn't index a URL we might abandon.
+
 ### P3 — the list builder adds *any* product (analyse-and-add, async, persisted) — `feat/add-product` + `feat/list-async-add`
 The builder searched the **catalog only** — you could add a product only once it had been analysed.
 Now it uses the same OFF-backed `/api/search` as the homepage, so you can add **any** product, and the

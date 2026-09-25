@@ -50,6 +50,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title,
     description,
+    // Canonical is the pretty vanity URL (/@handle), never the internal /u/[handle] the middleware
+    // rewrites to — so crawlers index the one public form.
+    alternates: { canonical: profilePath(data.profile.handle) },
     openGraph: { title, description, images: [{ url: ogImage, width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description, images: [ogImage] },
   };

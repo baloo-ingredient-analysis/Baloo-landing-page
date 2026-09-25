@@ -168,6 +168,20 @@ migration 0010, pgvector + HNSW cosine). `/api/search` embeds the query and `sea
 pgvector nearest-neighbours with the keyword hits via reciprocal-rank fusion. Optional-infra:
 keyword-only without `OPENAI_API_KEY`. Depth in `docs/SEMANTIC_SEARCH.md`.
 
+**SEO surfaces:** product pages are the acquisition channel, so the public routes carry the standard
+crawl signals. One base URL — `siteUrl()` in `lib/config.ts` — feeds every absolute URL: it resolves
+`NEXT_PUBLIC_SITE_URL` → Vercel's production domain → localhost, so **an undecided domain never blocks
+this** (set the env var the day it locks; everything follows on the next deploy, no code change).
+Built on it: `metadataBase` in `app/layout.tsx` (makes canonical + OG/Twitter image URLs absolute);
+per-page **canonical** tags via `alternates.canonical` on `/p/[slug]`, `/list/[slug]`, and `/u/[handle]`
+(canonical = the pretty `/@handle`, never the rewritten `/u/…`); a DB-backed **`app/sitemap.ts`** (static
+routes + every analysed product, public list, and public profile; ISR `revalidate = 3600`; degrades to
+static-only with no DB); `app/robots.ts` points at it; and **JSON-LD** on the product page (`lib/seo.ts`:
+schema.org `Product` + `BreadcrumbList`). The `Product` node is deliberately **score-free — no
+`aggregateRating`, `review`, or `Offer`** (Baloo has no ratings by design and no pricing in the beta);
+it emits only the honest entity. Sitemap-entry queries live beside their tables
+(`get*SitemapEntries` in the products/lists/profiles query files).
+
 **Open Food Facts catalog source (OFF):** scraping retailer sites is a dead end (they block us and
 never publish the barcode — tested), so the catalog is filled from **Open Food Facts** instead.
 `lib/openfoodfacts.ts` looks products up by barcode (`/api/v2/product`) or name (search-a-licious) and
