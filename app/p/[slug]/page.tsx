@@ -15,6 +15,7 @@ import { getSessionUser } from "@/lib/auth";
 import { getThread } from "@/lib/db/queries/comments";
 import { isProductSaved } from "@/lib/db/queries/pantry";
 import { storedIngredients } from "@/lib/analysis/stored";
+import { absoluteUrl, breadcrumbJsonLd, productJsonLd } from "@/lib/seo";
 import type { Ingredient, Nutrition } from "@/lib/schema";
 
 // The canonical product page (Order G3): a permanent, shareable, SSR'd page per product, read
@@ -38,6 +39,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title,
     description,
+    alternates: { canonical: `/p/${slug}` },
     openGraph: { title, description, images: [{ url: ogImage, width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description, images: [ogImage] },
   };
@@ -83,8 +85,29 @@ export default async function ProductPage({ params }: Params) {
     </>
   );
 
+  // Structured data (SEO): the honest Product entity (no rating/offer — score-free by design) plus a
+  // Home → product breadcrumb. Base URL follows the domain via siteUrl(); image falls back to the OG
+  // card when the catalog has no product photo.
+  const jsonLd = productJsonLd({
+    name: data.product.name,
+    slug,
+    brand: data.product.brand,
+    imageUrl: data.product.imageUrl ?? absoluteUrl(`/api/og/product/${slug}`),
+    description: data.summary,
+    category: data.product.category,
+  });
+  const breadcrumb = breadcrumbJsonLd([
+    { name: "Baloo", path: "/" },
+    { name: data.product.name, path: `/p/${slug}` },
+  ]);
+
   return (
     <div className="relative flex min-h-screen flex-col">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }}
+      />
       <SiteHeader />
       <main className="mx-auto flex w-full max-w-tool flex-1 flex-col px-5 pt-8">
         {data.items.length > 0 ? (

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
+import { siteUrl } from "@/lib/config";
 import "./globals.css";
 
 const sans = Inter({
@@ -18,6 +19,10 @@ const display = Playfair_Display({
 });
 
 export const metadata: Metadata = {
+  // Absolute base for every relative URL in metadata (canonical tags + OG/Twitter images). Without
+  // it Next resolves those against localhost — so setting it once here fixes canonicals AND social
+  // card images site-wide. Follows the domain via siteUrl() (lib/config.ts).
+  metadataBase: new URL(siteUrl()),
   title: "Baloo — Know what's in your food",
   description:
     "Search any food product and see what every ingredient is, and why it's there. Calm, plain language, no score.",

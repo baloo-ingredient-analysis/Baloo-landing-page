@@ -1,9 +1,9 @@
 // Profile queries (Order G1). G2 (auth) creates profiles on signup via upsertProfile; public
 // profile pages (G5) read via getProfileByHandle.
 
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../index";
-import { handleRedirects, profiles, type Profile } from "../schema";
+import { handleRedirects, lists, profiles, type Profile } from "../schema";
 
 export async function getProfileByHandle(dbi: Db, handle: string): Promise<Profile | null> {
   const [row] = await dbi.select().from(profiles).where(eq(profiles.handle, handle)).limit(1);
@@ -51,6 +51,20 @@ export async function changeHandle(
 export async function getProfileById(dbi: Db, id: string): Promise<Profile | null> {
   const [row] = await dbi.select().from(profiles).where(eq(profiles.id, id)).limit(1);
   return row ?? null;
+}
+
+// Sitemap (SEO): handles of PUBLIC profiles only. A profile is public once it has ≥1 public list
+// (L5c), so we inner-join through public lists — a profile with none is never emitted (no leak).
+// lastmod = the most recent public-list edit.
+export async function getPublicProfileSitemapEntries(
+  dbi: Db,
+): Promise<{ handle: string; lastmod: Date }[]> {
+  const rows = await dbi
+    .select({ handle: profiles.handle, lastmod: sql<Date>`max(${lists.updatedAt})` })
+    .from(profiles)
+    .innerJoin(lists, and(eq(lists.ownerId, profiles.id), eq(lists.isPublic, true)))
+    .groupBy(profiles.id, profiles.handle);
+  return rows.map((r) => ({ handle: r.handle, lastmod: r.lastmod }));
 }
 
 // Id-conflict upsert: G2 calls this on signup/login with id = auth.users.id, so repeated
