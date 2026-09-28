@@ -1,7 +1,9 @@
 // In-app notifications (N1). The activity log (G6) only records who DID what, not who it's FOR, so
 // we derive a user's notifications straight from the source tables — the events that involve THEM as
-// the recipient: a new follower, and likes/saves on one of their lists. Product comments have no
-// per-user recipient in this model, so they're deliberately out of v1.
+// the recipient: a new follower, likes/saves on one of their lists, TOP-LEVEL comments on their
+// lists, and replies to their comments (on a product OR a list). To stay calm, a reply notifies the
+// parent-comment author (not the whole thread), and a top-level list comment notifies the list owner —
+// so the two never double-fire for the same row.
 //
 // Unread is a single marker (`profiles.notifications_seen_at`): anything newer is unread. Callers own
 // the db() null-guard + auth (owner-scoped by construction — everything is keyed to `userId`).
@@ -15,12 +17,18 @@ export type NotificationActor = { handle: string; displayName: string };
 export type Notification =
   | { kind: "followed"; ts: string; actor: NotificationActor }
   | {
-      kind: "liked_list" | "saved_list";
+      kind: "liked_list" | "saved_list" | "commented_list";
       ts: string;
       actor: NotificationActor;
       list: { title: string; slug: string };
     }
-  | { kind: "replied"; ts: string; actor: NotificationActor; product: { slug: string; name: string } };
+  | {
+      kind: "replied";
+      ts: string;
+      actor: NotificationActor;
+      // A reply lives on a product OR a list thread — link + label follow the target.
+      target: { kind: "product" | "list"; slug: string; label: string };
+    };
 
 export async function markNotificationsSeen(dbi: Db, userId: string): Promise<void> {
   await dbi.update(profiles).set({ notificationsSeenAt: sql`now()` }).where(eq(profiles.id, userId));
@@ -85,33 +93,65 @@ export async function getNotifications(
       const list = listMap.get(r.listId);
       if (list) out.push({ kind: "saved_list", ts: r.ts.toISOString(), actor: { handle: r.handle, displayName: r.displayName }, list });
     }
+
+    // Top-level comments on my lists (someone started a discussion). Replies within a thread are
+    // handled below and notify the parent's author, so restrict to parentId IS NULL here — no overlap.
+    const listCommentRows = await dbi
+      .select({ ts: comments.createdAt, listId: comments.listId, handle: profiles.handle, displayName: profiles.displayName })
+      .from(comments)
+      .innerJoin(profiles, eq(profiles.id, comments.userId))
+      .where(
+        and(
+          inArray(comments.listId, listIds),
+          isNull(comments.parentId),
+          ne(comments.userId, userId),
+          isNull(comments.hiddenBy),
+        ),
+      )
+      .orderBy(desc(comments.createdAt))
+      .limit(limit);
+    for (const r of listCommentRows) {
+      const list = r.listId ? listMap.get(r.listId) : undefined;
+      if (list) out.push({ kind: "commented_list", ts: r.ts.toISOString(), actor: { handle: r.handle, displayName: r.displayName }, list });
+    }
   }
 
   // Replies to my comments. A reply's parent comment is mine → I'm the recipient (self-replies and
-  // hidden/tombstoned rows excluded). Links to the product where the discussion lives.
+  // hidden/tombstoned rows excluded). A reply carries the same target as its thread, so left-join both
+  // products and lists and link to whichever is set — this is what now covers replies on LIST comments.
   const parent = alias(comments, "parent_comment");
   const replyRows = await dbi
     .select({
       ts: comments.createdAt,
       handle: profiles.handle,
       displayName: profiles.displayName,
-      slug: products.slug,
-      name: products.name,
+      productSlug: products.slug,
+      productName: products.name,
+      listSlug: lists.slug,
+      listTitle: lists.title,
     })
     .from(comments)
     .innerJoin(parent, eq(comments.parentId, parent.id))
     .innerJoin(profiles, eq(profiles.id, comments.userId))
-    .innerJoin(products, eq(products.id, comments.productId))
+    .leftJoin(products, eq(products.id, comments.productId))
+    .leftJoin(lists, eq(lists.id, comments.listId))
     .where(and(eq(parent.userId, userId), ne(comments.userId, userId), isNull(comments.hiddenBy)))
     .orderBy(desc(comments.createdAt))
     .limit(limit);
   for (const r of replyRows) {
-    out.push({
-      kind: "replied",
-      ts: r.ts.toISOString(),
-      actor: { handle: r.handle, displayName: r.displayName },
-      product: { slug: r.slug, name: r.name },
-    });
+    const target = r.productSlug
+      ? { kind: "product" as const, slug: r.productSlug, label: r.productName ?? "a product" }
+      : r.listSlug
+        ? { kind: "list" as const, slug: r.listSlug, label: r.listTitle ?? "a list" }
+        : null;
+    if (target) {
+      out.push({
+        kind: "replied",
+        ts: r.ts.toISOString(),
+        actor: { handle: r.handle, displayName: r.displayName },
+        target,
+      });
+    }
   }
 
   out.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
