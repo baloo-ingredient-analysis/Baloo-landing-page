@@ -374,6 +374,38 @@ export async function getPublicListsRecent(dbi: Db, limit = 12): Promise<ListWit
   }));
 }
 
+// Product → the public lists that include it (the products↔lists loop: SEO internal linking + a
+// discovery path from a product page into the community). Ranked by public Likes, then recency.
+// innerJoin on list_items filtered to the product; (list_id, product_id) is unique so each list
+// appears once. Ownerless (S7a) lists drop out via the profiles innerJoin, like the other public reads.
+export async function getPublicListsFeaturingProduct(
+  dbi: Db,
+  productId: string,
+  limit = 6,
+): Promise<ListWithCountsAndOwner[]> {
+  const rows = await dbi
+    .select({
+      list: lists,
+      itemCount: sql<number>`(select count(*)::int from ${listItems} li where li.list_id = ${lists.id})`,
+      saveCount: sql<number>`(select count(*)::int from ${saves} s2 where s2.list_id = ${lists.id})`,
+      likeCount: likeCountExpr,
+      ownerHandle: profiles.handle,
+    })
+    .from(lists)
+    .innerJoin(listItems, and(eq(listItems.listId, lists.id), eq(listItems.productId, productId)))
+    .innerJoin(profiles, eq(profiles.id, lists.ownerId))
+    .where(eq(lists.isPublic, true))
+    .orderBy(desc(likeCountExpr), desc(lists.updatedAt))
+    .limit(limit);
+  return rows.map((r) => ({
+    ...r.list,
+    itemCount: r.itemCount,
+    saveCount: r.saveCount,
+    likeCount: r.likeCount,
+    ownerHandle: r.ownerHandle,
+  }));
+}
+
 // Explore (Order L9) — the Discover surface: public lists ranked by a blended engagement + recency
 // score. Likes are public, saves are the internal signal; both feed the score, then a gentle recency
 // decay keeps fresh lists visible. When a viewer is known we EXCLUDE what already lives in their

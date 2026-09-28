@@ -9,9 +9,11 @@ import { Availability } from "@/components/product/Availability";
 import { SiteHeader } from "@/components/SiteHeader";
 import { AddToList } from "@/components/lists/AddToList";
 import { ShareButton } from "@/components/lists/ShareButton";
+import { ListCard } from "@/components/lists/ListCard";
 import { PantryButton } from "@/components/engagement/PantryButton";
 import { CommentThread } from "@/components/engagement/CommentThread";
 import { getSessionUser } from "@/lib/auth";
+import { getPublicListsFeaturingProduct } from "@/lib/db/queries/lists";
 import { getThread } from "@/lib/db/queries/comments";
 import { isProductSaved } from "@/lib/db/queries/pantry";
 import { storedIngredients } from "@/lib/analysis/stored";
@@ -55,10 +57,11 @@ export default async function ProductPage({ params }: Params) {
   // SSR-hydrated.
   const dbi = db()!; // load() already proved it exists
   const viewer = await getSessionUser();
-  const [thread, viewerSavedProduct, offers] = await Promise.all([
+  const [thread, viewerSavedProduct, offers, featuredIn] = await Promise.all([
     getThread(dbi, { productId: data.product.id }, { sort: "top", viewerId: viewer?.id ?? null }),
     viewer ? isProductSaved(dbi, viewer.id, data.product.id) : Promise.resolve(false),
     getOffersForProduct(dbi, data.product.id), // P4 "also available at"
+    getPublicListsFeaturingProduct(dbi, data.product.id), // the products↔lists discovery loop
   ]);
 
   // "From X · also at Y, Z" — the source retailer plus any other retailers carrying this product.
@@ -137,6 +140,22 @@ export default async function ProductPage({ params }: Params) {
             <p className="mt-4 text-sm text-muted">
               We haven&apos;t broken this one down yet — its ingredient explanation is on the way.
             </p>
+          </section>
+        )}
+
+        {/* On these lists — the public lists that include this product (products↔lists loop). Crawlable
+            internal links from the product into community lists; only renders when there's ≥1. */}
+        {featuredIn.length > 0 && (
+          <section className="mt-14">
+            <h2 className="font-display text-[23px] text-ink">On these lists</h2>
+            <p className="mt-1 text-sm text-muted">
+              Public lists from the community that include {data.product.name}.
+            </p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              {featuredIn.map((l) => (
+                <ListCard key={l.id} list={l} handle={l.ownerHandle} />
+              ))}
+            </div>
           </section>
         )}
 
