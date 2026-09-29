@@ -4,9 +4,10 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../index";
-import { comments, profiles, votes } from "../schema";
+import { comments, products, profiles, votes } from "../schema";
 
 export type CommentAuthor = { handle: string; displayName: string };
+export type ProductRef = { slug: string; name: string };
 export type ThreadComment = {
   id: string;
   body: string;
@@ -18,8 +19,42 @@ export type ThreadComment = {
   // Lets the client show the owner's Delete affordance. Null since S7a: the author deleted their
   // account, so the comment is an ownerless tombstone — no viewer id can ever match, which is right.
   authorId: string | null;
+  // Product references (roadmap 1a): products the comment links via a /p/<slug> URL in its body.
+  // Resolved to name + slug here; the raw token is stripped from `body` and rendered as a chip.
+  productRefs: ProductRef[];
   replies: ThreadComment[]; // one level; always chronological
 };
+
+// A Baloo product link inside comment text — relative (`/p/slug`) or absolute
+// (`https://baloo.life/p/slug`). Factory (not a shared const) so the global regex's lastIndex is
+// never carried between matchAll/replace calls. Slugs are generated lowercase.
+const productRefRe = () => /\s*(?:https?:\/\/[^\s/]+)?\/p\/([a-z0-9][a-z0-9-]*)/gi;
+
+function extractProductSlugs(body: string): string[] {
+  return [...body.matchAll(productRefRe())].map((m) => m[1].toLowerCase());
+}
+
+// Strip resolved product links out of the display body and return them as chips. An unresolved
+// /p/xxx (no matching product) is left in the text untouched — it wasn't a real reference.
+function resolveRefs(body: string, refMap: Map<string, string>): { body: string; refs: ProductRef[] } {
+  const refs: ProductRef[] = [];
+  const seen = new Set<string>();
+  const cleaned = body
+    .replace(productRefRe(), (full, slug: string) => {
+      const key = slug.toLowerCase();
+      const name = refMap.get(key);
+      if (!name) return full;
+      if (!seen.has(key)) {
+        seen.add(key);
+        refs.push({ slug: key, name });
+      }
+      return "";
+    })
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { body: cleaned, refs };
+}
 
 export type ThreadSort = "top" | "newest";
 
@@ -74,12 +109,26 @@ export async function getThread(
       )
     : new Set<string>();
 
+  // Resolve every /p/<slug> referenced across the thread to a product name, in one bulk query.
+  const refSlugs = [
+    ...new Set(rows.flatMap((r) => (r.c.hiddenAt ? [] : extractProductSlugs(r.c.body)))),
+  ];
+  const refMap = new Map<string, string>();
+  if (refSlugs.length > 0) {
+    const prods = await dbi
+      .select({ slug: products.slug, name: products.name })
+      .from(products)
+      .where(inArray(products.slug, refSlugs));
+    for (const p of prods) refMap.set(p.slug, p.name);
+  }
+
   const toNode = (r: (typeof rows)[number]): ThreadComment => {
     const hidden = !!r.c.hiddenAt;
+    // Tombstone: hidden content leaks neither its text, author, nor its references.
+    const resolved = hidden ? { body: "", refs: [] as ProductRef[] } : resolveRefs(r.c.body, refMap);
     return {
       id: r.c.id,
-      // Tombstone: hidden content leaks neither its text nor its author.
-      body: hidden ? "" : r.c.body,
+      body: resolved.body,
       ts: r.c.createdAt.toISOString(),
       author: hidden
         ? { handle: "", displayName: "" }
@@ -88,6 +137,7 @@ export async function getThread(
       viewerVoted: hidden ? false : voted.has(r.c.id),
       hidden,
       authorId: r.c.userId,
+      productRefs: resolved.refs,
       replies: [],
     };
   };

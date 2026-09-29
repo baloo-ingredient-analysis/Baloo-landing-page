@@ -44,6 +44,10 @@ function SparkGlyph({ className }: { className?: string }) {
 // server query module into this client component).
 type CommentTarget = { productId: string } | { listId: string };
 
+// A catalog product the composer can attach as a reference (roadmap 1a). Sending it appends the
+// product's /p/<slug> link to the comment body; the server resolves that back into a chip on read.
+type ProductPick = { slug: string; name: string; brand: string | null };
+
 type ExplainTarget = { commentId: string } | { productId: string };
 function useExplain(target: ExplainTarget, signedIn: boolean, onNeedAuth: () => void) {
   const [open, setOpen] = useState(false);
@@ -159,6 +163,8 @@ export function CommentThread({
         signedIn={verified}
         profileName={profile?.displayName ?? profile?.handle ?? null}
         onNeedAuth={openAuth}
+        allowProductRef={!!listId}
+        placeholder={listId ? "Share what you think about this list…" : undefined}
         onPost={async (text) => {
           const res = await fetch("/api/comments", {
             method: "POST",
@@ -221,6 +227,7 @@ function Composer({
   onPost,
   placeholder = "Share what you think about this product…",
   compact = false,
+  allowProductRef = false,
   onCancel,
 }: {
   available: boolean;
@@ -230,23 +237,48 @@ function Composer({
   onPost: (text: string) => Promise<boolean>;
   placeholder?: string;
   compact?: boolean;
+  allowProductRef?: boolean;
   onCancel?: () => void;
 }) {
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(compact);
   const [busy, setBusy] = useState(false);
+  const [attached, setAttached] = useState<ProductPick | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<ProductPick[]>([]);
   if (!available) return null;
 
-  const open = focused || text.length > 0;
+  const open = focused || text.length > 0 || !!attached;
+
+  async function runSearch(query: string) {
+    setQ(query);
+    if (query.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/products/search?q=${encodeURIComponent(query)}`);
+      const d = await res.json();
+      setResults(d.products ?? []);
+    } catch {
+      setResults([]);
+    }
+  }
 
   async function submit() {
     const t = text.trim();
     if (!t || busy) return;
     setBusy(true);
-    const ok = await onPost(t);
+    // The reference rides along as the product's /p/<slug> link; getThread turns it back into a chip.
+    const finalText = attached ? `${t}\n/p/${attached.slug}` : t;
+    const ok = await onPost(finalText);
     setBusy(false);
     if (ok) {
       setText("");
+      setAttached(null);
+      setPicking(false);
+      setResults([]);
       setFocused(false);
       onCancel?.();
     }
@@ -276,6 +308,65 @@ function Composer({
             maxLength={1000}
             className="w-full resize-none rounded-lg border border-line bg-paper px-3.5 py-2.5 text-[15px] text-ink outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20"
           />
+          {open && allowProductRef && (
+            <div className="mt-2 animate-fade-in">
+              {attached ? (
+                <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[13px] text-ink">
+                  <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded bg-paper font-display text-[10px] text-ink/40">
+                    {monogram(attached.name)}
+                  </span>
+                  <span className="max-w-[180px] truncate font-medium">{attached.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setAttached(null)}
+                    aria-label="Remove referenced product"
+                    className="ml-0.5 text-muted transition hover:text-ink"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ) : picking ? (
+                <div className="relative">
+                  <input
+                    value={q}
+                    onChange={(e) => runSearch(e.target.value)}
+                    placeholder="Search a product to reference…"
+                    autoFocus
+                    className="w-full rounded-lg border border-line bg-paper px-3 py-1.5 text-[13px] text-ink outline-none transition focus:border-natural"
+                  />
+                  {results.length > 0 && (
+                    <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-line bg-paper shadow-card">
+                      {results.map((p) => (
+                        <li key={p.slug}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttached(p);
+                              setPicking(false);
+                              setQ("");
+                              setResults([]);
+                            }}
+                            className="block w-full px-3 py-2 text-left text-[13px] text-ink transition hover:bg-canvas"
+                          >
+                            <span className="font-medium">{p.name}</span>
+                            {p.brand && <span className="text-muted"> · {p.brand}</span>}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPicking(true)}
+                  className="inline-flex items-center gap-1 text-[13px] font-medium text-muted transition hover:text-ink"
+                >
+                  <span aria-hidden className="text-base leading-none">+</span> Reference a product
+                </button>
+              )}
+            </div>
+          )}
           {open && (
             <div className="mt-2 flex animate-fade-in items-center justify-between gap-3">
               <p className="text-xs text-muted">This reads as your opinion, not a fact.</p>
@@ -406,6 +497,27 @@ function CommentRow({
           <p className={`mt-1 whitespace-pre-wrap leading-relaxed text-ink/70 ${isReply ? "text-sm" : "text-[15px]"}`}>
             {comment.body}
           </p>
+
+          {/* Referenced products (roadmap 1a): a /p/<slug> link in the comment becomes a chip. */}
+          {!comment.hidden && comment.productRefs.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {comment.productRefs.map((p) => (
+                <Link
+                  key={p.slug}
+                  href={`/p/${p.slug}`}
+                  className="inline-flex max-w-full items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink transition hover:border-ink/25"
+                >
+                  <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-canvas font-display text-[11px] text-ink/40">
+                    {monogram(p.name)}
+                  </span>
+                  <span className="truncate font-medium">{p.name}</span>
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted">
+                    <path d="M6 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </Link>
+              ))}
+            </div>
+          )}
 
           <div className="mt-2 flex items-center gap-3">
             <UpvotePill
