@@ -1,8 +1,10 @@
 // Stress-test Igor's recognition API (docs/PARTNER_RECOGNITION_API.md) against REAL products from our
 // own catalog — the "Miquel stress-tests the endpoints" step. For each barcode: find-ingredients →
 // explain-ingredients(locale:"en"). Reports status, the name/category Igor returns vs what we have,
-// ingredient count, and whether the first ingredient name came back in English. Throwaway harness;
-// keys from .env.local; prints only truncated key prefixes. Run: npm run stress:recognition
+// ingredient count, English-ness, AND (since 1 Oct 2026) the new fields the web now depends on:
+// product_summary, nutrition + daily_reference (UK reference intake), and the processing_tag spread
+// (natural/processed/artificial — informs the 2-vs-3 tag decision). Throwaway harness; keys from
+// .env.local; prints only truncated key prefixes. Run: npm run stress:recognition
 import { config } from "dotenv";
 config({ path: ".env.local" });
 config({ path: ".env.development.local" });
@@ -27,6 +29,8 @@ const PRODUCTS: { barcode: string; brand: string; name: string }[] = [
   { barcode: "5024530005316", brand: "PIZZA EXPRESS", name: "American pepperoni" },
 ];
 
+type Json = Record<string, unknown>;
+
 async function post(path: string, body: unknown) {
   try {
     const res = await fetch(`${BASE}/${path}`, {
@@ -34,9 +38,9 @@ async function post(path: string, body: unknown) {
       headers: { "Content-Type": "application/json", apikey: ANON, "x-recognition-key": KEY },
       body: JSON.stringify(body),
     });
-    return { status: res.status, json: (await res.json().catch(() => null)) as Record<string, unknown> | null };
+    return { status: res.status, json: (await res.json().catch(() => null)) as Json | null };
   } catch (e) {
-    return { status: 0, json: { error: String(e) } as Record<string, unknown> };
+    return { status: 0, json: { error: String(e) } as Json };
   }
 }
 
@@ -49,7 +53,12 @@ async function main() {
   }
   console.log(`stress-testing ${PRODUCTS.length} real catalog products against find-ingredients + explain(locale:en)\n`);
 
-  const rows: Record<string, unknown>[] = [];
+  const rows: Json[] = [];
+  const tagTotals: Record<string, number> = { natural: 0, processed: 0, artificial: 0, other: 0 };
+  let withSummary = 0;
+  let withNutrition = 0;
+  let withRefIntake = 0;
+
   for (const p of PRODUCTS) {
     const find = await post("find-ingredients", { barcode: p.barcode });
     const j = find.json ?? {};
@@ -57,31 +66,53 @@ async function main() {
     let ing: number | null = null;
     let firstName: string | null = null;
     let hasContext: boolean | null = null;
+    let summary: string | null = null;
+    let hasNutr = false;
+    let hasRef = false;
 
     if (status === "found" && j.variant_id) {
       const ex = await post("explain-ingredients", { variant_id: j.variant_id, locale: "en" });
-      const items = (ex.json?.ingredients as Record<string, unknown>[] | undefined) ?? [];
+      const body = ex.json ?? {};
+      const items = (body.ingredients as Json[] | undefined) ?? [];
       ing = items.length;
       firstName = (items[0]?.canonical_name as string) ?? null;
       hasContext = items[0] ? "product_context" in items[0] : null;
+      summary = (body.product_summary as string) ?? null;
+      const nutr = (body.nutrition as Json | null) ?? null;
+      hasNutr = !!nutr;
+      hasRef = !!(nutr && nutr.daily_reference);
+      if (summary) withSummary++;
+      if (hasNutr) withNutrition++;
+      if (hasRef) withRefIntake++;
+      for (const it of items) {
+        const t = (it.processing_tag as string) ?? "";
+        if (t in tagTotals) tagTotals[t]++;
+        else tagTotals.other++;
+      }
     }
-    rows.push({ ...p, status, offName: j.display_name ?? "", cat: j.category ?? "", ing, firstName, hasContext });
+    rows.push({ ...p, status, ing, firstName });
 
     const bits = [
       `${status}`,
       j.display_name ? `"${j.display_name}"` : "",
       j.category ? `cat:${j.category}` : "",
-      ing != null ? `${ing} ing, 1st="${firstName}"${looksNonEnglish(firstName) ? " ⚠︎non-EN" : ""}, context=${hasContext}` : "",
+      ing != null ? `${ing} ing, 1st="${firstName}"${looksNonEnglish(firstName) ? " ⚠︎non-EN" : ""}, ctx=${hasContext}` : "",
+      status === "found" ? `summary=${summary ? "✓" : "✗"} nutrition=${hasNutr ? "✓" : "✗"} refIntake=${hasRef ? "✓" : "✗"}` : "",
     ].filter(Boolean);
     console.log(`• ${p.brand} — ${p.name}  [${p.barcode}]\n    → ${bits.join("  |  ")}`);
+    if (summary) console.log(`      summary: "${summary}"`);
   }
 
   const by = (s: string) => rows.filter((r) => r.status === s).length;
   const nonEng = rows.filter((r) => looksNonEnglish(r.firstName as string | null));
+  const foundN = by("found");
+  const totalTags = tagTotals.natural + tagTotals.processed + tagTotals.artificial + tagTotals.other;
   console.log(`\n=== summary ===`);
-  console.log(`found ${by("found")} · disambiguation ${by("disambiguation")} · not_found ${by("not_found")} · of ${rows.length}`);
+  console.log(`found ${foundN} · disambiguation ${by("disambiguation")} · not_found ${by("not_found")} · of ${rows.length}`);
+  console.log(`new fields (of ${foundN} found): product_summary ${withSummary} · nutrition ${withNutrition} · daily_reference ${withRefIntake}`);
+  console.log(`processing_tag spread (${totalTags} ingredients): natural ${tagTotals.natural} · processed ${tagTotals.processed} · artificial ${tagTotals.artificial}${tagTotals.other ? ` · other ${tagTotals.other}` : ""}`);
   console.log(`first-ingredient name looks non-English: ${nonEng.length}${nonEng.length ? ` (${nonEng.map((r) => r.firstName).join(", ")})` : ""}`);
-  console.log(`\nflag-to-Igor candidates: not_found store-brands, non-EN names, empty categories.`);
+  console.log(`\nflag-to-Igor candidates: not_found store-brands, non-EN names, empty categories, missing summary/nutrition on found products.`);
 }
 
 main().catch((e) => {
