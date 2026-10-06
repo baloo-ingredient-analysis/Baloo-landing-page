@@ -8,18 +8,21 @@ export type EngineProcessingTag = "natural" | "processed" | "artificial";
 export type EngineIngredient = {
   id?: string;
   profile_item_id?: string;
-  canonical_name: string;
+  canonical_name: string; // catalog identity, in the first-stored language (source language)
+  localized_name?: string | null; // display name for the requested locale; null → use canonical_name
   rank?: number;
   percent?: number | null;
   percent_type?: "stated" | "estimated" | null;
-  percent_basis?: "product" | "parent" | null;
+  percent_basis?: "product" | "parent" | null; // null when the source doesn't establish the basis
+  percent_note?: string | null; // e.g. the >100% QUID caption
   processing_tag?: EngineProcessingTag | string;
   general_explanation?: string | null; // → our what_it_is (product-independent)
   product_context?: string | null; // → our why_its_here (product-specific)
   significance_note?: string | null; // → our percentage_note
   role_tags?: string[];
-  original_name?: string;
-  attributes?: string[];
+  original_name?: string; // exact pack wording
+  attributes?: string[]; // closed qualifiers: organic, extra_virgin, …
+  origin?: string | null; // geographic origin (e.g. "Italy"), kept out of the name
   component_of_item_id?: string | null;
 };
 

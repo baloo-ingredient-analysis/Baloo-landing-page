@@ -11,7 +11,9 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(req: Request) {
-  const slug = new URL(req.url).searchParams.get("slug");
+  const url = new URL(req.url);
+  const slug = url.searchParams.get("slug");
+  const locale = url.searchParams.get("locale") === "es" ? "es" : "en"; // en | es for the Spain-first look
   if (!slug) return NextResponse.json({ error: "slug required" }, { status: 400 });
 
   const dbi = db();
@@ -44,7 +46,7 @@ export async function GET(req: Request) {
       barcode,
       brand: data.product.brand ?? undefined,
       productName: data.product.name,
-      locale: "en",
+      locale,
     });
     if (res.ok) {
       engine = {
@@ -57,6 +59,7 @@ export async function GET(req: Request) {
         // The engine's raw per-ingredient signals, so the 3-value tag + source-language names are visible.
         raw: (res.raw.ingredients ?? []).map((r) => ({
           canonical_name: r.canonical_name,
+          localized_name: r.localized_name ?? null,
           processing_tag: r.processing_tag ?? null,
           percent: r.percent ?? null,
           percent_type: r.percent_type ?? null,

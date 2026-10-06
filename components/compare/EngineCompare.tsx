@@ -30,7 +30,7 @@ type EngineIngredient = {
   why_its_here: string;
   percentage_note: string | null;
 };
-type RawIngredient = { canonical_name: string; processing_tag: string | null; percent: number | null; percent_type: string | null; role_tags: string[] };
+type RawIngredient = { canonical_name: string; localized_name: string | null; processing_tag: string | null; percent: number | null; percent_type: string | null; role_tags: string[] };
 
 type CompareResult = {
   product: { name: string; slug: string; barcode: string | null };
@@ -49,6 +49,7 @@ type Row = {
   whatItIs: string | null;
   whyItsHere: string | null;
   rawTag?: string | null; // engine only — the 3-value tag before our fold
+  rawName?: string | null; // engine only — the canonical (source-language) name, when it differs
 };
 
 function TagPill({ tag, rawTag }: { tag: Row["tag"]; rawTag?: string | null }) {
@@ -71,6 +72,7 @@ function IngredientList({ rows }: { rows: Row[] }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs tabular-nums text-muted">{i + 1}</span>
             <span className="font-medium text-ink">{r.name}</span>
+            {r.rawName && r.rawName !== r.name && <span className="text-[11px] text-muted">({r.rawName})</span>}
             <TagPill tag={r.tag} rawTag={r.rawTag} />
             {r.percent && <span className="text-xs tabular-nums text-muted">{r.percent}</span>}
             {r.role && <span className="text-[11px] text-muted">· {r.role}</span>}
@@ -124,6 +126,7 @@ export function EngineCompare() {
   const [data, setData] = useState<CompareResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [locale, setLocale] = useState<"en" | "es">("en"); // en | es — the Spain-first view
 
   // Debounced catalog search for the picker.
   const first = useRef(true);
@@ -144,15 +147,12 @@ export function EngineCompare() {
     return () => clearTimeout(t);
   }, [q, picked]);
 
-  async function pick(p: Pick) {
-    setPicked(p);
-    setResults([]);
-    setQ(p.name);
+  async function load(p: Pick, loc: "en" | "es") {
     setData(null);
     setErr(null);
     setLoading(true);
     try {
-      const r = await fetch(`/api/compare/engine?slug=${encodeURIComponent(p.slug)}`);
+      const r = await fetch(`/api/compare/engine?slug=${encodeURIComponent(p.slug)}&locale=${loc}`);
       if (!r.ok) throw new Error(String(r.status));
       setData(await r.json());
     } catch {
@@ -160,6 +160,18 @@ export function EngineCompare() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function pick(p: Pick) {
+    setPicked(p);
+    setResults([]);
+    setQ(p.name);
+    load(p, locale);
+  }
+
+  function changeLocale(loc: "en" | "es") {
+    setLocale(loc);
+    if (picked) load(picked, loc);
   }
 
   function reset() {
@@ -177,6 +189,7 @@ export function EngineCompare() {
       ? data.engine.ingredients.map((i, idx) => ({
           name: i.name, tag: i.tag, role: i.role, percent: i.percentage, whatItIs: i.what_it_is, whyItsHere: i.why_its_here,
           rawTag: data.engine.ok ? data.engine.raw[idx]?.processing_tag ?? null : null,
+          rawName: data.engine.ok ? data.engine.raw[idx]?.canonical_name ?? null : null,
         }))
       : [];
 
@@ -205,6 +218,23 @@ export function EngineCompare() {
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 text-sm">
+        <span className="text-muted">Engine language:</span>
+        <div className="inline-flex rounded-full bg-canvas p-0.5">
+          {(["en", "es"] as const).map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => changeLocale(l)}
+              aria-pressed={locale === l}
+              className={`rounded-full px-3 py-1 text-[13px] font-medium transition ${locale === l ? "bg-paper text-ink shadow-card" : "text-muted hover:text-ink"}`}
+            >
+              {l === "en" ? "English" : "Español (Spain-first)"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading && (

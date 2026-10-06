@@ -22,7 +22,7 @@ const sample: ExplainResponse = {
     daily_reference: { standard: "uk_adult_ri", context: "…", nutrients: [{ id: "energy", amount: 300, unit: "kcal", reference: 2000, percent: 15 }] },
   },
   ingredients: [
-    { canonical_name: "chickpeas", rank: 1, percent: 59, percent_type: "stated", processing_tag: "natural", general_explanation: "Chickpeas are a legume.", product_context: "The base of this hummus.", significance_note: "The main ingredient.", role_tags: ["base"] },
+    { canonical_name: "garbanzos", localized_name: "chickpeas", rank: 1, percent: 59, percent_type: "stated", processing_tag: "natural", general_explanation: "Chickpeas are a legume.", product_context: "The base of this hummus.", significance_note: "The main ingredient.", role_tags: ["base"] },
     { canonical_name: "sunflower oil", rank: 2, percent: 16.17, percent_type: "estimated", processing_tag: "processed", general_explanation: "A refined oil.", product_context: "Adds fat and texture.", significance_note: null, role_tags: ["fat", "texture_agent"] },
     { canonical_name: "potassium sorbate", percent: null, processing_tag: "artificial", general_explanation: "A preservative.", product_context: "Extends shelf life.", role_tags: ["preservative"] },
   ],
@@ -36,9 +36,9 @@ describe("adaptExplain", () => {
     expect(a.source).toMatchObject({ variantId: "v1", displayName: "Hummus Classic 240 g", category: "Classic hummus" });
   });
 
-  it("maps a stated ingredient's full field set", () => {
+  it("maps a stated ingredient's full field set, preferring localized_name", () => {
     expect(a.ingredients[0]).toEqual({
-      name: "chickpeas",
+      name: "chickpeas", // localized_name wins over canonical "garbanzos"
       tag: "Natural",
       role: "Base",
       what_it_is: "Chickpeas are a legume.",
@@ -46,6 +46,21 @@ describe("adaptExplain", () => {
       percentage: "59%",
       percentage_note: "The main ingredient.",
     });
+  });
+
+  it("falls back to canonical_name when localized_name is absent", () => {
+    // The 2nd sample ingredient has no localized_name.
+    expect(a.ingredients[1].name).toBe("sunflower oil");
+  });
+
+  it("folds percent_note (e.g. the >100% caption) into the note", () => {
+    const [out] = adaptExplain({
+      ingredients: [
+        { canonical_name: "pork", localized_name: "pork", percent: 136.7, percent_type: "stated", processing_tag: "processed", significance_note: "The main ingredient.", percent_note: "This can exceed 100% because weight is lost during processing." },
+      ],
+    }).ingredients;
+    expect(out.percentage).toBe("136.7%");
+    expect(out.percentage_note).toBe("The main ingredient. This can exceed 100% because weight is lost during processing.");
   });
 
   it("maps the nutrition panel into rows per 100g", () => {
