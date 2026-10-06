@@ -40,14 +40,19 @@ export function adaptRole(tags?: string[]): string {
 }
 
 function adaptIngredient(i: EngineIngredient): Ingredient {
+  // NAME — prefer the locale display name (`localized_name`); it's null when the catalog identity is
+  // already in the requested language (e.g. a Spanish product under locale:es), so fall back to it.
+  // The deeper "stable canonical name across languages" is a separate engine roadmap item.
   return {
-    name: i.canonical_name,
+    name: i.localized_name || i.canonical_name,
     tag: adaptTag(i.processing_tag),
     role: adaptRole(i.role_tags),
     what_it_is: i.general_explanation ?? "",
     why_its_here: i.product_context ?? "",
     percentage: adaptPercent(i),
-    percentage_note: i.significance_note ?? null,
+    // significance_note is the general "how meaningful is this amount" line; percent_note carries the
+    // special cases (e.g. the >100% QUID caption). Show both when present.
+    percentage_note: [i.significance_note, i.percent_note].filter(Boolean).join(" ") || null,
   };
 }
 
