@@ -39,6 +39,7 @@ export function itemListJsonLd(input: {
   name: string;
   slug: string;
   description?: string | null;
+  keywords?: string[];
   items: { name: string; slug: string }[];
 }): Record<string, unknown> {
   const node: Record<string, unknown> = {
@@ -55,6 +56,7 @@ export function itemListJsonLd(input: {
     })),
   };
   if (input.description) node.description = input.description;
+  if (input.keywords && input.keywords.length > 0) node.keywords = input.keywords.join(", ");
   return node;
 }
 
