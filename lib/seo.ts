@@ -33,6 +33,31 @@ export function productJsonLd(input: {
   return node;
 }
 
+// schema.org ItemList for a list page — the ordered products, each linking to its /p/<slug>. Lets
+// crawlers + answer engines see exactly what's inside a list (the products↔lists graph, structured).
+export function itemListJsonLd(input: {
+  name: string;
+  slug: string;
+  description?: string | null;
+  items: { name: string; slug: string }[];
+}): Record<string, unknown> {
+  const node: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: input.name,
+    url: absoluteUrl(`/list/${input.slug}`),
+    numberOfItems: input.items.length,
+    itemListElement: input.items.map((it, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: it.name,
+      url: absoluteUrl(`/p/${it.slug}`),
+    })),
+  };
+  if (input.description) node.description = input.description;
+  return node;
+}
+
 // A trail of { name, path } from the site root down to the current page. Earns the breadcrumb
 // rich result and gives crawlers the hierarchy explicitly.
 export function breadcrumbJsonLd(

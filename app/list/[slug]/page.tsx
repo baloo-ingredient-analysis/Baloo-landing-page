@@ -17,6 +17,7 @@ import { LikePill } from "@/components/engagement/LikePill";
 import { ReportControl } from "@/components/ReportControl";
 import { isSaved } from "@/lib/db/queries/saves";
 import { getVoteCount, hasVoted } from "@/lib/db/queries/votes";
+import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo";
 
 // Public list page (Order G4) — the shareable growth surface. SSR from Postgres. A private list
 // is visible only to its owner; everyone else gets a 404 (no existence leak).
@@ -72,8 +73,32 @@ export default async function ListPage({ params }: Params) {
   // List discussion (L-community): comments on the list itself, SSR-hydrated like the product page.
   const thread = await getThread(dbi, { listId: list.id }, { sort: "top", viewerId: viewer?.id ?? null });
 
+  // Structured data (AEO/SEO): the list's products as an ItemList so bots + answer engines see what's
+  // inside, plus a Baloo → Discover → list breadcrumb. Public lists only — never emit for a private one.
+  const jsonLd = list.isPublic
+    ? itemListJsonLd({
+        name: list.title,
+        slug: list.slug,
+        description: list.description,
+        items: list.items.map((i) => ({ name: i.product.name, slug: i.product.slug })),
+      })
+    : null;
+  const breadcrumb = list.isPublic
+    ? breadcrumbJsonLd([
+        { name: "Baloo", path: "/" },
+        { name: "Discover", path: "/discover" },
+        { name: list.title, path: `/list/${list.slug}` },
+      ])
+    : null;
+
   return (
     <div className="relative flex min-h-screen flex-col">
+      {jsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      )}
+      {breadcrumb && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      )}
       {/* The owner's Edit control lives with the list header (next to Share), not in the top bar. */}
       <SiteHeader />
       <main className="mx-auto flex w-full max-w-tool flex-1 flex-col px-5 pt-8">
