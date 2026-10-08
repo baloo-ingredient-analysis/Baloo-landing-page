@@ -223,6 +223,12 @@ export const lists = pgTable(
     description: text("description"),
     isPublic: boolean("is_public").notNull().default(false),
     coverUrl: text("cover_url"),
+    // AEO + discovery (tags track): a FEW controlled tags for navigation/filtering, and a short
+    // human-readable, synonym-rich discovery description for the page + search + answer engines. Both
+    // auto-generated from title+description+products on update/publish. Optional-infra: null until
+    // generated (ANTHROPIC_API_KEY absent → stays null, nothing breaks).
+    tags: text("tags").array(),
+    discovery: text("discovery"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     // Semantic search over public lists (L3): OpenAI embedding of title + description. Filled on

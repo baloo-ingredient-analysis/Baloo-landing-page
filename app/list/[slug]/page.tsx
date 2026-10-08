@@ -42,6 +42,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const title = `${data.list.title} — Baloo`;
   const description =
     data.list.description ??
+    data.list.discovery ?? // the auto discovery sentence is a good meta description when there's no user one
     `A list of ${data.list.items.length} products on Baloo${data.owner ? `, by @${data.owner.handle}` : ""}.`;
   return {
     title,
@@ -79,7 +80,8 @@ export default async function ListPage({ params }: Params) {
     ? itemListJsonLd({
         name: list.title,
         slug: list.slug,
-        description: list.description,
+        description: list.discovery ?? list.description,
+        keywords: list.tags ?? [],
         items: list.items.map((i) => ({ name: i.product.name, slug: i.product.slug })),
       })
     : null;
@@ -114,10 +116,22 @@ export default async function ListPage({ params }: Params) {
           <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h1 className="font-display text-3xl leading-tight text-ink">{list.title}</h1>
-              {list.description && (
+              {list.description ? (
                 <p className="mt-2 max-w-lg text-[15px] leading-relaxed text-ink/80">
                   {list.description}
                 </p>
+              ) : list.discovery ? (
+                // No user description → show the auto discovery sentence (curated, human).
+                <p className="mt-2 max-w-lg text-[15px] leading-relaxed text-muted">{list.discovery}</p>
+              ) : null}
+              {list.tags && list.tags.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {list.tags.map((t) => (
+                    <span key={t} className="rounded-full bg-canvas px-2.5 py-0.5 text-[12px] font-medium text-muted">
+                      {t}
+                    </span>
+                  ))}
+                </div>
               )}
               {/* Own-list cleanup (V3, Jitain): no "by @you" on your own list — keep it to the meta
                   that tells the reader something new. Non-owners still see who curated it. */}

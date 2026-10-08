@@ -30,6 +30,7 @@ import {
 import type { Region } from "../../retailers";
 import { GEO_WEIGHTS } from "../../config";
 import { embedText, embeddingsEnabled, listEmbeddingText } from "../../embeddings";
+import { generateListMeta } from "../../listMeta";
 
 // Best-effort semantic embedding for a public list (L3). Optional-infra: a no-op without OPENAI_API_KEY,
 // and any failure is swallowed — embedding a list must NEVER break creating or editing it. Awaited so a
@@ -87,6 +88,36 @@ export async function updateList(
 
 export async function deleteList(dbi: Db, listId: string): Promise<void> {
   await dbi.delete(lists).where(eq(lists.id, listId));
+}
+
+// AEO + tags: store the auto-generated controlled tags + discovery sentence on a list.
+export async function setListMeta(
+  dbi: Db,
+  listId: string,
+  meta: { tags: string[]; discovery: string },
+): Promise<void> {
+  await dbi.update(lists).set({ tags: meta.tags, discovery: meta.discovery }).where(eq(lists.id, listId));
+}
+
+// Generate (title + description + product names → tags + discovery) and store. Best-effort /
+// optional-infra: a no-op when generation returns null. Call fire-and-forget (after()) from
+// update/publish so it never slows the list flow.
+export async function generateAndStoreListMeta(dbi: Db, listId: string): Promise<void> {
+  const list = await getListById(dbi, listId);
+  if (!list) return;
+  const rows = await dbi
+    .select({ name: products.name })
+    .from(listItems)
+    .innerJoin(products, eq(products.id, listItems.productId))
+    .where(eq(listItems.listId, listId))
+    .orderBy(asc(listItems.position))
+    .limit(30);
+  const meta = await generateListMeta({
+    title: list.title,
+    description: list.description,
+    products: rows.map((r) => r.name),
+  });
+  if (meta) await setListMeta(dbi, listId, meta);
 }
 
 // Appends at the end (position = max + 1). The (list_id, product_id) unique index makes adding
