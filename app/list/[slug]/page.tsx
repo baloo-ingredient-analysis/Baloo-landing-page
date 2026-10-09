@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { notFound } from "next/navigation";
 import { profilePath } from "@/lib/profilePath";
 import { db } from "@/lib/db";
@@ -18,6 +18,7 @@ import { ReportControl } from "@/components/ReportControl";
 import { isSaved } from "@/lib/db/queries/saves";
 import { getVoteCount, hasVoted } from "@/lib/db/queries/votes";
 import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo";
+import { localeAlternates } from "@/lib/i18n/metadata";
 
 // Public list page (Order G4) — the shareable growth surface. SSR from Postgres. A private list
 // is visible only to its owner; everyone else gets a 404 (no existence leak).
@@ -47,7 +48,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title,
     description,
-    alternates: { canonical: `/list/${slug}` },
+    alternates: await localeAlternates(`/list/${slug}`),
     openGraph: { title, description, images: [{ url: `/api/og/list/${slug}`, width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description, images: [`/api/og/list/${slug}`] },
   };
@@ -141,9 +142,9 @@ export default async function ListPage({ params }: Params) {
                 ) : owner ? (
                   <>
                     by{" "}
-                    <Link href={profilePath(owner.handle)} className="text-ink/70 underline decoration-line underline-offset-2 hover:text-ink">
+                    <LocalizedLink href={profilePath(owner.handle)} className="text-ink/70 underline decoration-line underline-offset-2 hover:text-ink">
                       @{owner.handle}
-                    </Link>
+                    </LocalizedLink>
                   </>
                 ) : (
                   "by a Baloo user"
@@ -157,12 +158,12 @@ export default async function ListPage({ params }: Params) {
                   don't like or save your own list, so both are hidden for the owner (V3 own-list
                   cleanup); Share stays (growth loop). The owner gets Edit right here by the title. */}
               {isOwner && (
-                <Link
+                <LocalizedLink
                   href={`/list/${list.slug}/edit`}
                   className="rounded-full border border-line bg-paper px-3.5 py-1.5 text-[13px] font-medium text-ink transition hover:border-ink/20"
                 >
                   Edit
-                </Link>
+                </LocalizedLink>
               )}
               {!isOwner && (
                 <LikePill listId={list.id} initialLiked={viewerLiked} initialCount={likeCount} />
@@ -186,12 +187,12 @@ export default async function ListPage({ params }: Params) {
                 <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted">
                   Add a product to start building this list.
                 </p>
-                <Link
+                <LocalizedLink
                   href={`/list/${list.slug}/edit`}
                   className="mt-4 inline-flex rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85"
                 >
                   Add a product
-                </Link>
+                </LocalizedLink>
               </>
             ) : (
               <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted">

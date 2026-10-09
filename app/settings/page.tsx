@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { getCurrentProfile } from "@/lib/auth";
 import { profilePath } from "@/lib/profilePath";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -33,23 +33,23 @@ export default async function SettingsPage() {
               <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted">
                 Choose a handle to finish setting up your account.
               </p>
-              <Link
+              <LocalizedLink
                 href="/welcome"
                 className="mt-4 inline-flex rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85"
               >
                 Choose your handle
-              </Link>
+              </LocalizedLink>
             </div>
           ) : (
             <>
               <p className="mt-2 text-sm text-muted">
                 Signed in as{" "}
-                <Link
+                <LocalizedLink
                   href={profilePath(auth.profile.handle)}
                   className="text-ink underline decoration-line underline-offset-2"
                 >
                   @{auth.profile.handle}
-                </Link>
+                </LocalizedLink>
               </p>
               <SettingsClient handle={auth.profile.handle} />
             </>

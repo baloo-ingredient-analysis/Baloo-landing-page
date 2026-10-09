@@ -5,12 +5,12 @@
 // "Confirm"), and only then enables the destructive button.
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
 import { Modal } from "@/components/Modal";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 export function DeleteAccountDialog({ handle, onClose }: { handle: string; onClose: () => void }) {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

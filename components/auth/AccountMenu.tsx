@@ -4,8 +4,8 @@
 // behaves exactly as pre-G2. Dropdown interaction mirrors ProfileSelector's pattern.
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
+import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
 import { profilePath } from "@/lib/profilePath";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useAuth } from "./useAuth";
@@ -16,7 +16,7 @@ export function AccountMenu() {
   const [open, setOpen] = useState(false);
   const [modal, setModal] = useState<AuthMode | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  const router = useLocalizedRouter();
 
   useEffect(() => {
     if (!open) return;
@@ -66,13 +66,13 @@ export function AccountMenu() {
     <div ref={rootRef} className="relative">
       {hasProfile ? (
         <div className="flex items-center overflow-hidden rounded-full border border-line bg-paper text-[13px] font-medium text-ink">
-          <Link
+          <LocalizedLink
             href={profileHref}
             onClick={() => setOpen(false)}
             className="max-w-[120px] truncate py-1.5 pl-3.5 pr-2 transition hover:bg-canvas"
           >
             @{profile!.handle}
-          </Link>
+          </LocalizedLink>
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}

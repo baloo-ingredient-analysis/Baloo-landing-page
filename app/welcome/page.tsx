@@ -4,7 +4,7 @@
 // Bounces straight home when the profile already exists. D-G2 restyles later.
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
 import { useAuth } from "@/components/auth/useAuth";
 import { SiteHeader } from "@/components/SiteHeader";
 
@@ -17,7 +17,7 @@ const ERRORS: Record<string, string> = {
 
 export default function Welcome() {
   const { loading, available, user, profile, refresh } = useAuth();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [handle, setHandle] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);

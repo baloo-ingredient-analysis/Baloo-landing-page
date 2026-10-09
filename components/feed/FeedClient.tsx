@@ -5,7 +5,7 @@
 // mechanics by design.
 
 import { useState } from "react";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { coverCss, monogram } from "@/lib/cover";
 import { profilePath } from "@/lib/profilePath";
 import { ListCover } from "@/components/lists/ListCover";
@@ -140,18 +140,18 @@ function Article({ article }: { article: FeedArticle }) {
           {monogram(article.actor.displayName)}
         </span>
         <p className="min-w-0 flex-1 text-sm leading-snug">
-          <Link href={profilePath(article.actor.handle)} className="font-medium text-ink hover:underline">
+          <LocalizedLink href={profilePath(article.actor.handle)} className="font-medium text-ink hover:underline">
             @{article.actor.handle}
-          </Link>{" "}
+          </LocalizedLink>{" "}
           <span className="text-muted">
             {article.kind === "created_list"
               ? "created a list"
               : `added ${article.count} ${article.count === 1 ? "product" : "products"} to`}
           </span>{" "}
           {article.kind === "added_items" && (
-            <Link href={`/list/${article.list.slug}`} className="font-medium text-ink hover:underline">
+            <LocalizedLink href={`/list/${article.list.slug}`} className="font-medium text-ink hover:underline">
               &quot;{article.list.title}&quot;
-            </Link>
+            </LocalizedLink>
           )}
         </p>
         <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={article.ts}>
@@ -161,7 +161,7 @@ function Article({ article }: { article: FeedArticle }) {
 
       {article.kind === "created_list" ? (
         // The richest event earns the card (D-G6 §3b) — same anatomy as the shipped ListCard.
-        <Link
+        <LocalizedLink
           href={`/list/${article.list.slug}`}
           className="group mt-3 block overflow-hidden rounded-2xl border border-line bg-paper shadow-card transition duration-200 hover:shadow-card-hover sm:ml-9"
         >
@@ -177,7 +177,7 @@ function Article({ article }: { article: FeedArticle }) {
               {article.list.itemCount} {article.list.itemCount === 1 ? "product" : "products"}
             </p>
           </div>
-        </Link>
+        </LocalizedLink>
       ) : (
         // A receipt of what changed — not a card (D-G6 §3b).
         <div className="mt-3 rounded-xl border border-line bg-paper sm:ml-9">
@@ -185,7 +185,7 @@ function Article({ article }: { article: FeedArticle }) {
             <ul className="[&>li+li]:border-t [&>li+li]:border-line">
               {article.products.map((p) => (
                 <li key={p.slug}>
-                  <Link href={`/p/${p.slug}`} className="flex items-center gap-3 px-3.5 py-2.5 transition hover:bg-canvas">
+                  <LocalizedLink href={`/p/${p.slug}`} className="flex items-center gap-3 px-3.5 py-2.5 transition hover:bg-canvas">
                     <span
                       aria-hidden
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-canvas font-display text-sm text-ink/30"
@@ -196,19 +196,19 @@ function Article({ article }: { article: FeedArticle }) {
                       <span className="block truncate font-display text-[15px] text-ink">{p.name}</span>
                       {p.brand && <span className="text-xs text-muted">{p.brand}</span>}
                     </span>
-                  </Link>
+                  </LocalizedLink>
                 </li>
               ))}
             </ul>
           ) : (
             <p className="px-3.5 py-2.5 text-sm text-muted">Products added earlier.</p>
           )}
-          <Link
+          <LocalizedLink
             href={`/list/${article.list.slug}`}
             className="block border-t border-line px-3.5 py-2 text-[13px] font-medium text-muted transition hover:text-ink"
           >
             View the list →
-          </Link>
+          </LocalizedLink>
         </div>
       )}
     </article>
@@ -251,9 +251,9 @@ function EmptyState({
                 </span>
               </span>
               <span className="min-w-0 flex-1">
-                <Link href={profilePath(s.handle)} className="block truncate font-display text-base text-ink hover:underline">
+                <LocalizedLink href={profilePath(s.handle)} className="block truncate font-display text-base text-ink hover:underline">
                   {s.displayName}
-                </Link>
+                </LocalizedLink>
                 <span className="text-xs tabular-nums text-muted">
                   @{s.handle} · {s.publicLists} {s.publicLists === 1 ? "list" : "lists"} ·{" "}
                   {s.followers} {s.followers === 1 ? "follower" : "followers"}
@@ -266,9 +266,9 @@ function EmptyState({
       )}
 
       <p className="mt-4 text-sm">
-        <Link href="/discover" className="text-muted underline decoration-line underline-offset-2 transition hover:text-ink">
+        <LocalizedLink href="/discover" className="text-muted underline decoration-line underline-offset-2 transition hover:text-ink">
           Or browse all lists →
-        </Link>
+        </LocalizedLink>
       </p>
     </div>
   );

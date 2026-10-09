@@ -5,7 +5,7 @@
 // (saved lists are private). Client so the Latest / Most popular filter re-sorts without a round-trip.
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { ListCard } from "@/components/lists/ListCard";
 import type { ListWithCountsAndOwner } from "@/lib/db/queries/lists";
 
@@ -39,12 +39,12 @@ export function ProfileLists({
             : "This person hasn’t published any lists yet."}
         </p>
         {isOwner && (
-          <Link
+          <LocalizedLink
             href="/lists/new"
             className="mt-4 inline-flex rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85"
           >
             New list
-          </Link>
+          </LocalizedLink>
         )}
       </div>
     );

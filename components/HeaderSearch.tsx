@@ -10,7 +10,8 @@
 // search without touching this.
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
 import { validateUrl, looksLikeUrl } from "@/lib/retailers";
 import { Modal } from "@/components/Modal";
 
@@ -54,7 +55,7 @@ export function HeaderSearch() {
 }
 
 function SearchOverlay({ onClose }: { onClose: () => void }) {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
 
 // /lists/new (Order G4): name the list, create it, go straight to the editor where products get
 // added. Kept minimal — the editor is the rich surface.
 export function CreateListForm() {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

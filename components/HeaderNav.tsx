@@ -10,6 +10,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/useAuth";
 import { profilePath } from "@/lib/profilePath";
+import { useLocale, useT } from "@/lib/i18n/context";
+import { localizePath } from "@/lib/i18n/config";
 
 const stroke = {
   fill: "none",
@@ -65,13 +67,19 @@ function AdminIcon() {
 export function HeaderNav({ className = "" }: { className?: string }) {
   const pathname = usePathname() ?? "";
   const { profile } = useAuth();
+  const t = useT();
+  const locale = useLocale();
   const listsHref = profile?.handle ? profilePath(profile.handle, "lists") : "/lists";
 
+  // Locale-aware hrefs: in Spanish, links carry the /es prefix (localizePath). The rest of the app's
+  // links get the same treatment slice by slice.
   const items = [
-    { href: "/feed", label: "Following", icon: <FollowingIcon /> },
-    { href: "/discover", label: "Discover", icon: <DiscoverIcon /> },
-    { href: listsHref, label: "Lists", icon: <ListsIcon /> },
-    ...(profile?.isAdmin ? [{ href: "/admin", label: "Admin", icon: <AdminIcon /> }] : []),
+    { href: localizePath("/feed", locale), label: t.nav.following, icon: <FollowingIcon /> },
+    { href: localizePath("/discover", locale), label: t.nav.discover, icon: <DiscoverIcon /> },
+    { href: localizePath(listsHref, locale), label: t.nav.lists, icon: <ListsIcon /> },
+    ...(profile?.isAdmin
+      ? [{ href: localizePath("/admin", locale), label: t.nav.admin, icon: <AdminIcon /> }]
+      : []),
   ];
 
   const isActive = (href: string) => {

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 
 // Shared product row (Order L1f) — one idiom for "a product in a list", used by Discover's
 // "Recently analysed" and the search results in SearchBox (and reusable on profiles later). Pure
@@ -45,7 +45,7 @@ export function ProductRow({
           {inner}
         </button>
       ) : (
-        <Link
+        <LocalizedLink
           href={`/p/${slug}`}
           onClick={
             onQuickView && slug
@@ -60,7 +60,7 @@ export function ProductRow({
           className={cls}
         >
           {inner}
-        </Link>
+        </LocalizedLink>
       )}
     </li>
   );

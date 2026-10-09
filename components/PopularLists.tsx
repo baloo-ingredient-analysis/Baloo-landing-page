@@ -5,7 +5,7 @@
 // signal — real numbers only, never a faked ranking. Mirrors <Board>'s idle-only, no-polling pattern.
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { ListCard } from "@/components/lists/ListCard";
 import type { ListWithCountsAndOwner } from "@/lib/db/queries/lists";
 
@@ -32,9 +32,9 @@ export function PopularLists() {
     <section className="mt-16 animate-fade-in sm:mt-20">
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="font-display text-[23px] text-ink">Popular lists this week</h2>
-        <Link href="/discover" className="shrink-0 text-sm font-medium text-natural hover:underline">
+        <LocalizedLink href="/discover" className="shrink-0 text-sm font-medium text-natural hover:underline">
           Browse all →
-        </Link>
+        </LocalizedLink>
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {lists.map((l) => (

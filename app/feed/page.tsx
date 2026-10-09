@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { getCurrentProfile } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getFeed } from "@/lib/db/queries/feed";
@@ -33,9 +33,9 @@ export default async function FeedPage() {
       <Shell>
         <p className="mt-10 text-sm text-muted">
           One step left —{" "}
-          <Link href="/welcome" className="underline decoration-line underline-offset-2 hover:text-ink">
+          <LocalizedLink href="/welcome" className="underline decoration-line underline-offset-2 hover:text-ink">
             choose your handle
-          </Link>{" "}
+          </LocalizedLink>{" "}
           and your feed opens up.
         </p>
       </Shell>

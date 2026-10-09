@@ -11,7 +11,7 @@
 // row analyses it; a raw row with no ingredient list dead-ends on purpose — part of what this reveals.
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
 import { ProductRow } from "@/components/ProductRow";
 
 type FilteredHit = {
@@ -39,7 +39,7 @@ type CommercialResult = {
 type CommercialHit = { configured: boolean; provider: string | null; results: CommercialResult[] };
 
 export function OffCompare() {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [q, setQ] = useState("");
   const [filtered, setFiltered] = useState<FilteredHit | null>(null);
   const [raw, setRaw] = useState<RawHit | null>(null);

@@ -6,7 +6,7 @@
 // invisible until it actually has something (an empty, badge-less bell would just be chrome).
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { useAuth } from "../auth/useAuth";
 import { profilePath } from "@/lib/profilePath";
 
@@ -120,7 +120,7 @@ export function NotificationBell() {
                     : `/list/${n.list.slug}`;
               return (
                 <li key={`${n.kind}-${i}-${n.ts}`}>
-                  <Link
+                  <LocalizedLink
                     href={href}
                     onClick={() => setOpen(false)}
                     className="block px-4 py-3 transition hover:bg-canvas"
@@ -145,7 +145,7 @@ export function NotificationBell() {
                       )}
                     </span>
                     <span className="mt-0.5 block text-xs text-muted">{timeAgo(n.ts)}</span>
-                  </Link>
+                  </LocalizedLink>
                 </li>
               );
             })}

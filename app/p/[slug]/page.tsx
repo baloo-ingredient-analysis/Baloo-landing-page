@@ -18,6 +18,7 @@ import { getThread } from "@/lib/db/queries/comments";
 import { isProductSaved } from "@/lib/db/queries/pantry";
 import { storedIngredients } from "@/lib/analysis/stored";
 import { absoluteUrl, breadcrumbJsonLd, productJsonLd } from "@/lib/seo";
+import { localeAlternates } from "@/lib/i18n/metadata";
 import type { Ingredient, Nutrition } from "@/lib/schema";
 
 // The canonical product page (Order G3): a permanent, shareable, SSR'd page per product, read
@@ -41,7 +42,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title,
     description,
-    alternates: { canonical: `/p/${slug}` },
+    alternates: await localeAlternates(`/p/${slug}`),
     openGraph: { title, description, images: [{ url: ogImage, width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description, images: [ogImage] },
   };

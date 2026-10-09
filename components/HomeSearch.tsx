@@ -5,7 +5,7 @@
 // routes to /discover's keyword search today; L3 swaps in semantic search without touching this box.
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
 import { validateUrl, looksLikeUrl } from "@/lib/retailers";
 
 export function HomeSearch({
@@ -15,7 +15,7 @@ export function HomeSearch({
   onAnalyze: (url: string) => void;
   busy: boolean;
 }) {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
 

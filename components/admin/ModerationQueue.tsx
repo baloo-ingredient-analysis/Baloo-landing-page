@@ -4,7 +4,7 @@
 // in place. Calls /api/moderation then drops the row optimistically.
 
 import { useState } from "react";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import type { QueueReport } from "@/lib/db/queries/reports";
 
 const REASON_LABEL: Record<string, string> = {
@@ -55,9 +55,9 @@ export function ModerationQueue({ initial }: { initial: QueueReport[] }) {
             {r.preview || "(empty)"}
           </p>
           {r.targetHref && (
-            <Link href={r.targetHref} className="mt-1 inline-block text-[13px] text-natural hover:underline">
+            <LocalizedLink href={r.targetHref} className="mt-1 inline-block text-[13px] text-natural hover:underline">
               View →
-            </Link>
+            </LocalizedLink>
           )}
 
           <div className="mt-3 flex items-center gap-2">
