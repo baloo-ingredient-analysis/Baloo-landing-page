@@ -3,6 +3,7 @@ import { Wordmark } from "./Wordmark";
 import { AccountMenu } from "./auth/AccountMenu";
 import { HeaderNav } from "./HeaderNav";
 import { HeaderSearch } from "./HeaderSearch";
+import { LocaleToggle } from "./LocaleToggle";
 import { NotificationBell } from "./notifications/NotificationBell";
 
 // The shared app-shell header (Orders G5 + L1d). One component instead of seven hand-copied headers.
@@ -50,6 +51,7 @@ export function SiteHeader({
         <div className="flex items-center gap-3">
           {showNav && <HeaderNav className="hidden sm:flex" />}
           <HeaderSearch />
+          <LocaleToggle />
           {action}
           <NotificationBell />
           <AccountMenu />

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { siteUrl } from "@/lib/config";
+import { getLocale } from "@/lib/i18n/server";
+import { LocaleProvider } from "@/lib/i18n/context";
 import "./globals.css";
 
 const sans = Inter({
@@ -29,13 +31,16 @@ export const metadata: Metadata = {
     "Search any food product and see what every ingredient is, and why it's there. Calm, plain language, no score.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Locale from the request (middleware sets it from the URL: /es → es). Drives <html lang> and the
+  // client LocaleProvider that every "use client" component reads strings from.
+  const locale = await getLocale();
   return (
-    <html lang="en" className={`${sans.variable} ${display.variable}`}>
+    <html lang={locale} className={`${sans.variable} ${display.variable}`}>
       {/* Vercel Web Analytics (cookieless, no PII — fits Baloo's privacy posture). Same-origin only
           (/_vercel/insights/*), so the enforcing CSP needs no change. */}
       <body className="font-sans">
-        {children}
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
         <Analytics />
       </body>
     </html>
