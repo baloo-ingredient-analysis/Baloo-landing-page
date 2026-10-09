@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n/context";
 
 export function EmailCapture() {
+  const t = useT();
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -28,19 +30,16 @@ export function EmailCapture() {
   if (done) {
     return (
       <div className="mt-12 rounded-2xl border border-natural/30 bg-natural-soft/60 p-6 text-center animate-fade-in">
-        <p className="font-medium text-natural">You&apos;re on the list.</p>
-        <p className="mt-1 text-sm text-muted">We&apos;ll be in touch when the app is ready.</p>
+        <p className="font-medium text-natural">{t.email.doneTitle}</p>
+        <p className="mt-1 text-sm text-muted">{t.email.doneSub}</p>
       </div>
     );
   }
 
   return (
     <div className="mt-12 rounded-2xl border border-line bg-paper p-6 text-center shadow-card sm:p-8">
-      <h2 className="font-display text-xl text-ink">Get early access to the Baloo app</h2>
-      <p className="mx-auto mt-1.5 max-w-md text-sm text-muted">
-        This is a prototype. Leave your email to be first to know when Baloo launches on iOS and
-        Android.
-      </p>
+      <h2 className="font-display text-xl text-ink">{t.email.heading}</h2>
+      <p className="mx-auto mt-1.5 max-w-md text-sm text-muted">{t.email.body}</p>
       <div className="mx-auto mt-5 flex max-w-sm flex-col gap-2 sm:flex-row">
         <input
           type="email"
@@ -50,7 +49,7 @@ export function EmailCapture() {
             if (e.key === "Enter") submit();
           }}
           placeholder="you@email.com"
-          aria-label="Email address"
+          aria-label={t.email.ariaLabel}
           className="flex-1 rounded-lg border border-line bg-canvas px-4 py-2.5 text-ink outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20"
         />
         <button
@@ -58,10 +57,10 @@ export function EmailCapture() {
           disabled={busy}
           className="rounded-lg bg-natural px-5 py-2.5 font-medium text-paper transition hover:bg-natural/90 disabled:opacity-50"
         >
-          Notify me
+          {t.email.notify}
         </button>
       </div>
-      <p className="mt-3 text-xs text-muted">No spam. Unsubscribe anytime.</p>
+      <p className="mt-3 text-xs text-muted">{t.email.noSpam}</p>
     </div>
   );
 }

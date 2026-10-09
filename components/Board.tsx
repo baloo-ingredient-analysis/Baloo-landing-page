@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT, useLocale } from "@/lib/i18n/context";
+import type { Locale } from "@/lib/i18n/config";
 import type { Board as BoardData } from "@/lib/stats";
 
 type BoardPayload = BoardData & { showTopScanners?: boolean };
@@ -30,6 +32,8 @@ export function Board() {
 
 // Presentational and fixture-drivable (used by Board above; handy for layout work and reuse).
 export function BoardView({ data }: { data: BoardPayload }) {
+  const t = useT();
+  const locale = useLocale();
   const recent = data.recent.slice(0, 7);
 
   return (
@@ -39,22 +43,18 @@ export function BoardView({ data }: { data: BoardPayload }) {
           aria-hidden
           className="h-2 w-2 animate-pulse-dot rounded-full bg-natural ring-4 ring-natural-soft"
         />
-        <h2 className="font-display text-2xl text-ink">On Baloo right now</h2>
+        <h2 className="font-display text-2xl text-ink">{t.board.heading}</h2>
       </div>
-      <p className="mt-2 text-sm text-muted">
-        What people are scanning — every scan quietly adds to the board.
-      </p>
+      <p className="mt-2 text-sm text-muted">{t.board.subtitle}</p>
 
       <div className="mt-4 rounded-2xl border border-line bg-paper p-6 shadow-card">
         {/* 1 · Recently scanned */}
         <div className="flex items-baseline justify-between gap-3">
-          <PanelLabel>Recently scanned</PanelLabel>
-          <span className="text-xs text-muted">last 30</span>
+          <PanelLabel>{t.board.recentlyScanned}</PanelLabel>
+          <span className="text-xs text-muted">{t.board.last30}</span>
         </div>
         {recent.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">
-            Nothing scanned yet. Paste a link above and you&apos;ll be first on the board.
-          </p>
+          <p className="mt-3 text-sm text-muted">{t.board.emptyRecent}</p>
         ) : (
           <ul className="mt-2">
             {recent.map((scan, i) => (
@@ -68,7 +68,7 @@ export function BoardView({ data }: { data: BoardPayload }) {
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-muted">
                   {scan.country ? `${scan.country} · ` : ""}
-                  {timeAgo(scan.ts)}
+                  {timeAgo(scan.ts, t.board.justNow, t.board.ago)}
                 </span>
               </li>
             ))}
@@ -79,10 +79,10 @@ export function BoardView({ data }: { data: BoardPayload }) {
 
         {/* 2 · Top supermarkets / Top countries */}
         <div className="grid gap-7 sm:grid-cols-2">
-          <RankedPanel label="Top supermarkets" entries={data.topRetailers} />
+          <RankedPanel label={t.board.topSupermarkets} entries={data.topRetailers} />
           <RankedPanel
-            label="Top countries"
-            entries={data.topCountries.map((c) => ({ ...c, name: countryName(c.name) }))}
+            label={t.board.topCountries}
+            entries={data.topCountries.map((c) => ({ ...c, name: countryName(c.name, locale) }))}
           />
         </div>
 
@@ -94,22 +94,18 @@ export function BoardView({ data }: { data: BoardPayload }) {
                 <LockIcon />
               </span>
               <span>
-                <span className="block text-sm text-ink">Top scanners</span>
-                <span className="block text-xs text-muted">
-                  Arrives with Baloo accounts — scan history and streaks.
-                </span>
+                <span className="block text-sm text-ink">{t.board.topScanners}</span>
+                <span className="block text-xs text-muted">{t.board.topScannersNote}</span>
               </span>
             </div>
             <span className="shrink-0 rounded-full bg-line px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.09em] text-ink/70">
-              Coming soon
+              {t.board.comingSoon}
             </span>
           </div>
         )}
       </div>
 
-      <p className="mt-3.5 text-xs text-muted">
-        Recorded at country level only — no personal data, no exact location.
-      </p>
+      <p className="mt-3.5 text-xs text-muted">{t.board.privacyNote}</p>
     </section>
   );
 }
@@ -127,6 +123,8 @@ function RankedPanel({
   label: string;
   entries: { name: string; count: number }[];
 }) {
+  const t = useT();
+  const locale = useLocale();
   const top = entries.slice(0, 5);
   const max = top[0]?.count ?? 0;
 
@@ -134,7 +132,7 @@ function RankedPanel({
     <div>
       <PanelLabel>{label}</PanelLabel>
       {top.length === 0 ? (
-        <p className="mt-3 text-sm text-muted">No scans yet.</p>
+        <p className="mt-3 text-sm text-muted">{t.board.noScans}</p>
       ) : (
         <ul className="mt-1.5">
           {top.map((entry, i) => (
@@ -148,7 +146,7 @@ function RankedPanel({
                 />
               </span>
               <span className="w-11 shrink-0 text-right text-[13px] tabular-nums text-muted">
-                {entry.count.toLocaleString("en-GB")}
+                {entry.count.toLocaleString(locale === "es" ? "es-ES" : "en-GB")}
               </span>
             </li>
           ))}
@@ -176,21 +174,20 @@ function LockIcon() {
   );
 }
 
-// "just now" under 45s, then minutes/hours (and days past 24h). Code-side, en-GB style.
-function timeAgo(ts: number): string {
+// "just now" under 45s, then a compact m/h/d span. The locale strings supply the wording:
+// `justNow` and an `ago` template whose {v} is the span (so EN "5m ago" / ES "hace 5m").
+function timeAgo(ts: number, justNow: string, agoTpl: string): string {
   const s = Math.max(0, (Date.now() - ts) / 1000);
-  if (s < 45) return "just now";
+  if (s < 45) return justNow;
   const m = Math.round(s / 60);
-  if (m < 60) return `${Math.max(1, m)}m ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.round(h / 24)}d ago`;
+  const span = m < 60 ? `${Math.max(1, m)}m` : Math.round(m / 60) < 24 ? `${Math.round(m / 60)}h` : `${Math.round(m / 60 / 24)}d`;
+  return agoTpl.replace("{v}", span);
 }
 
-// Country codes from Vercel geolocation ("GB") → readable names, raw code as fallback.
-function countryName(code: string): string {
+// Country codes from Vercel geolocation ("GB") → readable names in the active locale, raw code as fallback.
+function countryName(code: string, locale: Locale): string {
   try {
-    return new Intl.DisplayNames("en", { type: "region" }).of(code) ?? code;
+    return new Intl.DisplayNames(locale, { type: "region" }).of(code) ?? code;
   } catch {
     return code;
   }
