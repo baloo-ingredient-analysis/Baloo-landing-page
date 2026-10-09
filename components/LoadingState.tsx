@@ -1,9 +1,11 @@
+"use client";
+
+import { useT } from "@/lib/i18n/context";
+
 export function LoadingState({ phase }: { phase: "reading" | "analyzing" }) {
-  const label = phase === "reading" ? "Reading ingredients…" : "Analysing with AI…";
-  const sub =
-    phase === "reading"
-      ? "Fetching the product page and finding the label."
-      : "Explaining each ingredient in plain language.";
+  const t = useT();
+  const label = phase === "reading" ? t.loading.readingLabel : t.loading.analysingLabel;
+  const sub = phase === "reading" ? t.loading.readingSub : t.loading.analysingSub;
 
   return (
     <div className="mt-14 flex flex-col items-center gap-3 text-center animate-fade-in">
