@@ -28,6 +28,9 @@ export async function GET() {
     `- [Baloo home — analyse any product](${base}/): paste a product link, or search a product.`,
     `- [Discover](${base}/discover): community lists, every product explained ingredient by ingredient.`,
     "",
+    "Every product and list page also has a plain-markdown version for machines at the same path + " +
+      "`/llms.txt` (e.g. `/p/<slug>/llms.txt`, `/list/<slug>/llms.txt`).",
+    "",
     "## What Baloo is",
     "- A neutral ingredient encyclopedia for packaged food: what each ingredient is and why it's used.",
     "- Nutrition shown in context against public UK reference intakes — numbers, never a verdict.",

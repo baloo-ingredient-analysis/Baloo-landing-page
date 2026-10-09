@@ -42,7 +42,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title,
     description,
-    alternates: await localeAlternates(`/p/${slug}`),
+    alternates: {
+      ...(await localeAlternates(`/p/${slug}`)),
+      // AEO: point crawlers at the plain-markdown version (app/p/[slug]/llms.txt).
+      types: { "text/markdown": `/p/${slug}/llms.txt` },
+    },
     openGraph: { title, description, images: [{ url: ogImage, width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description, images: [ogImage] },
   };
