@@ -7,15 +7,15 @@
 // a form that can't work.
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
+import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { SiteHeader } from "@/components/SiteHeader";
 
 type State = "checking" | "ready" | "invalid" | "done";
 
 export default function ResetPasswordPage() {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [state, setState] = useState<State>("checking");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,12 +75,12 @@ export default function ResetPasswordPage() {
                 Head back and choose <span className="font-medium text-ink">Forgot password?</span> to
                 get a fresh one.
               </p>
-              <Link
+              <LocalizedLink
                 href="/"
                 className="mt-4 inline-flex rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85"
               >
                 Back to Baloo
-              </Link>
+              </LocalizedLink>
             </div>
           )}
 

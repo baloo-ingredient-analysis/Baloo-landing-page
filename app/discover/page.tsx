@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import { db } from "@/lib/db";
@@ -12,11 +12,15 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { ListCard } from "@/components/lists/ListCard";
 import { ProductRow } from "@/components/ProductRow";
 import { SearchBox } from "@/components/discover/SearchBox";
+import { localeAlternates } from "@/lib/i18n/metadata";
 
-export const metadata: Metadata = {
-  title: "Discover — Baloo",
-  description: "Find lists and products the Baloo community is putting together.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "Discover — Baloo",
+    description: "Find lists and products the Baloo community is putting together.",
+    alternates: await localeAlternates("/discover"),
+  };
+}
 
 // Explore (Order L9). Discover is now the EXPLORE surface: ranked public lists from people you
 // don't already follow (your Following surface is /feed). Ranking blends likes + saves + recency,
@@ -86,7 +90,7 @@ export default async function DiscoverPage({
                 { id: "month", label: "This month" },
                 { id: "all", label: "All time" },
               ] as const).map((w) => (
-                <Link
+                <LocalizedLink
                   key={w.id}
                   href={`/discover?t=${w.id}&region=${region}`}
                   scroll={false}
@@ -96,12 +100,12 @@ export default async function DiscoverPage({
                   }`}
                 >
                   {w.label}
-                </Link>
+                </LocalizedLink>
               ))}
             </div>
             <div className="flex gap-1 rounded-full bg-canvas p-1">
               {REGIONS.map((r) => (
-                <Link
+                <LocalizedLink
                   key={r.id}
                   href={`/discover?region=${r.id}${windowSel !== "all" ? `&t=${windowSel}` : ""}`}
                   scroll={false}
@@ -111,7 +115,7 @@ export default async function DiscoverPage({
                   }`}
                 >
                   {r.label}
-                </Link>
+                </LocalizedLink>
               ))}
             </div>
           </div>

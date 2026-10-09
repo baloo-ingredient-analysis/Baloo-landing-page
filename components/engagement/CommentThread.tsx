@@ -5,7 +5,7 @@
 // (G8b), never a vote on a comment. Calm by default — the composer collapses when empty.
 
 import { useState } from "react";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { useAuth } from "@/components/auth/useAuth";
 import { profilePath } from "@/lib/profilePath";
 import { AuthModal, type AuthMode } from "@/components/auth/AuthModal";
@@ -459,9 +459,9 @@ function CommentRow({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
-            <Link href={profilePath(comment.author.handle)} className="font-semibold text-ink hover:underline">
+            <LocalizedLink href={profilePath(comment.author.handle)} className="font-semibold text-ink hover:underline">
               @{comment.author.handle}
-            </Link>
+            </LocalizedLink>
             <time className="text-xs tabular-nums text-muted" dateTime={comment.ts}>
               {relTime(comment.ts)}
             </time>
@@ -502,7 +502,7 @@ function CommentRow({
           {!comment.hidden && comment.productRefs.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {comment.productRefs.map((p) => (
-                <Link
+                <LocalizedLink
                   key={p.slug}
                   href={`/p/${p.slug}`}
                   className="inline-flex max-w-full items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink transition hover:border-ink/25"
@@ -514,7 +514,7 @@ function CommentRow({
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted">
                     <path d="M6 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                </Link>
+                </LocalizedLink>
               ))}
             </div>
           )}

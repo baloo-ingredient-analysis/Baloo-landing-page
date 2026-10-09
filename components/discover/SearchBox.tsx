@@ -7,8 +7,9 @@
 // that scraping retailers is a dead end.
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
+import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
 import { ProductRow, RowChevron } from "@/components/ProductRow";
 import { QuickView } from "@/components/product/QuickView";
 
@@ -20,9 +21,11 @@ type Hit = {
 
 type Filter = "all" | "products" | "lists";
 
+// basePath is the UN-localized base ("/" on the homepage, "/discover" here); useLocalizedRouter adds
+// the /es prefix when the viewer is in Spanish, so URL state + navigation stay in the active locale.
 export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}) {
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [hits, setHits] = useState<Hit | null>(null);
   const [searched, setSearched] = useState(false);
@@ -194,7 +197,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
               <ul className="mt-2 max-w-[760px] overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
                 {hits.lists.map((l) => (
                   <li key={l.id}>
-                    <Link
+                    <LocalizedLink
                       href={`/list/${l.slug}`}
                       className="flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-canvas"
                     >
@@ -208,7 +211,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
                         </span>
                       </span>
                       <RowChevron />
-                    </Link>
+                    </LocalizedLink>
                   </li>
                 ))}
               </ul>

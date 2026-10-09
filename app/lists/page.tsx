@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { redirect } from "next/navigation";
 import { profilePath } from "@/lib/profilePath";
 import { getCurrentProfile } from "@/lib/auth";
@@ -35,12 +35,12 @@ export default async function MyListsPage() {
               <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted">
                 Choose a handle and your lists get a shareable home.
               </p>
-              <Link
+              <LocalizedLink
                 href="/welcome"
                 className="mt-4 inline-flex rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85"
               >
                 Choose your handle
-              </Link>
+              </LocalizedLink>
             </div>
           )}
         </section>

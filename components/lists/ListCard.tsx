@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { ListCover } from "./ListCover";
 import type { ListWithCounts } from "@/lib/db/queries/lists";
 
@@ -23,7 +23,7 @@ export function ListCard({
   availability?: Availability;
 }) {
   return (
-    <Link
+    <LocalizedLink
       href={`/list/${list.slug}`}
       className="group block overflow-hidden rounded-2xl border border-line bg-paper shadow-card transition duration-200 hover:shadow-card-hover"
     >
@@ -56,6 +56,6 @@ export function ListCard({
           </p>
         )}
       </div>
-    </Link>
+    </LocalizedLink>
   );
 }

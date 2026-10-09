@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { Wordmark } from "./Wordmark";
 import { AccountMenu } from "./auth/AccountMenu";
 import { HeaderNav } from "./HeaderNav";
@@ -30,9 +30,9 @@ export function SiteHeader({
   if (variant === "center") {
     return (
       <header className="relative flex items-center justify-center pt-8 sm:pt-10">
-        <Link href="/" aria-label="Baloo home">
+        <LocalizedLink href="/" aria-label="Baloo home">
           <Wordmark className="text-xl" />
-        </Link>
+        </LocalizedLink>
         <div className="absolute right-0">
           <AccountMenu />
         </div>
@@ -45,9 +45,9 @@ export function SiteHeader({
   return (
     <header className="sticky top-0 z-40 w-full border-b border-line/70 bg-canvas/75 backdrop-blur-md">
       <div className={`mx-auto flex h-14 items-center justify-between gap-3 px-5 ${inner}`}>
-        <Link href="/" aria-label="Baloo home">
+        <LocalizedLink href="/" aria-label="Baloo home">
           <Wordmark className="text-xl" />
-        </Link>
+        </LocalizedLink>
         <div className="flex items-center gap-3">
           {showNav && <HeaderNav className="hidden sm:flex" />}
           <HeaderSearch />

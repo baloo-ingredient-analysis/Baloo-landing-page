@@ -6,8 +6,8 @@
 // Client so search + selection have no round-trip; server-side search is a later upgrade.
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
+import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
 import { CreateListModal } from "./CreateListModal";
 
 export type PantryProduct = { id: string; slug: string; name: string; brand: string | null };
@@ -31,7 +31,7 @@ function CardBody({ p }: { p: PantryProduct }) {
 }
 
 export function PantryGrid({ products }: { products: PantryProduct[] }) {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [q, setQ] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [building, setBuilding] = useState<{ id: string; slug: string; title: string } | null>(null);
@@ -78,7 +78,7 @@ export function PantryGrid({ products }: { products: PantryProduct[] }) {
           }),
         ),
       );
-      router.push(`/list/${building.slug}`);
+      router.push(`/list/${building.slug}`); // locale-aware (useLocalizedRouter)
     } finally {
       setAdding(false);
     }
@@ -91,12 +91,12 @@ export function PantryGrid({ products }: { products: PantryProduct[] }) {
         <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted">
           Tap Save on any product you want to keep — they collect here.
         </p>
-        <Link
+        <LocalizedLink
           href="/discover"
           className="mt-4 inline-flex rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85"
         >
           Find products
-        </Link>
+        </LocalizedLink>
       </div>
     );
   }
@@ -180,9 +180,9 @@ export function PantryGrid({ products }: { products: PantryProduct[] }) {
                     <CardBody p={p} />
                   </button>
                 ) : (
-                  <Link href={`/p/${p.slug}`} className={`${cardBase} border-line hover:shadow-card-hover`}>
+                  <LocalizedLink href={`/p/${p.slug}`} className={`${cardBase} border-line hover:shadow-card-hover`}>
                     <CardBody p={p} />
-                  </Link>
+                  </LocalizedLink>
                 )}
               </li>
             );

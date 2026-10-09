@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { db } from "@/lib/db";
 import { siteUrl } from "@/lib/config";
 import { profilePath } from "@/lib/profilePath";
+import { i18nEnabled, localizePath } from "@/lib/i18n/config";
 import { getProductSitemapEntries } from "@/lib/db/queries/products";
 import { getPublicListSitemapEntries } from "@/lib/db/queries/lists";
 import { getPublicProfileSitemapEntries } from "@/lib/db/queries/profiles";
@@ -21,9 +22,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
   const now = new Date();
 
+  // hreflang in the sitemap (Languages track): when i18n is on, every entry declares its en + es
+  // variants via <xhtml:link rel="alternate">, so Google discovers both language URLs without a
+  // second set of <url> rows. GATED: flag off → no `alternates`, identical to today's sitemap.
+  const langs = (path: string): { alternates?: { languages: Record<string, string> } } =>
+    i18nEnabled()
+      ? { alternates: { languages: { en: `${base}${path}`, es: `${base}${localizePath(path, "es")}` } } }
+      : {};
+
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: `${base}/`, lastModified: now, changeFrequency: "daily", priority: 1 },
-    { url: `${base}/discover`, lastModified: now, changeFrequency: "daily", priority: 0.8 },
+    { url: `${base}/`, lastModified: now, changeFrequency: "daily", priority: 1, ...langs("/") },
+    { url: `${base}/discover`, lastModified: now, changeFrequency: "daily", priority: 0.8, ...langs("/discover") },
   ];
 
   const dbi = db();
@@ -42,18 +51,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(p.lastmod),
       changeFrequency: "weekly" as const,
       priority: 0.7,
+      ...langs(`/p/${p.slug}`),
     })),
     ...lists.map((l) => ({
       url: `${base}/list/${l.slug}`,
       lastModified: new Date(l.lastmod),
       changeFrequency: "weekly" as const,
       priority: 0.6,
+      ...langs(`/list/${l.slug}`),
     })),
     ...profiles.map((pr) => ({
       url: `${base}${profilePath(pr.handle)}`,
       lastModified: new Date(pr.lastmod),
       changeFrequency: "weekly" as const,
       priority: 0.5,
+      ...langs(profilePath(pr.handle)),
     })),
   ];
 }

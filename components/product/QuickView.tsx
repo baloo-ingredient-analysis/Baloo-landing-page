@@ -6,7 +6,7 @@
 // with an "Open full page" escape hatch. Full-width sheet on mobile, right-hand drawer on desktop.
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import type { CachedResult } from "@/lib/schema";
 import { ResultsView } from "@/components/ResultsView";
 import { Availability } from "./Availability";
@@ -76,12 +76,12 @@ export function QuickView({ slug, onClose }: { slug: string | null; onClose: () 
               <path d="M4 4l8 8M12 4l-8 8" />
             </svg>
           </button>
-          <Link
+          <LocalizedLink
             href={`/p/${slug}`}
             className="rounded-full border border-line bg-paper px-3.5 py-1.5 text-[13px] font-medium text-ink transition hover:border-ink/20"
           >
             Open full page
-          </Link>
+          </LocalizedLink>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-10 [&>section]:mt-4">
@@ -93,9 +93,9 @@ export function QuickView({ slug, onClose }: { slug: string | null; onClose: () 
           {state === "error" && (
             <p className="mt-10 text-center text-sm text-muted">
               We couldn&apos;t load this one.{" "}
-              <Link href={`/p/${slug}`} className="text-ink underline underline-offset-2">
+              <LocalizedLink href={`/p/${slug}`} className="text-ink underline underline-offset-2">
                 Open the full page
-              </Link>
+              </LocalizedLink>
               .
             </p>
           )}

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { analysisSchema, type Ingredient, type Nutrition } from "@/lib/schema";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { SearchBox } from "@/components/discover/SearchBox";
 import { LoadingState } from "@/components/LoadingState";
 import { ResultsView } from "@/components/ResultsView";
@@ -13,8 +13,7 @@ import { HowItWorks } from "@/components/HowItWorks";
 import { Board } from "@/components/Board";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { useT, useLocale } from "@/lib/i18n/context";
-import { localizePath } from "@/lib/i18n/config";
+import { useT } from "@/lib/i18n/context";
 
 type Phase = "idle" | "reading" | "analyzing" | "done" | "error";
 type Header = {
@@ -33,7 +32,6 @@ export default function Home() {
   const [cached, setCached] = useState<Ingredient[] | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const t = useT();
-  const locale = useLocale();
   const friendly = t.errors.friendly;
 
   // Return to the idle home (the search screen). Used by the "New search" button after a link paste.
@@ -148,17 +146,18 @@ export default function Home() {
               {/* The search engine IS the home screen. useSearchParams needs a Suspense boundary. */}
               <div className="mt-7 max-w-xl">
                 <Suspense fallback={null}>
-                  <SearchBox basePath={localizePath("/", locale)} />
+                  {/* Un-localized base — SearchBox adds the /es prefix itself (useLocalizedRouter). */}
+                  <SearchBox basePath="/" />
                 </Suspense>
               </div>
 
               <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-                <Link
-                  href={localizePath("/p/oatly-oat-drink-barista-edition", locale)}
+                <LocalizedLink
+                  href="/p/oatly-oat-drink-barista-edition"
                   className="font-medium text-natural hover:underline"
                 >
                   {t.home.sample}
-                </Link>
+                </LocalizedLink>
                 <span className="text-muted">{t.home.tagline}</span>
               </p>
             </>

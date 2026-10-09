@@ -8,7 +8,7 @@ import {
   getPublicListsByOwnerWithCounts,
   type ListWithCountsAndOwner,
 } from "@/lib/db/queries/lists";
-import Link from "next/link";
+import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { getSessionUser } from "@/lib/auth";
 import { getFollowCounts, isFollowing } from "@/lib/db/queries/follows";
 import { getSavedListsWithCounts } from "@/lib/db/queries/saves";
@@ -19,6 +19,7 @@ import { FollowButton } from "@/components/FollowButton";
 import { ShareButton } from "@/components/lists/ShareButton";
 import { ProfileLists } from "@/components/profile/ProfileLists";
 import { PantryGrid } from "@/components/profile/PantryGrid";
+import { localeAlternates } from "@/lib/i18n/metadata";
 
 // Public profile (Order G5; PP2 makes it Pinterest-style). Two tabs: PANTRY (your saved products —
 // owner-only, private) and LISTS (your created lists AND lists you've saved, unified). Visitors see
@@ -51,8 +52,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     title,
     description,
     // Canonical is the pretty vanity URL (/@handle), never the internal /u/[handle] the middleware
-    // rewrites to — so crawlers index the one public form.
-    alternates: { canonical: profilePath(data.profile.handle) },
+    // rewrites to — so crawlers index the one public form. localeAlternates adds the /es hreflang
+    // pair on top (gated on the flag), keeping the vanity path as the base.
+    alternates: await localeAlternates(profilePath(data.profile.handle)),
     openGraph: { title, description, images: [{ url: ogImage, width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description, images: [ogImage] },
   };
@@ -170,23 +172,23 @@ export default async function ProfilePage({ params, searchParams }: Params) {
         {/* Tabs (PP2): Pantry (owner-only, private) + Lists (unified). Link-tabs, SSR. */}
         <div role="tablist" aria-label="Profile views" className="mt-6 flex gap-6 border-b border-line">
           {isOwner && (
-            <Link
+            <LocalizedLink
               role="tab"
               aria-selected={activeTab === "pantry"}
               href={profilePath(profile.handle, "pantry")}
               className={tabCls(activeTab === "pantry")}
             >
               Pantry
-            </Link>
+            </LocalizedLink>
           )}
-          <Link
+          <LocalizedLink
             role="tab"
             aria-selected={activeTab === "lists"}
             href={profilePath(profile.handle, "lists")}
             className={tabCls(activeTab === "lists")}
           >
             Lists
-          </Link>
+          </LocalizedLink>
         </div>
 
         {activeTab === "pantry" ? (
