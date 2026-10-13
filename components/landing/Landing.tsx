@@ -7,32 +7,33 @@
 // natural-green, Playfair + Inter), light-only. No judgment colours; score-free guardrail intact.
 
 import Link from "next/link";
-import Image from "next/image";
-import { motion, useReducedMotion, useScroll, useTransform, type Variants } from "motion/react";
+import { motion, MotionConfig, useReducedMotion, useScroll, useTransform, type Variants } from "motion/react";
 import { Wordmark } from "@/components/Wordmark";
 
 const ANALYSE_HREF = "/";
 const EXAMPLE_HREF = "/p/oatly-oat-drink-barista-edition";
 const EASE = [0.16, 1, 0.3, 1] as const;
 
-// All motion components keep a CONSTANT `initial` (never branched on useReducedMotion), so the server
-// and first client render are identical — the Motion + SSR hydration bug comes from an `initial` or a
-// reducedMotion config that resolves differently on the client. Continuous motion (hero parallax)
-// reads useReducedMotion, but only to flatten its scroll range, which is 0 at first paint either way.
+// Rendered client-only (see LandingClient / page.tsx, next/dynamic ssr:false). Skipping SSR of this
+// motion tree removes the Motion + prefers-reduced-motion hydration mismatch entirely, which also
+// lets MotionConfig reducedMotion="user" do its job: full motion by default, static for anyone who
+// asks for reduced motion.
 export function Landing() {
   return (
-    <div className="min-h-[100dvh] overflow-x-hidden bg-canvas text-ink">
-      <LandingNav />
-      <main>
-        <Hero />
-        <PositioningBand />
-        <HowItWorks />
-        <NutritionShowcase />
-        <Community />
-        <FinalCta />
-      </main>
-      <LandingFooter />
-    </div>
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-[100dvh] overflow-x-hidden bg-canvas text-ink">
+        <LandingNav />
+        <main>
+          <Hero />
+          <PositioningBand />
+          <HowItWorks />
+          <NutritionShowcase />
+          <Community />
+          <FinalCta />
+        </main>
+        <LandingFooter />
+      </div>
+    </MotionConfig>
   );
 }
 
@@ -159,14 +160,18 @@ function Hero() {
             transition={{ duration: 1, ease: EASE }}
             className="relative aspect-[4/5] w-full overflow-hidden rounded-[22px] shadow-hero"
           >
-            <Image
-              src="/landing/hero-oat.png"
-              alt="A glass of oat drink beside raw oats on warm linen"
-              fill
-              priority
-              sizes="(max-width: 1024px) 100vw, 480px"
-              className="object-cover"
-            />
+            {/* Generated ambient living-photo loop (Higgsfield); the still is the poster + fallback. */}
+            <video
+              className="absolute inset-0 h-full w-full object-cover"
+              poster="/landing/hero-oat.png"
+              autoPlay
+              muted
+              loop
+              playsInline
+              aria-hidden
+            >
+              <source src="/landing/hero.mp4" type="video/mp4" />
+            </video>
           </motion.div>
 
           <motion.div
