@@ -7,33 +7,32 @@
 // natural-green, Playfair + Inter), light-only. No judgment colours; score-free guardrail intact.
 
 import Link from "next/link";
-import { motion, MotionConfig, useReducedMotion, useScroll, useTransform, type Variants } from "motion/react";
+import { motion, useReducedMotion, useScroll, useTransform, type Variants } from "motion/react";
 import { Wordmark } from "@/components/Wordmark";
 
 const ANALYSE_HREF = "/";
 const EXAMPLE_HREF = "/p/oatly-oat-drink-barista-edition";
 const EASE = [0.16, 1, 0.3, 1] as const;
 
-// Rendered client-only (see LandingClient / page.tsx, next/dynamic ssr:false). Skipping SSR of this
-// motion tree removes the Motion + prefers-reduced-motion hydration mismatch entirely, which also
-// lets MotionConfig reducedMotion="user" do its job: full motion by default, static for anyone who
-// asks for reduced motion.
+// SSR'd (page.tsx renders this directly) so the content is in the HTML immediately. Every motion
+// element keeps a CONSTANT `initial` and there is NO MotionConfig reducedMotion override, so Motion's
+// default (ignore the OS reduced-motion preference) renders the same `initial` on server and client —
+// no hydration mismatch. useReducedMotion is read only for the hero parallax range, whose value at
+// first paint is 0 either way.
 export function Landing() {
   return (
-    <MotionConfig reducedMotion="user">
-      <div className="min-h-[100dvh] overflow-x-hidden bg-canvas text-ink">
-        <LandingNav />
-        <main>
-          <Hero />
-          <PositioningBand />
-          <HowItWorks />
-          <NutritionShowcase />
-          <Community />
-          <FinalCta />
-        </main>
-        <LandingFooter />
-      </div>
-    </MotionConfig>
+    <div className="min-h-[100dvh] overflow-x-hidden bg-canvas text-ink">
+      <LandingNav />
+      <main>
+        <Hero />
+        <PositioningBand />
+        <HowItWorks />
+        <NutritionShowcase />
+        <Community />
+        <FinalCta />
+      </main>
+      <LandingFooter />
+    </div>
   );
 }
 
@@ -52,8 +51,8 @@ function Reveal({
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ y }}
+      whileInView={{ y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.7, delay, ease: EASE }}
     >
@@ -97,9 +96,11 @@ function LandingNav() {
 const heroStagger: Variants = {
   show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
 };
+// Transform-only (no opacity): content is visible at rest, so a slow or failed JS load never blanks
+// the page. Motion just slides it into place.
 const heroItem: Variants = {
-  hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+  hidden: { y: 18 },
+  show: { y: 0, transition: { duration: 0.7, ease: EASE } },
 };
 
 function Hero() {
@@ -155,8 +156,8 @@ function Hero() {
         <div className="relative">
           <motion.div
             style={{ y: yPhoto }}
-            initial={{ opacity: 0, scale: 1.04 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ scale: 1.04 }}
+            animate={{ scale: 1 }}
             transition={{ duration: 1, ease: EASE }}
             className="relative aspect-[4/5] w-full overflow-hidden rounded-[22px] shadow-hero"
           >
@@ -201,8 +202,8 @@ function Pill({ kind }: { kind: "natural" | "processed" }) {
 
 const rowStagger: Variants = { show: { transition: { staggerChildren: 0.12, delayChildren: 0.5 } } };
 const rowItem: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
+  hidden: { y: 8 },
+  show: { y: 0, transition: { duration: 0.5, ease: EASE } },
 };
 
 function IngredientCard() {

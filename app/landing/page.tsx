@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import LandingClient from "@/components/landing/LandingClient";
+import { Landing } from "@/components/landing/Landing";
 
 // Demo landing page (not linked from the app). The live product keeps "the homepage IS the tool";
 // this is a separate marketing page to explore a dedicated landing, per Jitain's ask. Noindex so it
-// never competes with the real homepage. The animated page is rendered client-only via LandingClient.
+// never competes with the real homepage. SSR'd so the content is in the HTML immediately (no blank
+// spinner); the motion enhances it on the client.
 export const metadata: Metadata = {
   title: "Baloo — Know what's in your food",
   description:
@@ -12,5 +13,5 @@ export const metadata: Metadata = {
 };
 
 export default function LandingPage() {
-  return <LandingClient />;
+  return <Landing />;
 }
