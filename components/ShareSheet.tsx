@@ -53,11 +53,13 @@ export function ShareSheet({
   url,
   title,
   cardPath,
+  igCardPath,
   onClose,
 }: {
   url: string; // absolute
   title: string;
-  cardPath?: string; // e.g. /api/og/list/[slug] — omitted when the surface has no card
+  cardPath?: string; // landscape OG card, e.g. /api/og/list/[slug] — the sheet preview
+  igCardPath?: string; // portrait 4:5 Instagram card — what the IG action + native share hand over
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -67,6 +69,8 @@ export function ShareSheet({
   const text = `${title} — on Baloo`;
   const targets = shareTargets({ url, text });
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  // Prefer the portrait 4:5 card for anything that becomes a social post; fall back to the OG card.
+  const shareCard = igCardPath ?? cardPath;
 
   async function copy() {
     try {
@@ -84,9 +88,9 @@ export function ShareSheet({
     if (busy) return;
     setBusy(true);
     try {
-      if (cardPath) {
+      if (shareCard) {
         try {
-          const res = await fetch(cardPath);
+          const res = await fetch(shareCard);
           const blob = await res.blob();
           const file = new File([blob], "baloo-card.png", { type: blob.type || "image/png" });
           if (navigator.canShare?.({ files: [file] })) {
@@ -109,12 +113,12 @@ export function ShareSheet({
   // can't prefill a post from the browser. So we do the best real thing: on mobile, the native share
   // sheet (with the card image) lists Instagram; on desktop, save the card and open Instagram to post.
   async function instagram() {
-    if (canNativeShare && cardPath) return nativeShare();
-    if (cardPath) {
+    if (canNativeShare && shareCard) return nativeShare();
+    if (shareCard) {
       try {
         const a = document.createElement("a");
-        a.href = cardPath;
-        a.download = "baloo-card.png";
+        a.href = shareCard;
+        a.download = "baloo-instagram.png";
         document.body.appendChild(a);
         a.click();
         a.remove();

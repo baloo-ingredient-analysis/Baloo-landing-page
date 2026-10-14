@@ -177,6 +177,7 @@ export default async function ListPage({ params }: Params) {
                 path={`/list/${list.slug}`}
                 title={list.title}
                 cardPath={`/api/og/list/${list.slug}`}
+                igCardPath={`/api/share/list/${list.slug}`}
               />
               {!isOwner && <ReportControl targetType="list" targetId={list.id} />}
             </div>
