@@ -38,6 +38,7 @@
     "@vercel/functions": "^3.7.5",
     "ai": "^4.3.0",
     "drizzle-orm": "^0.45.2",
+    "motion": "^14.1.0",
     "next": "^15.1.6",
     "postgres": "^3.4.9",
     "react": "^18.3.1",
