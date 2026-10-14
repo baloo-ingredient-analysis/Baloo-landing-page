@@ -6,24 +6,30 @@
 // localizePath returns the bare path. Use this instead of useRouter for app navigation that should
 // stay in the viewer's language.
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "./context";
 import { localizePath } from "./config";
 
 type NavOptions = Parameters<ReturnType<typeof useRouter>["push"]>[1];
 
+// Memoised so the returned object keeps a stable identity across renders (it only changes when the
+// router or locale does). Without this, callers that put the router in an effect's dependency array —
+// e.g. SearchBox's debounced fetch — would re-run every render and loop. useRouter itself is stable.
 export function useLocalizedRouter() {
   const router = useRouter();
   const locale = useLocale();
-  const loc = (url: string) =>
-    url.startsWith("/") && !url.startsWith("//") ? localizePath(url, locale) : url;
 
-  return {
-    push: (url: string, options?: NavOptions) => router.push(loc(url), options),
-    replace: (url: string, options?: NavOptions) => router.replace(loc(url), options),
-    prefetch: (url: string) => router.prefetch(loc(url)),
-    back: () => router.back(),
-    forward: () => router.forward(),
-    refresh: () => router.refresh(),
-  };
+  return useMemo(() => {
+    const loc = (url: string) =>
+      url.startsWith("/") && !url.startsWith("//") ? localizePath(url, locale) : url;
+    return {
+      push: (url: string, options?: NavOptions) => router.push(loc(url), options),
+      replace: (url: string, options?: NavOptions) => router.replace(loc(url), options),
+      prefetch: (url: string) => router.prefetch(loc(url)),
+      back: () => router.back(),
+      forward: () => router.forward(),
+      refresh: () => router.refresh(),
+    };
+  }, [router, locale]);
 }

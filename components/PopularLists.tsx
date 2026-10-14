@@ -7,9 +7,11 @@
 import { useEffect, useState } from "react";
 import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { ListCard } from "@/components/lists/ListCard";
+import { useT } from "@/lib/i18n/context";
 import type { ListWithCountsAndOwner } from "@/lib/db/queries/lists";
 
 export function PopularLists() {
+  const t = useT();
   const [lists, setLists] = useState<ListWithCountsAndOwner[] | null>(null);
 
   useEffect(() => {
@@ -31,9 +33,9 @@ export function PopularLists() {
   return (
     <section className="mt-16 animate-fade-in sm:mt-20">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="font-display text-[23px] text-ink">Popular lists this week</h2>
+        <h2 className="font-display text-[23px] text-ink">{t.popular.heading}</h2>
         <LocalizedLink href="/discover" className="shrink-0 text-sm font-medium text-natural hover:underline">
-          Browse all →
+          {t.popular.browseAll}
         </LocalizedLink>
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

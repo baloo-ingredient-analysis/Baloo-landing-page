@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LocalizedLink } from "@/components/i18n/LocalizedLink";
 import { useLocalizedRouter } from "@/lib/i18n/useLocalizedRouter";
+import { useT } from "@/lib/i18n/context";
 import { ProductRow, RowChevron } from "@/components/ProductRow";
 import { QuickView } from "@/components/product/QuickView";
 
@@ -26,6 +27,7 @@ type Filter = "all" | "products" | "lists";
 export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}) {
   const searchParams = useSearchParams();
   const router = useLocalizedRouter();
+  const t = useT();
   const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [hits, setHits] = useState<Hit | null>(null);
   const [searched, setSearched] = useState(false);
@@ -55,14 +57,10 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
         router.push(`/p/${data.slug}`);
         return; // keep the analysing screen up through navigation (don't flash the list back)
       }
-      setOffErr(
-        res.status === 404
-          ? "That product has no ingredient list on Open Food Facts."
-          : "We couldn't analyse that right now. Please try again in a moment.",
-      );
+      setOffErr(res.status === 404 ? t.search.offErr404 : t.search.offErrGeneric);
       setAnalyzing(null);
     } catch {
-      setOffErr("We couldn't analyse that right now. Please try again in a moment.");
+      setOffErr(t.search.offErrGeneric);
       setAnalyzing(null);
     }
   }
@@ -127,8 +125,8 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         disabled={analyzing !== null}
-        aria-label="Search products and lists"
-        placeholder="Search products and lists…"
+        aria-label={t.search.ariaLabel}
+        placeholder={t.search.placeholder}
         className="w-full rounded-full border border-line bg-paper px-5 py-3 text-ink shadow-card outline-none transition focus:border-natural focus:ring-2 focus:ring-natural/20 disabled:opacity-60"
       />
 
@@ -143,11 +141,9 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
           </span>
           <div>
             <p className="font-display text-[23px] leading-tight text-ink">
-              Analysing {analyzing.name}…
+              {t.search.analysing.replace("{name}", analyzing.name)}
             </p>
-            <p className="mt-1.5 text-sm text-muted">
-              This takes a few seconds — we&rsquo;re reading the label and explaining every ingredient.
-            </p>
+            <p className="mt-1.5 text-sm text-muted">{t.search.analysingSub}</p>
           </div>
         </div>
       )}
@@ -158,16 +154,17 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
             aria-hidden
             className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-natural"
           />
-          Searching…
+          {t.search.searching}
         </p>
       )}
 
       {!analyzing && searched && !loading && hits && (nProducts > 0 || nL > 0) && (
         <div className="mt-5 animate-fade-in">
           <p className="text-sm tabular-nums text-muted">
-            {nProducts + nL} {nProducts + nL === 1 ? "result" : "results"}
+            {nProducts + nL} {nProducts + nL === 1 ? t.search.resultOne : t.search.resultMany}
             {" · "}
-            {nL} {nL === 1 ? "list" : "lists"}, {nProducts} {nProducts === 1 ? "product" : "products"}
+            {nL} {nL === 1 ? t.search.listOne : t.search.listMany}, {nProducts}{" "}
+            {nProducts === 1 ? t.search.productOne : t.search.productMany}
           </p>
 
           {/* Segmented filter — active pill = ink fill (D-G5 §4). */}
@@ -184,7 +181,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
                     : "border border-line bg-paper text-ink/70 hover:bg-canvas"
                 }`}
               >
-                {f === "all" ? "All" : f === "products" ? "Products" : "Lists"}
+                {f === "all" ? t.search.filterAll : f === "products" ? t.search.filterProducts : t.search.filterLists}
               </button>
             ))}
           </div>
@@ -192,7 +189,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
           {showLists && (
             <>
               <h2 className="mt-6 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-                Lists
+                {t.search.sectionLists}
               </h2>
               <ul className="mt-2 max-w-[760px] overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
                 {hits.lists.map((l) => (
@@ -206,7 +203,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
                           {l.title}
                         </span>
                         <span className="text-xs tabular-nums text-muted">
-                          {l.itemCount} {l.itemCount === 1 ? "product" : "products"}
+                          {l.itemCount} {l.itemCount === 1 ? t.search.productOne : t.search.productMany}
                           {l.ownerHandle && ` · @${l.ownerHandle}`}
                         </span>
                       </span>
@@ -221,7 +218,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
           {showProducts && (
             <>
               <h2 className="mt-6 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-                Products
+                {t.search.sectionProducts}
               </h2>
               <ul className="mt-2 max-w-[760px] overflow-hidden rounded-2xl border border-line bg-paper shadow-card [&>li+li]:border-t [&>li+li]:border-line">
                 {visibleProducts.map((it) =>
@@ -246,7 +243,7 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
                   onClick={() => setExpanded(true)}
                   className="mt-3 text-sm font-medium text-natural hover:underline"
                 >
-                  Show {nProducts - INITIAL_PRODUCTS} more
+                  {t.search.showMore.replace("{n}", String(nProducts - INITIAL_PRODUCTS))}
                 </button>
               )}
               {offErr && (
@@ -261,11 +258,8 @@ export function SearchBox({ basePath = "/discover" }: { basePath?: string } = {}
 
       {!analyzing && empty && (
         <div className="mt-5 max-w-[640px] animate-fade-in rounded-2xl border border-line bg-paper p-5 shadow-card">
-          <p className="text-sm text-ink">No matches for &quot;{q.trim()}&quot;.</p>
-          <p className="mt-1 text-sm text-muted">
-            We couldn&rsquo;t find it in our catalog or on Open Food Facts — try a more specific name or
-            brand.
-          </p>
+          <p className="text-sm text-ink">{t.search.emptyTitle.replace("{q}", q.trim())}</p>
+          <p className="mt-1 text-sm text-muted">{t.search.emptyBody}</p>
         </div>
       )}
 

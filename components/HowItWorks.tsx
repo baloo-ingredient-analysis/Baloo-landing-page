@@ -1,31 +1,23 @@
+"use client";
+
 // A quiet three-step explainer for the idle state. Disappears once an analysis starts,
 // keeping the homepage tool-first. Consumer language — no mention of the tech underneath.
-const STEPS = [
-  {
-    title: "Paste a link",
-    body: "Copy a product page from a supported supermarket and drop it in above.",
-    icon: LinkIcon,
-  },
-  {
-    title: "We read the label",
-    body: "Baloo pulls the full ingredient list, kept in the exact order it's printed.",
-    icon: LabelIcon,
-  },
-  {
-    title: "See it explained",
-    body: "What each ingredient is, why it's in there, and whether it's natural or processed.",
-    icon: LeafIcon,
-  },
-];
+import { useT } from "@/lib/i18n/context";
 
 export function HowItWorks() {
+  const t = useT();
+  const steps = [
+    { title: t.howItWorks.step1Title, body: t.howItWorks.step1Body, icon: LinkIcon },
+    { title: t.howItWorks.step2Title, body: t.howItWorks.step2Body, icon: LabelIcon },
+    { title: t.howItWorks.step3Title, body: t.howItWorks.step3Body, icon: LeafIcon },
+  ];
   return (
     <section className="mt-16 animate-fade-in border-t border-line pt-10 sm:mt-20">
       {/* Quiet by design — no visible title, but a heading keeps the h1→h2→h3 order intact and
           gives screen-reader users a section landmark. */}
-      <h2 className="sr-only">How it works</h2>
+      <h2 className="sr-only">{t.howItWorks.heading}</h2>
       <ol className="grid gap-8 sm:grid-cols-3 sm:gap-6">
-        {STEPS.map((step, i) => (
+        {steps.map((step, i) => (
           <li key={step.title} className="text-center sm:text-left">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-natural-soft text-natural">
               <step.icon />
