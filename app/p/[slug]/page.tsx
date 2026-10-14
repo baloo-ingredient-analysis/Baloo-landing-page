@@ -89,7 +89,12 @@ export default async function ProductPage({ params }: Params) {
     <>
       <PantryButton productId={data.product.id} initialSaved={viewerSavedProduct} />
       <AddToList productId={data.product.id} />
-      <ShareButton path={`/p/${slug}`} title={data.product.name} cardPath={`/api/og/product/${slug}`} />
+      <ShareButton
+        path={`/p/${slug}`}
+        title={data.product.name}
+        cardPath={`/api/og/product/${slug}`}
+        igCardPath={`/api/share/product/${slug}`}
+      />
     </>
   );
 

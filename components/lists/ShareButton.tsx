@@ -12,10 +12,12 @@ export function ShareButton({
   path,
   title = "Baloo",
   cardPath,
+  igCardPath,
 }: {
   path: string;
   title?: string;
-  cardPath?: string; // omit on surfaces that have no share card yet (e.g. profiles)
+  cardPath?: string; // landscape OG card (link unfurls + sheet preview); omit on surfaces without one
+  igCardPath?: string; // portrait 4:5 Instagram card; the Instagram action + native share prefer it
 }) {
   const [open, setOpen] = useState(false);
   const url = typeof window !== "undefined" ? window.location.origin + path : path;
@@ -30,7 +32,13 @@ export function ShareButton({
         Share
       </button>
       {open && (
-        <ShareSheet url={url} title={title} cardPath={cardPath} onClose={() => setOpen(false)} />
+        <ShareSheet
+          url={url}
+          title={title}
+          cardPath={cardPath}
+          igCardPath={igCardPath}
+          onClose={() => setOpen(false)}
+        />
       )}
     </>
   );
