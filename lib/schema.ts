@@ -72,9 +72,31 @@ export const extractionSchema = z.object({
 export type Extraction = z.infer<typeof extractionSchema>;
 
 // --- Call 2: per-ingredient analysis (streamed) ---
+// TAGS — two INDEPENDENT axes (team decision, 16 Oct 2026), not one Natural/Processed boolean:
+//   origin    = where it comes from  (natural ↔ artificial are the real opposites)
+//   processed = what was done to it  (an ingredient can be natural AND processed — e.g. olive oil)
+// This mirrors the engine's `origin_class` + `processed_class`. The legacy single `tag` is DERIVED
+// (deriveTag) for the catalog/cache columns and for surfaces not yet upgraded to the two chips.
 export const ingredientSchema = z.object({
   name: z.string(),
-  tag: z.enum(["Natural", "Processed"]),
+  origin: z
+    .enum(["natural", "artificial", "unknown"])
+    .describe(
+      "Where the ingredient comes from. 'natural' = from a plant, animal, fungus, or mineral source, " +
+        "INCLUDING things pressed, extracted, refined, or purified from such a source (sugar, olive oil, " +
+        "citric acid). 'artificial' = synthetically manufactured and not found in nature in that form " +
+        "(sucralose, aspartame, artificial colours such as Red 40 / Allura Red). 'unknown' only when the " +
+        "source is genuinely unclear. This describes ORIGIN, independent of whether it was processed.",
+    ),
+  processed: z
+    .enum(["yes", "no", "unknown"])
+    .describe(
+      "Whether the ingredient has been materially transformed. 'yes' = pressed, extracted, refined, " +
+        "concentrated, isolated, hydrogenated, FERMENTED, or otherwise changed from its whole state " +
+        "(rolled oats, refined oil, yoghurt, maltodextrin). 'no' = essentially whole and unchanged " +
+        "(a whole oat grain, a whole date). Washing, cleaning, cutting, or sorting ALONE do NOT count. " +
+        "'unknown' only when genuinely unclear. Independent of origin — a natural ingredient can be processed.",
+    ),
   role: z
     .string()
     .describe(
@@ -88,7 +110,24 @@ export const ingredientSchema = z.object({
     .nullable()
     .describe("Whether that amount is meaningful or mainly cosmetic; null if no percentage"),
 });
-export type Ingredient = z.infer<typeof ingredientSchema>;
+// origin/processed are REQUIRED for generation but OPTIONAL on the type: stored/legacy ingredients
+// (pre-two-axis) carry only the derived `tag`, and the UI reads all three defensively.
+export type Ingredient = Omit<z.infer<typeof ingredientSchema>, "origin" | "processed"> & {
+  origin?: "natural" | "artificial" | "unknown";
+  processed?: "yes" | "no" | "unknown";
+  /** Legacy single display tag, derived from origin+processed. Still stored in the catalog/cache. */
+  tag?: "Natural" | "Processed";
+};
+
+// The single pill some surfaces still render, and the value persisted to the `tag` column. Prefer the
+// two axes when present (origin=artificial OR processed=yes → "Processed"); fall back to a stored
+// legacy tag; default "Natural". The ONLY place the two-axis → one-tag fold happens.
+export function deriveTag(i: Pick<Ingredient, "origin" | "processed" | "tag">): "Natural" | "Processed" {
+  if (i.origin || i.processed) {
+    return i.origin === "artificial" || i.processed === "yes" ? "Processed" : "Natural";
+  }
+  return i.tag ?? "Natural";
+}
 
 export const analysisSchema = z.object({
   ingredients: z.array(ingredientSchema),

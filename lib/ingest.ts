@@ -17,6 +17,7 @@ import { upsertOffer } from "./db/queries/offers";
 import { canonicalKey, ingredientKey, productSlug } from "./canonical";
 import { embedText, productEmbeddingText } from "./embeddings";
 import type { Ingredient, Nutrition } from "./schema";
+import { deriveTag } from "./schema";
 
 export type IngestInput = {
   product_name: string;
@@ -105,7 +106,8 @@ export async function ingestAnalysis(
           name: ing.name,
           percent: ing.percentage ?? null,
           role: ing.role ?? null,
-          tag: ing.tag ?? null,
+          // Derived single tag for now; the two axes get their own columns in the next step (commit 2).
+          tag: deriveTag(ing),
           whyItsHere: ing.why_its_here ?? null,
           percentageNote: ing.percentage_note ?? null,
         })),
@@ -152,7 +154,7 @@ async function cacheIngredients(dbi: Db, list: Ingredient[]): Promise<void> {
     const cn = ingredientKey(ing.name);
     if (!cn || seen.has(cn)) continue;
     seen.add(cn);
-    rows.push({ canonicalName: cn, tag: ing.tag ?? null, whatItIs: ing.what_it_is ?? null });
+    rows.push({ canonicalName: cn, tag: deriveTag(ing), whatItIs: ing.what_it_is ?? null });
   }
   // First write of an ingredient wins; later products contributing the same ingredient are a
   // no-op, so the shared explanation stays stable.

@@ -79,6 +79,13 @@ without `DATABASE_URL`. Connects as `postgres` (via the transaction pooler, `pre
 **Enums:** `ingredient_tag` (Natural | Processed) · `nutrition_per` (100g | serving | both) ·
 `analysis_status` (pending | analysing | done | failed).
 
+**Ingredient tags — two axes (team decision, 16 Oct 2026):** the model and UI now use two INDEPENDENT
+axes — `origin` (natural / artificial / unknown) and `processed` (yes / no / unknown) — not a single
+Natural/Processed badge, so an ingredient can be both (olive oil = Natural · Processed). The legacy
+single `tag` is DERIVED (`deriveTag` in `lib/schema.ts`) and still written to the `ingredient_tag`
+columns. Giving `origin`/`processed` their own persisted columns (so `/p/` pages + the v1 API serve them)
+is a follow-up migration; until then stored products show the derived single chip.
+
 ### Tables (15)
 
 **Catalog**

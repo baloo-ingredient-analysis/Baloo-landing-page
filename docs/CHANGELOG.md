@@ -7,6 +7,25 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### Two-axis ingredient tags (origin × processed) — `feat/two-axis-tags`
+Resolved the long-pending 2-vs-3 tag decision (team, 16 Oct 2026): the single Natural/Processed badge
+becomes **two independent axes** — `origin` (natural / artificial / unknown) and `processed`
+(yes / no / unknown) — so an ingredient can read **Natural · Processed** (e.g. olive oil), which is the
+whole literacy point (processed ≠ bad, natural ≠ unprocessed). Commit 1 (this change) lands it
+end-to-end for the live paste flow, no DB migration:
+- **Model + schema** (`lib/schema.ts`, `lib/prompts.ts`): the analysis model now classifies the two
+  axes using the locked definitions — washing/cleaning/sorting excluded, fermentation + extraction /
+  pressing / refining / etc. included, both labels explicitly **neutral** (never a judgment). The legacy
+  single `tag` is now **derived** (`deriveTag`) for the catalog/cache and any surface not yet upgraded.
+- **Chips** (`components/IngredientCard.tsx`): up to two quiet chips — **Natural** (green) / **Artificial**
+  (neutral ink, deliberately never red) + **Processed** (amber). Tapping **Processed** reveals a short
+  neutral note on what processing means — **no numbered scale** (that would be an implicit score).
+  Falls back to the single derived chip for stored/legacy results. Chips wrap to their own line on mobile.
+- **Engine connector** (`lib/recognition/*`): updated to Igor's new `origin_class` + `processed_class`
+  fields, with a fallback that derives the two axes from the legacy `processing_tag` for null/old records.
+- Still TODO (commit 2): persist the two axes as their own columns so `/p/` pages, lists and the v1 API
+  serve them (needs the Supabase advisor re-run).
+
 ### SEO foundation — product pages become the acquisition channel — `feat/seo-foundation`
 Product pages carried a title/description/OG image but none of the crawl signals search needs. Added
 the full baseline, all off **one** base URL (`siteUrl()` in `lib/config.ts`, resolving

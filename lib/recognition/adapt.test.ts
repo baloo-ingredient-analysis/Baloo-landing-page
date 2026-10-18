@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { adaptExplain, adaptNutrition, adaptPercent, adaptRole, adaptTag } from "./adapt";
+import { adaptAxes, adaptExplain, adaptNutrition, adaptPercent, adaptRole } from "./adapt";
 import type { ExplainResponse } from "./types";
 
 // A representative response (shaped like the real explain-ingredients output seen in stress testing).
@@ -39,7 +39,9 @@ describe("adaptExplain", () => {
   it("maps a stated ingredient's full field set, preferring localized_name", () => {
     expect(a.ingredients[0]).toEqual({
       name: "chickpeas", // localized_name wins over canonical "garbanzos"
-      tag: "Natural",
+      origin: "natural", // from legacy processing_tag "natural"
+      processed: "unknown", // legacy "natural" can't establish the processed axis
+      tag: "Natural", // derived
       role: "Base",
       what_it_is: "Chickpeas are a legume.",
       why_its_here: "The base of this hummus.",
@@ -71,11 +73,21 @@ describe("adaptExplain", () => {
   });
 });
 
-describe("adaptTag (pending 2-vs-3 decision)", () => {
-  it("natural stays Natural", () => expect(adaptTag("natural")).toBe("Natural"));
-  it("processed stays Processed", () => expect(adaptTag("processed")).toBe("Processed"));
-  it("artificial folds into Processed for now", () => expect(adaptTag("artificial")).toBe("Processed"));
-  it("unknown/empty defaults to Processed", () => expect(adaptTag(undefined)).toBe("Processed"));
+describe("adaptAxes (two independent axes, with legacy fallback)", () => {
+  const axes = (i: Partial<Parameters<typeof adaptAxes>[0]>) => adaptAxes({ canonical_name: "x", ...i });
+
+  it("passes the new two fields straight through (olive oil = natural + processed)", () =>
+    expect(axes({ origin_class: "natural", processed_class: "yes" })).toEqual({ origin: "natural", processed: "yes" }));
+  it("new fields override a stale legacy processing_tag", () =>
+    expect(axes({ origin_class: "artificial", processed_class: "yes", processing_tag: "natural" })).toEqual({ origin: "artificial", processed: "yes" }));
+  it("legacy natural → origin natural, processed unknown (the old field can't tell)", () =>
+    expect(axes({ processing_tag: "natural" })).toEqual({ origin: "natural", processed: "unknown" }));
+  it("legacy processed → origin unknown, processed yes", () =>
+    expect(axes({ processing_tag: "processed" })).toEqual({ origin: "unknown", processed: "yes" }));
+  it("legacy artificial → origin artificial, processed yes", () =>
+    expect(axes({ processing_tag: "artificial" })).toEqual({ origin: "artificial", processed: "yes" }));
+  it("nothing at all → unknown / unknown", () =>
+    expect(axes({})).toEqual({ origin: "unknown", processed: "unknown" }));
 });
 
 describe("adaptPercent", () => {
