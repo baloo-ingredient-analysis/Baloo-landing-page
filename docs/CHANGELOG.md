@@ -23,8 +23,12 @@ end-to-end for the live paste flow, no DB migration:
   Falls back to the single derived chip for stored/legacy results. Chips wrap to their own line on mobile.
 - **Engine connector** (`lib/recognition/*`): updated to Igor's new `origin_class` + `processed_class`
   fields, with a fallback that derives the two axes from the legacy `processing_tag` for null/old records.
-- Still TODO (commit 2): persist the two axes as their own columns so `/p/` pages, lists and the v1 API
-  serve them (needs the Supabase advisor re-run).
+- **Persistence** (`lib/db/schema.ts` + migration `0018`, `lib/ingest.ts`, `lib/db/queries/products.ts`,
+  `lib/analysis/stored.ts`, `docs/API_CONTRACT_V1.md`): `origin` + `processed` are now their own nullable
+  columns on `ingredient_profile_items` and `ingredients` (two new enums), written on ingest and read
+  back on `/p/` pages, lists and the v1 API. Old rows stay null (derived `tag` still shown) until
+  re-analysed — same "null until re-explained" behaviour as the engine. Run `db:migrate` + the Supabase
+  advisor when deploying the DDL.
 
 ### SEO foundation — product pages become the acquisition channel — `feat/seo-foundation`
 Product pages carried a title/description/OG image but none of the crawl signals search needs. Added

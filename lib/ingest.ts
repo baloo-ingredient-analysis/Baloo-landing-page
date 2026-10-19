@@ -106,8 +106,9 @@ export async function ingestAnalysis(
           name: ing.name,
           percent: ing.percentage ?? null,
           role: ing.role ?? null,
-          // Derived single tag for now; the two axes get their own columns in the next step (commit 2).
-          tag: deriveTag(ing),
+          tag: deriveTag(ing), // legacy single tag, derived
+          origin: ing.origin ?? null,
+          processed: ing.processed ?? null,
           whyItsHere: ing.why_its_here ?? null,
           percentageNote: ing.percentage_note ?? null,
         })),
@@ -149,12 +150,24 @@ export async function ingestAnalysis(
 
 async function cacheIngredients(dbi: Db, list: Ingredient[]): Promise<void> {
   const seen = new Set<string>();
-  const rows: { canonicalName: string; tag: Ingredient["tag"] | null; whatItIs: string | null }[] = [];
+  const rows: {
+    canonicalName: string;
+    tag: Ingredient["tag"] | null;
+    origin: Ingredient["origin"] | null;
+    processed: Ingredient["processed"] | null;
+    whatItIs: string | null;
+  }[] = [];
   for (const ing of list) {
     const cn = ingredientKey(ing.name);
     if (!cn || seen.has(cn)) continue;
     seen.add(cn);
-    rows.push({ canonicalName: cn, tag: deriveTag(ing), whatItIs: ing.what_it_is ?? null });
+    rows.push({
+      canonicalName: cn,
+      tag: deriveTag(ing),
+      origin: ing.origin ?? null,
+      processed: ing.processed ?? null,
+      whatItIs: ing.what_it_is ?? null,
+    });
   }
   // First write of an ingredient wins; later products contributing the same ingredient are a
   // no-op, so the shared explanation stays stable.

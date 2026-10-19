@@ -88,7 +88,9 @@ and persisted so the next call for that product is a `hit`.
   "ingredients": [
     {
       "name": "Rapeseed oil",
-      "tag": "Processed",                      // "Natural" | "Processed" — the ONLY meaningful colour
+      "origin": "natural",                     // "natural" | "artificial" | "unknown" — where it comes from
+      "processed": "yes",                      // "yes" | "no" | "unknown" — whether it was transformed
+      "tag": "Processed",                      // "Natural" | "Processed" — legacy single tag, DERIVED from the two axes
       "role": "Fat / emulsion",                // 2–4 word neutral microlabel, never a judgment
       "what_it_is": "Plain-language description of the ingredient itself.",
       "why_its_here": "Why it is in THIS product, tied to the label.",
@@ -96,6 +98,8 @@ and persisted so the next call for that product is a `hit`.
       "percentage_note": "Whether that amount is meaningful or cosmetic."  // or null
     }
   ],
+  // `origin`/`processed` are null on products analysed before the two-axis model (16 Oct 2026);
+  // `tag` is always present (derived). Consumers should prefer the two axes and fall back to `tag`.
   "nutrition": {
     "serving_size": "200 ml",                  // or null
     "per": "100g",                             // "100g" | "serving" | "both"
@@ -160,7 +164,9 @@ So Igor can map responses straight into his tables:
 | `ingredients[].what_it_is` | `ingredients.general_explanation` (product-independent cache) |
 | `ingredients[].why_its_here` | `ingredient_profile_items.product_context` |
 | `ingredients[].role` | *(new microlabel — his `significance_note` is the closest slot)* |
-| `ingredients[].tag` (Natural/Processed) | `ingredients.processing_tag` |
+| `ingredients[].origin` (natural/artificial/unknown) | `ingredients.origin_class` |
+| `ingredients[].processed` (yes/no/unknown) | `ingredients.processed_class` |
+| `ingredients[].tag` (Natural/Processed, derived) | *(legacy; was `ingredients.processing_tag`)* |
 | `ingredients[].percentage` | `ingredient_profile_items.percent` |
 | `product_summary` | *(per-variant; no exact slot yet)* |
 | `nutrition.*` | `nutritional_profiles.*` |
