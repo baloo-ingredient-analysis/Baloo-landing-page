@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { Ingredient } from "@/lib/schema";
-import { deriveTag } from "@/lib/schema";
 
 // Order F2: the progressive ingredient row. Collapsed by default — rank, name (+% chip),
 // a caps role microlabel, the origin/processed chips, a chevron — and unfolds to the full
@@ -15,7 +14,9 @@ import { deriveTag } from "@/lib/schema";
 // exactly the literacy point (processed ≠ bad; natural ≠ unprocessed). Natural stays the one green,
 // Processed the one amber; Artificial is a NEUTRAL ink chip, deliberately never red/alarm. Tapping
 // Processed reveals a short neutral note — no numbered scale (that would be an implicit score).
-// Stored/legacy ingredients that lack the two axes fall back to the single derived `tag` chip.
+// The engine's two axes are the only source — no legacy processing_tag fallback (team, 20 Oct 2026):
+// the catalog is backfilled and fresh analyses always carry both, so an ingredient with neither chip
+// is genuinely unknown on both axes (shows nothing), never an old single tag.
 export function IngredientRow({
   ingredient,
   index,
@@ -28,13 +29,10 @@ export function IngredientRow({
   const bodyId = `ingredient-body-${index}`;
   const procId = `ingredient-processing-${index}`;
 
-  const hasAxes = !!(ingredient.origin || ingredient.processed);
   const showNatural = ingredient.origin === "natural";
   const showArtificial = ingredient.origin === "artificial";
   const showProcessed = ingredient.processed === "yes";
-  // Legacy fallback: no axes but a stored tag → the old single chip (Natural green / Processed amber).
-  const legacyTag = !hasAxes && ingredient.tag ? deriveTag(ingredient) : null;
-  const hasChips = showNatural || showArtificial || showProcessed || !!legacyTag;
+  const hasChips = showNatural || showArtificial || showProcessed;
 
   const toggle = () => setOpen((o) => !o);
 
@@ -98,23 +96,6 @@ export function IngredientRow({
                 <span className="h-1.5 w-1.5 rounded-full bg-processed" aria-hidden />
                 Processed
               </button>
-            )}
-            {legacyTag && (
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                  legacyTag === "Processed"
-                    ? "bg-processed-soft text-processed"
-                    : "bg-natural-soft text-natural"
-                }`}
-              >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    legacyTag === "Processed" ? "bg-processed" : "bg-natural"
-                  }`}
-                  aria-hidden
-                />
-                {legacyTag}
-              </span>
             )}
           </span>
         )}

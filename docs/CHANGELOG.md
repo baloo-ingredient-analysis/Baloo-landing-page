@@ -27,8 +27,15 @@ end-to-end for the live paste flow, no DB migration:
   `lib/analysis/stored.ts`, `docs/API_CONTRACT_V1.md`): `origin` + `processed` are now their own nullable
   columns on `ingredient_profile_items` and `ingredients` (two new enums), written on ingest and read
   back on `/p/` pages, lists and the v1 API. Old rows stay null (derived `tag` still shown) until
-  re-analysed — same "null until re-explained" behaviour as the engine. Run `db:migrate` + the Supabase
-  advisor when deploying the DDL.
+  re-analysed — same "null until re-explained" behaviour as the engine.
+- **Applied + backfilled, no legacy fallback** (team, 20 Oct 2026): migration `0018` is **applied to
+  Supabase** (rewritten idempotent — safe for `db:migrate` to re-run; advisor clean). All 361 existing
+  ingredient rows were backfilled with `origin`/`processed` (classified by the locked definitions: 11
+  artificial, 84 unprocessed, 24 unknown-origin, 240 natural+processed). With the catalog consistent, the
+  website's legacy `processing_tag` → single-tag fallback is **removed** — the two axes are the only
+  source on the web (`deriveTag` is pure-from-axes; the pill shows no chip for genuinely-unknown axes;
+  the product `llms.txt` exposes both axes). The `tag` column is still written (derived) pending its
+  eventual retirement.
 
 ### SEO foundation — product pages become the acquisition channel — `feat/seo-foundation`
 Product pages carried a title/description/OG image but none of the crawl signals search needs. Added

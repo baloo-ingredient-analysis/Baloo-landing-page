@@ -38,7 +38,10 @@ export async function GET(_req: Request, { params }: Params) {
   if (ingredients.length) {
     lines.push("", `## Ingredients (${ingredients.length}, in label order)`, "");
     ingredients.forEach((ing, i) => {
-      const bits = [ing.tag, ing.role].filter(Boolean).join(" · ");
+      // Expose the two axes (origin + processed), not the legacy single tag.
+      const origin = ing.origin === "natural" ? "Natural" : ing.origin === "artificial" ? "Artificial" : null;
+      const processed = ing.processed === "yes" ? "Processed" : null;
+      const bits = [origin, processed, ing.role].filter(Boolean).join(" · ");
       const pct = ing.percentage ? ` — ${ing.percentage}` : "";
       lines.push(`${i + 1}. ${ing.name}${pct}${bits ? ` (${bits})` : ""}`);
       if (ing.what_it_is) lines.push(`   What it is: ${ing.what_it_is}`);

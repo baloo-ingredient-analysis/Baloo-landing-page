@@ -119,14 +119,11 @@ export type Ingredient = Omit<z.infer<typeof ingredientSchema>, "origin" | "proc
   tag?: "Natural" | "Processed";
 };
 
-// The single pill some surfaces still render, and the value persisted to the `tag` column. Prefer the
-// two axes when present (origin=artificial OR processed=yes → "Processed"); fall back to a stored
-// legacy tag; default "Natural". The ONLY place the two-axis → one-tag fold happens.
-export function deriveTag(i: Pick<Ingredient, "origin" | "processed" | "tag">): "Natural" | "Processed" {
-  if (i.origin || i.processed) {
-    return i.origin === "artificial" || i.processed === "yes" ? "Processed" : "Natural";
-  }
-  return i.tag ?? "Natural";
+// The derived single value still written to the legacy `tag` column (kept until that column is retired).
+// Derived PURELY from the two axes — no legacy `tag` fallback (team, 20 Oct 2026): origin=artificial OR
+// processed=yes → "Processed", else "Natural". The ONLY place the two-axis → one-tag fold happens.
+export function deriveTag(i: Pick<Ingredient, "origin" | "processed">): "Natural" | "Processed" {
+  return i.origin === "artificial" || i.processed === "yes" ? "Processed" : "Natural";
 }
 
 export const analysisSchema = z.object({
