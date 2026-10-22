@@ -18,6 +18,13 @@ export function recognitionEnabled(): boolean {
   return !!(anon() && key());
 }
 
+// Engine-FIRST rollout switch (engine swap, Slice A). Inert unless BOTH the recognition keys are set
+// AND ENGINE_FIRST=1 — so the live flow keeps using the web's own pipeline until we explicitly flip it,
+// and it can be turned off instantly with an env change (no code deploy) if quality or latency regress.
+export function engineFirstEnabled(): boolean {
+  return recognitionEnabled() && process.env.ENGINE_FIRST === "1";
+}
+
 async function post<T>(path: string, body: unknown): Promise<T | null> {
   if (!recognitionEnabled()) return null;
   try {
