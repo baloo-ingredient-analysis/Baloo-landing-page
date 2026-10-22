@@ -8,7 +8,12 @@
 import type { ExplainResponse, FindResponse } from "./types";
 
 const DEFAULT_BASE = "https://rahjnurtpwygtaayzfgi.supabase.co/functions/v1";
-const TIMEOUT_MS = 12_000; // explain-ingredients may call Claude on a cache miss, so give it room.
+// explain-ingredients calls Claude on a cache miss and measured ~12–16s against the live engine, so a
+// 12s bound aborted roughly half the calls and fell back — redoing the same Claude work on our side and
+// losing the engine's canonical data. 25s lets the engine be the source; the OFF-import path it runs on
+// has maxDuration 60, and a true outage still falls back. (Give the streaming paste path a tighter bound
+// in Slice B.)
+const TIMEOUT_MS = 25_000;
 
 const base = () => (process.env.BALOO_RECOGNITION_URL ?? DEFAULT_BASE).replace(/\/+$/, "");
 const anon = () => process.env.BALOO_RECOGNITION_ANON_KEY ?? "";
@@ -16,6 +21,13 @@ const key = () => process.env.BALOO_RECOGNITION_KEY ?? "";
 
 export function recognitionEnabled(): boolean {
   return !!(anon() && key());
+}
+
+// Engine-FIRST rollout switch (engine swap, Slice A). Inert unless BOTH the recognition keys are set
+// AND ENGINE_FIRST=1 — so the live flow keeps using the web's own pipeline until we explicitly flip it,
+// and it can be turned off instantly with an env change (no code deploy) if quality or latency regress.
+export function engineFirstEnabled(): boolean {
+  return recognitionEnabled() && process.env.ENGINE_FIRST === "1";
 }
 
 async function post<T>(path: string, body: unknown): Promise<T | null> {

@@ -12,6 +12,7 @@ import { ingestAnalysis } from "./ingest";
 import { canonicalKey } from "./canonical";
 import { db, type Db } from "./db";
 import { getProductBySlugOrKey } from "./db/queries/products";
+import { analyseViaEngine, engineFirstEnabled } from "./recognition";
 
 // OFF is the data SOURCE, not a shop — we don't record it as a retailer offer (that would read as
 // "buy at Open Food Facts"). Stores/"available at" are derived elsewhere (own-brand -> its store).
@@ -29,6 +30,39 @@ export async function importOffMapped(dbi: Db, off: OffProduct): Promise<ImportR
   const existing = await getProductBySlugOrKey(dbi, key);
   if (existing && existing.analysisStatus === "done") {
     return { ok: true, slug: existing.slug, productId: existing.id, reused: true };
+  }
+
+  // Engine-first (engine swap, Slice A): when it can resolve this barcode, Igor's shared engine is the
+  // source of the intelligence (ingredients, the two axes, explanations). OFF stays for identity, sales
+  // markets (countries) and the fallback. ANY miss falls through to the web's own Claude analysis below,
+  // so the path never dead-ends. Inert unless ENGINE_FIRST=1.
+  if (engineFirstEnabled() && off.barcode) {
+    try {
+      const eng = await analyseViaEngine({
+        barcode: off.barcode,
+        brand: off.brand ?? undefined,
+        productName: off.name,
+        locale: "en",
+      });
+      if (eng.ok && eng.analysis.ingredients.length) {
+        const persisted = await ingestAnalysis({
+          product_name: eng.analysis.source.displayName || off.name,
+          brand: off.brand,
+          barcode: off.barcode,
+          retailer: null,
+          ingredients: eng.analysis.ingredients,
+          product_summary: eng.analysis.product_summary || null,
+          nutrition: eng.analysis.nutrition ?? off.nutrition ?? undefined,
+          countries: off.countries,
+        });
+        if (persisted) {
+          return { ok: true, slug: persisted.slug, productId: persisted.productId, reused: false };
+        }
+      }
+    } catch (err) {
+      console.error("engine-first import failed (falling back to OFF + Claude):", err);
+    }
+    // fall through to the OFF + Claude path
   }
 
   if (!process.env.ANTHROPIC_API_KEY) return { ok: false, reason: "no_key" };

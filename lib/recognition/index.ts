@@ -9,7 +9,7 @@ import { explainProduct, findProduct, recognitionEnabled } from "./client";
 import type { ExplainResponse } from "./types";
 
 export type { EngineAnalysis } from "./adapt";
-export { recognitionEnabled } from "./client";
+export { recognitionEnabled, engineFirstEnabled } from "./client";
 export { adaptExplain } from "./adapt";
 
 export type EngineResult =
