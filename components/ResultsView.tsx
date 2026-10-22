@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Ingredient, Nutrition } from "@/lib/schema";
+import { deriveTag } from "@/lib/schema";
 import { IngredientRow } from "./IngredientCard";
 import { NutritionPanel } from "./NutritionPanel";
 
@@ -153,8 +154,10 @@ function CountLede({
   summary?: string;
   loading: boolean;
 }) {
-  const natural = ingredients.filter((i) => i.tag === "Natural").length;
-  const processed = ingredients.filter((i) => i.tag === "Processed").length;
+  // Counts use the derived single tag so the strip's "X natural, Y processed" stays a clean split
+  // (the two axes overlap — olive oil is both — so they can't both drive a mutually-exclusive count).
+  const natural = ingredients.filter((i) => deriveTag(i) === "Natural").length;
+  const processed = ingredients.filter((i) => deriveTag(i) === "Processed").length;
   const shown = ingredients.length > 0 ? ingredients.length : count;
 
   return (

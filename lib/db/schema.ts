@@ -32,6 +32,10 @@ import type { Nutrient } from "../schema";
 
 // ── Stable enums ──────────────────────────────────────────────────────────────────────────────
 export const tagEnum = pgEnum("ingredient_tag", ["Natural", "Processed"]);
+// Two INDEPENDENT axes (team decision, 16 Oct 2026) that supersede the single `tag` for display:
+// origin (natural ↔ artificial) and processed (yes/no). `tag` stays as the derived legacy value.
+export const originEnum = pgEnum("ingredient_origin", ["natural", "artificial", "unknown"]);
+export const processedEnum = pgEnum("ingredient_processed", ["yes", "no", "unknown"]);
 export const perEnum = pgEnum("nutrition_per", ["100g", "serving", "both"]);
 // Analysis lifecycle (Order P1): 'done' the moment a product's canonical analysis exists; 'pending'
 // / 'analysing' while a background job (P2) is resolving a product added to a list; 'failed' retries.
@@ -176,7 +180,9 @@ export const ingredientProfileItems = pgTable(
     name: text("name").notNull(),
     percent: text("percent"), // as printed ("10%")
     role: text("role"), // Order F1 functional label; null for pre-F1/seeded data
-    tag: tagEnum("tag"),
+    tag: tagEnum("tag"), // legacy single tag, derived from origin+processed
+    origin: originEnum("origin"), // null until re-analysed under the two-axis model
+    processed: processedEnum("processed"),
     whyItsHere: text("why_its_here"), // product-SPECIFIC (general what_it_is lives on ingredients)
     percentageNote: text("percentage_note"),
   },
@@ -192,7 +198,9 @@ export const ingredients = pgTable("ingredients", {
   id: uuid("id").primaryKey().defaultRandom(),
   canonicalName: text("canonical_name").notNull().unique(),
   aliases: text("aliases").array().notNull().default([]),
-  tag: tagEnum("tag"),
+  tag: tagEnum("tag"), // legacy single tag, derived from origin+processed
+  origin: originEnum("origin"), // product-independent, like what_it_is; null until re-analysed
+  processed: processedEnum("processed"),
   whatItIs: text("what_it_is"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

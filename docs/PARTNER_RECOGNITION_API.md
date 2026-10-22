@@ -216,6 +216,13 @@ Missing input → `400` `{ "error": "barcode, selected_variant_id, or brand + pr
 
 `processing_tag` is `natural`, `processed`, or `artificial`.
 
+> **Two-axis update (Igor, 16 Oct 2026).** The engine now also returns two INDEPENDENT fields per
+> ingredient — `origin_class` (`natural` | `artificial` | `unknown`) and `processed_class`
+> (`yes` | `no` | `unknown`) — replacing the single exclusive `processing_tag` (artificial is no longer
+> folded into processed). They are `null` on records not yet re-explained since the change. The web
+> consumes `origin_class`/`processed_class` (`lib/recognition/adapt.ts`) and falls back to
+> `processing_tag` when they are absent. `processing_tag` is kept for backward compatibility.
+
 Unknown `variant_id` → `404`.
 
 ### B. Names only (no catalog row)

@@ -13,6 +13,8 @@ export function storedIngredients(data: ProductPageData): Ingredient[] {
   return data.items.map((i) => ({
     name: i.name,
     tag: i.tag ?? undefined,
+    origin: i.origin ?? undefined,
+    processed: i.processed ?? undefined,
     role: i.role ?? undefined,
     what_it_is: i.whatItIs ?? "",
     why_its_here: i.whyItsHere ?? "",

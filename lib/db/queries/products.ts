@@ -146,6 +146,8 @@ export async function getNutritionForProduct(dbi: Db, productId: string) {
 export type ProductPageItem = {
   name: string;
   tag: "Natural" | "Processed" | null;
+  origin: "natural" | "artificial" | "unknown" | null;
+  processed: "yes" | "no" | "unknown" | null;
   role: string | null;
   percent: string | null;
   whyItsHere: string | null;
@@ -198,6 +200,8 @@ export async function getProductForPage(dbi: Db, slug: string): Promise<ProductP
   const items: ProductPageItem[] = itemRows.map((r) => ({
     name: r.name,
     tag: r.tag,
+    origin: r.origin,
+    processed: r.processed,
     role: r.role,
     percent: r.percent,
     whyItsHere: r.whyItsHere,

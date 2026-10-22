@@ -3,6 +3,7 @@
 // is the single place the two models meet, so every field decision lives here with a comment.
 
 import type { Ingredient, Nutrition, Nutrient } from "../schema";
+import { deriveTag } from "../schema";
 import type { EngineIngredient, EngineNutrition, ExplainResponse } from "./types";
 
 export type EngineAnalysis = {
@@ -12,12 +13,32 @@ export type EngineAnalysis = {
   source: { variantId: string; displayName?: string; category?: string };
 };
 
-// TAG — pending decision (2-vs-3, raised to Jitain/Kat). The engine classifies into three
-// (natural/processed/artificial); our shipped pill is two. Today we fold `artificial` into Processed to
-// match the current design. If we adopt the three tags, widen Ingredient.tag in lib/schema and change
-// THIS function — it's the only place the fold happens.
-export function adaptTag(tag?: string): Ingredient["tag"] {
-  return tag === "natural" ? "Natural" : "Processed";
+// TAGS (team decision, 16 Oct 2026) — two INDEPENDENT axes. The engine now sends `origin_class`
+// (natural/artificial/unknown) + `processed_class` (yes/no/unknown). We map them straight through.
+// FALLBACK: records explained before the engine change send only the legacy single `processing_tag`
+// (and new fields may arrive null) — derive the two axes from it so nothing reads blank:
+//   natural → origin natural (processing unknown; the old field can't tell us) ·
+//   processed → processed yes · artificial → origin artificial + processed yes.
+const VALID_ORIGIN = new Set(["natural", "artificial", "unknown"]);
+const VALID_PROCESSED = new Set(["yes", "no", "unknown"]);
+
+export function adaptAxes(i: EngineIngredient): { origin: Ingredient["origin"]; processed: Ingredient["processed"] } {
+  const pt = i.processing_tag;
+  const origin =
+    typeof i.origin_class === "string" && VALID_ORIGIN.has(i.origin_class)
+      ? (i.origin_class as Ingredient["origin"])
+      : pt === "artificial"
+        ? "artificial"
+        : pt === "natural"
+          ? "natural"
+          : "unknown";
+  const processed =
+    typeof i.processed_class === "string" && VALID_PROCESSED.has(i.processed_class)
+      ? (i.processed_class as Ingredient["processed"])
+      : pt === "processed" || pt === "artificial"
+        ? "yes"
+        : "unknown"; // legacy "natural" can't tell us; leave it unknown rather than guess "no"
+  return { origin, processed };
 }
 
 // PERCENT — the engine sends a number + percent_type. A stated amount prints as "59%", an estimate as
@@ -43,9 +64,12 @@ function adaptIngredient(i: EngineIngredient): Ingredient {
   // NAME — prefer the locale display name (`localized_name`); it's null when the catalog identity is
   // already in the requested language (e.g. a Spanish product under locale:es), so fall back to it.
   // The deeper "stable canonical name across languages" is a separate engine roadmap item.
+  const { origin, processed } = adaptAxes(i);
   return {
     name: i.localized_name || i.canonical_name,
-    tag: adaptTag(i.processing_tag),
+    origin,
+    processed,
+    tag: deriveTag({ origin, processed }), // legacy single tag, for surfaces not yet on two chips
     role: adaptRole(i.role_tags),
     what_it_is: i.general_explanation ?? "",
     why_its_here: i.product_context ?? "",

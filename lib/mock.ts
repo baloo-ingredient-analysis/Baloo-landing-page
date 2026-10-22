@@ -26,12 +26,12 @@ export const MOCK_EXTRACT = {
 };
 
 const MOCK_INGREDIENTS: Ingredient[] = [
-  { name: "Water", tag: "Natural", role: "Base", what_it_is: "The liquid base of the drink.", why_its_here: "It's the carrier the oats are blended into, which is why it's listed first.", percentage: null, percentage_note: null },
-  { name: "Oats", tag: "Natural", role: "Base", what_it_is: "A whole grain, here finely milled and enzyme-treated to release natural sweetness.", why_its_here: "The defining ingredient — it gives the drink its body and flavour.", percentage: "10%", percentage_note: "A meaningful amount for an oat drink; it's the second-largest ingredient by weight." },
-  { name: "Rapeseed Oil", tag: "Processed", role: "Oil / fat", what_it_is: "A refined plant oil.", why_its_here: "A small amount adds a creamier mouthfeel and carries fat-soluble vitamins.", percentage: null, percentage_note: null },
-  { name: "Calcium Carbonate", tag: "Processed", role: "Fortification", what_it_is: "A mineral source of calcium.", why_its_here: "Added to fortify the drink so it's closer to dairy milk's calcium level.", percentage: null, percentage_note: null },
-  { name: "Salt", tag: "Natural", role: "Flavour", what_it_is: "Sodium chloride.", why_its_here: "A pinch rounds out and balances the flavour.", percentage: null, percentage_note: null },
-  { name: "Vitamins (D2, Riboflavin, B12)", tag: "Processed", role: "Fortification", what_it_is: "Added micronutrients.", why_its_here: "Fortification, again to match the nutritional profile people expect from milk.", percentage: null, percentage_note: null },
+  { name: "Water", origin: "natural", processed: "no", role: "Base", what_it_is: "The liquid base of the drink.", why_its_here: "It's the carrier the oats are blended into, which is why it's listed first.", percentage: null, percentage_note: null },
+  { name: "Oats", origin: "natural", processed: "yes", role: "Base", what_it_is: "A whole grain, here finely milled and enzyme-treated to release natural sweetness.", why_its_here: "The defining ingredient — it gives the drink its body and flavour.", percentage: "10%", percentage_note: "A meaningful amount for an oat drink; it's the second-largest ingredient by weight." },
+  { name: "Rapeseed Oil", origin: "natural", processed: "yes", role: "Oil / fat", what_it_is: "A refined plant oil.", why_its_here: "A small amount adds a creamier mouthfeel and carries fat-soluble vitamins.", percentage: null, percentage_note: null },
+  { name: "Calcium Carbonate", origin: "natural", processed: "yes", role: "Fortification", what_it_is: "A mineral source of calcium.", why_its_here: "Added to fortify the drink so it's closer to dairy milk's calcium level.", percentage: null, percentage_note: null },
+  { name: "Salt", origin: "natural", processed: "no", role: "Flavour", what_it_is: "Sodium chloride.", why_its_here: "A pinch rounds out and balances the flavour.", percentage: null, percentage_note: null },
+  { name: "Vitamins (D2, Riboflavin, B12)", origin: "artificial", processed: "yes", role: "Fortification", what_it_is: "Added micronutrients, usually produced by synthesis or fermentation rather than extracted from food.", why_its_here: "Fortification, again to match the nutritional profile people expect from milk.", percentage: null, percentage_note: null },
 ];
 
 const MOCK_SUMMARY =

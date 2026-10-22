@@ -64,7 +64,18 @@ For each ingredient, in the same order, return:
 - name: the ingredient's common English name. The source list may be in another language (e.g.
   Dutch, French, Spanish) — translate each name to plain English (e.g. "Suiker" → "Sugar",
   "Huile de tournesol" → "Sunflower oil"). Keep the label ORDER exactly; never reorder or drop any.
-- tag: "Natural" or "Processed"
+- origin: "natural", "artificial", or "unknown". "natural" = from a plant, animal, fungus, or
+  mineral source, INCLUDING things pressed, extracted, refined, or purified from such a source
+  (sugar, olive oil, citric acid). "artificial" = synthetically manufactured and not found in
+  nature in that form (sucralose, aspartame, artificial colours like Red 40 / Allura Red).
+  "unknown" only if the source is genuinely unclear. This describes ORIGIN, nothing about processing.
+- processed: "yes", "no", or "unknown". "yes" = pressed, extracted, refined, concentrated, isolated,
+  hydrogenated, fermented, or otherwise changed from its whole state (rolled oats, refined oil,
+  yoghurt, maltodextrin). "no" = essentially whole and unchanged (a whole oat grain, a whole date).
+  Washing, cleaning, cutting, or sorting ALONE do NOT count as processed. "unknown" only if genuinely
+  unclear. Independent of origin — a natural ingredient can still be processed (e.g. olive oil is both).
+  These two labels are NEUTRAL descriptors, never judgments: "processed" does not mean unhealthy and
+  "artificial" does not mean unsafe. Do not let them read as good or bad.
 - role: a 2-4 word functional label for what it does in THIS product. Prefer one of: Base,
   Sweetener, Thickener / stabiliser, Emulsifier, Preservative, Colour, Flavour,
   Culture / ferment, Fortification, Oil / fat, Raising agent — but use another concise label

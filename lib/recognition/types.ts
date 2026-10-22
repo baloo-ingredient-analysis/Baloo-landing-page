@@ -3,7 +3,11 @@
 // service we don't control and the contract is still evolving (1 Oct 2026: nutrition + product_summary
 // were just added). The adapter (./adapt) turns these into our own lib/schema shapes.
 
+// Legacy single field (one exclusive badge). Superseded by the two independent axes below (engine
+// change, Igor, 16 Oct 2026) but kept so we can still fall back for records explained before the swap.
 export type EngineProcessingTag = "natural" | "processed" | "artificial";
+export type EngineOriginClass = "natural" | "artificial" | "unknown";
+export type EngineProcessedClass = "yes" | "no" | "unknown";
 
 export type EngineIngredient = {
   id?: string;
@@ -15,7 +19,12 @@ export type EngineIngredient = {
   percent_type?: "stated" | "estimated" | null;
   percent_basis?: "product" | "parent" | null; // null when the source doesn't establish the basis
   percent_note?: string | null; // e.g. the >100% QUID caption
-  processing_tag?: EngineProcessingTag | string;
+  // Two independent axes: origin (natural ↔ artificial) and processed (yes/no). Null on records not
+  // yet re-explained since the engine change — the adapter falls back to `processing_tag` then.
+  origin_class?: EngineOriginClass | string | null;
+  processed_class?: EngineProcessedClass | string | null;
+  processing_tag?: EngineProcessingTag | string; // legacy single field; fallback only
+
   general_explanation?: string | null; // → our what_it_is (product-independent)
   product_context?: string | null; // → our why_its_here (product-specific)
   significance_note?: string | null; // → our percentage_note

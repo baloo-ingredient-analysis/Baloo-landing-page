@@ -7,6 +7,36 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### Two-axis ingredient tags (origin × processed) — `feat/two-axis-tags`
+Resolved the long-pending 2-vs-3 tag decision (team, 16 Oct 2026): the single Natural/Processed badge
+becomes **two independent axes** — `origin` (natural / artificial / unknown) and `processed`
+(yes / no / unknown) — so an ingredient can read **Natural · Processed** (e.g. olive oil), which is the
+whole literacy point (processed ≠ bad, natural ≠ unprocessed). Commit 1 (this change) lands it
+end-to-end for the live paste flow, no DB migration:
+- **Model + schema** (`lib/schema.ts`, `lib/prompts.ts`): the analysis model now classifies the two
+  axes using the locked definitions — washing/cleaning/sorting excluded, fermentation + extraction /
+  pressing / refining / etc. included, both labels explicitly **neutral** (never a judgment). The legacy
+  single `tag` is now **derived** (`deriveTag`) for the catalog/cache and any surface not yet upgraded.
+- **Chips** (`components/IngredientCard.tsx`): up to two quiet chips — **Natural** (green) / **Artificial**
+  (neutral ink, deliberately never red) + **Processed** (amber). Tapping **Processed** reveals a short
+  neutral note on what processing means — **no numbered scale** (that would be an implicit score).
+  Falls back to the single derived chip for stored/legacy results. Chips wrap to their own line on mobile.
+- **Engine connector** (`lib/recognition/*`): updated to Igor's new `origin_class` + `processed_class`
+  fields, with a fallback that derives the two axes from the legacy `processing_tag` for null/old records.
+- **Persistence** (`lib/db/schema.ts` + migration `0018`, `lib/ingest.ts`, `lib/db/queries/products.ts`,
+  `lib/analysis/stored.ts`, `docs/API_CONTRACT_V1.md`): `origin` + `processed` are now their own nullable
+  columns on `ingredient_profile_items` and `ingredients` (two new enums), written on ingest and read
+  back on `/p/` pages, lists and the v1 API. Old rows stay null (derived `tag` still shown) until
+  re-analysed — same "null until re-explained" behaviour as the engine.
+- **Applied + backfilled, no legacy fallback** (team, 20 Oct 2026): migration `0018` is **applied to
+  Supabase** (rewritten idempotent — safe for `db:migrate` to re-run; advisor clean). All 361 existing
+  ingredient rows were backfilled with `origin`/`processed` (classified by the locked definitions: 11
+  artificial, 84 unprocessed, 24 unknown-origin, 240 natural+processed). With the catalog consistent, the
+  website's legacy `processing_tag` → single-tag fallback is **removed** — the two axes are the only
+  source on the web (`deriveTag` is pure-from-axes; the pill shows no chip for genuinely-unknown axes;
+  the product `llms.txt` exposes both axes). The `tag` column is still written (derived) pending its
+  eventual retirement.
+
 ### SEO foundation — product pages become the acquisition channel — `feat/seo-foundation`
 Product pages carried a title/description/OG image but none of the crawl signals search needs. Added
 the full baseline, all off **one** base URL (`siteUrl()` in `lib/config.ts`, resolving
