@@ -124,9 +124,11 @@ front-face label scan → reads as a pasted rectangle; a serving-suggestion / li
      a. any confidently-clean 3D packshot → **`hybrid`** scene from those (brand-deduped, capped at 4);
      b. classifier fully unavailable → **`hybrid`** on what we have, `verified: false` (no regression);
      c. no clean 3D shot but a faithful flat packshot → **`flat`** (show the real packshot on a tint card).
-  2. **Designed card** — nothing usable → **`brand`** today (the generic flat card); the planned upgrade is
-     a category-illustration card (tomatoes + basil for sauces, etc. — Igor's suggestion #1): always
-     accurate, free, no rights risk. Kat (design) owns the visual; the rung already exists in the ladder.
+  2. **Designed card** (`lib/sharecard/designedCard.tsx`) — no image available → a no-photo card: big
+     title, author, the product names as a clean numbered list, a quiet botanical motif (Spotify /
+     Letterboxd energy — Igor's suggestion #1). Always accurate, free, no rights risk; renders for any
+     list, and is the permanent card for lists the detector sends to fallback as well as the interim while
+     a hero generates. v0 visual — Kat (design) owns refining it, incl. per-category illustrations.
 
 > **Accuracy guarantee (the crux of the Igor/Jitain thread):** the hybrid is **not** AI-generated
 > packaging. Only the *backdrop + lighting* are generated; the packaging pixels are the **real** OFF
@@ -172,6 +174,8 @@ front-face label scan → reads as a pasted rectangle; a serving-suggestion / li
 | Editorial list card (4:5) — the mockup look | **shipped** (V2, Satori + bundled Playfair/Caveat/Baloo 2 fonts; `lib/sharecard/editorialCard.tsx`) |
 | Editorial product card + 9:16 story + 1.91:1 unfurl | **planned** |
 | Packshot quality detector + fallback ladder | **shipped** (Slice 4) — Claude-vision grade gates generation; only clean 3D packshots reach the model |
+| Author cover wins over generated hero (consent-first) | **shipped** — `lists.cover_url` is the top rung of the list card |
+| Designed no-photo card (title + numbered list + motif) | **shipped** (v0, `designedCard.tsx`) — the accurate/free fallback; Kat to refine |
 | Automatic hybrid compositor (backdrop + real cutouts) | **planned** — prototyped by hand (validated across varied lists); automate next |
 | Hero label fidelity (compositing vs generative) | **open** — generative models occasionally misspell packaging text; compositing real cutouts is the faithful alternative |
 | Video | **planned** (after images) |

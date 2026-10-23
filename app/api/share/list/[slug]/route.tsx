@@ -5,6 +5,7 @@ import { getListBySlug } from "@/lib/db/queries/lists";
 import { getProfileById } from "@/lib/db/queries/profiles";
 import { igCard } from "@/lib/igCard";
 import { editorialCard } from "@/lib/sharecard/editorialCard";
+import { designedCard } from "@/lib/sharecard/designedCard";
 import { loadCardFonts } from "@/lib/sharecard/cardFonts";
 import { generateAndStoreHero, heroGenerationConfigured } from "@/lib/sharecard/generate";
 import { classifyAndPlanHero } from "@/lib/sharecard/packshotQuality";
@@ -79,17 +80,27 @@ export async function GET(_req: Request, { params }: Params) {
 
   try {
     const fonts = await loadCardFonts();
-    return new ImageResponse(
-      editorialCard({
-        title: list.title,
-        subtitle,
-        heroUrl: listImage,
-        ownerName: owner?.displayName ?? null,
-        handle: owner?.handle ?? null,
-        productCount: count,
-      }),
-      { width: 1080, height: 1350, fonts, headers },
-    );
+    // With an image (author cover or a clean generated hero) → the editorial photo card. Without one
+    // (no cover, and either no clean packshot or a hero still generating) → the designed no-photo card:
+    // always accurate, never an empty panel, and the permanent card for lists the detector sends to fallback.
+    const card = listImage
+      ? editorialCard({
+          title: list.title,
+          subtitle,
+          heroUrl: listImage,
+          ownerName: owner?.displayName ?? null,
+          handle: owner?.handle ?? null,
+          productCount: count,
+        })
+      : designedCard({
+          title: list.title,
+          subtitle,
+          items: list.items.map((it) => it.product.name),
+          ownerName: owner?.displayName ?? null,
+          handle: owner?.handle ?? null,
+          productCount: count,
+        });
+    return new ImageResponse(card, { width: 1080, height: 1350, fonts, headers });
   } catch (err) {
     // A font-load / Satori failure must never break the share card — degrade to the flat card.
     console.error("editorial card render failed, using flat card:", err);
