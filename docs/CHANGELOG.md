@@ -7,6 +7,22 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### Social share cards — real product heroes — `fix/instagram-share-desktop-v9vkps`
+The groundwork for share cards that carry a real, presented product photo (the Jetain mockups), built in
+slices. See [`SHARE_CARDS.md`](SHARE_CARDS.md).
+- **Slice 1 — packshot ingestion:** `products.image_url` was defined but never populated (all 35 catalog
+  products had a null packshot). Threaded `imageUrl` through every ingest path (`lib/ingest.ts`,
+  `lib/offImport.ts`, the v1 mobile contract), added best-effort OFF backfill by barcode, and stopped a
+  later imageless scan from wiping a good packshot (COALESCE). Backfilled the 27 existing barcoded
+  products from OFF (the 8 barcode-less rows need the mobile engine's capture).
+- **Slice 2 — hero storage + engine:** `products.hero_url` / `lists.hero_url` (migration `0019`);
+  `lib/sharecard/` (pure, tested prompt builder + DB helpers) and `scripts/generate-heroes.ts`
+  (`npm run db:heroes`) — an offline, cached "generate once" job with an injected image provider.
+  Proven against Higgsfield `marketing_studio_image` (~2 credits / ~30s per render; cleans messy OFF
+  shop-shelf photos into a studio still life).
+- **Slice 3 — compose:** the portrait IG card (`lib/igCard.tsx`) shows the generated hero in its top band
+  when `hero_url` is set, else the flat card. The full 3-format editorial card (Chromium) is the planned V2.
+
 ### Two-axis ingredient tags (origin × processed) — `feat/two-axis-tags`
 Resolved the long-pending 2-vs-3 tag decision (team, 16 Oct 2026): the single Natural/Processed badge
 becomes **two independent axes** — `origin` (natural / artificial / unknown) and `processed`

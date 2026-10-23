@@ -42,6 +42,7 @@ export async function GET(_req: Request, { params }: Params) {
       meta: `${count} ${count === 1 ? "product" : "products"}`,
       rows,
       moreCount: Math.max(0, count - rows.length),
+      heroUrl: list.heroUrl ?? null, // the generated hero photo, once db:heroes has run; else flat card
     }),
     {
       width: 1080,

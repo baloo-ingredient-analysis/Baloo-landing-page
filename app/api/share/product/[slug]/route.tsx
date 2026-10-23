@@ -33,6 +33,7 @@ export async function GET(_req: Request, { params }: Params) {
           : "Know what's in your food",
       rows,
       moreCount: Math.max(0, count - rows.length),
+      heroUrl: data?.product.heroUrl ?? null, // generated hero photo once db:heroes has run; else flat
     }),
     {
       width: 1080,
