@@ -58,8 +58,11 @@ async function renderHero(input: HeroInput): Promise<ArrayBuffer | null> {
   form.append("prompt", buildHeroPrompt(input));
   form.append("size", sizeFor(input.ratio));
   form.append("quality", IMAGE_QUALITY);
-  // gpt-image-1 image edit accepts multiple reference images under `image[]`.
-  blobs.forEach((b, i) => form.append("image[]", b, `ref-${i}.png`));
+  // gpt-image-1 image edit accepts multiple reference images under `image[]` (PNG/WEBP/JPG, <25MB each).
+  blobs.forEach((b, i) => {
+    const ext = b.type.includes("png") ? "png" : b.type.includes("webp") ? "webp" : "jpg";
+    form.append("image[]", b, `ref-${i}.${ext}`);
+  });
 
   try {
     const res = await fetch("https://api.openai.com/v1/images/edits", {

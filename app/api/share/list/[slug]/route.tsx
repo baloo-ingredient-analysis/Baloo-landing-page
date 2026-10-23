@@ -10,6 +10,8 @@ import { setListHero } from "@/lib/sharecard/heroes";
 // Per-list Instagram card (4:5, 1080×1350) — the portrait share asset for a public list. Private
 // lists and a missing DB degrade to a generic Baloo card (no existence leak). nodejs runtime.
 export const runtime = "nodejs";
+// Give the background hero render (OpenAI, in after()) room to finish — it outlives the response.
+export const maxDuration = 60;
 
 type Params = { params: Promise<{ slug: string }> };
 

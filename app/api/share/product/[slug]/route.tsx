@@ -11,6 +11,8 @@ import { setProductHero } from "@/lib/sharecard/heroes";
 // thing an OG link unfurl can't). nodejs runtime (postgres.js isn't edge-safe). Cached like the OG
 // route; falls back to a generic Baloo card when the product/DB is absent.
 export const runtime = "nodejs";
+// Give the background hero render (OpenAI, in after()) room to finish — it outlives the response.
+export const maxDuration = 60;
 
 type Params = { params: Promise<{ slug: string }> };
 
