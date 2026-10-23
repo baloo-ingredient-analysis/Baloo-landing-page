@@ -3,7 +3,9 @@ import { after } from "next/server";
 import { db } from "@/lib/db";
 import { getListBySlug } from "@/lib/db/queries/lists";
 import { getProfileById } from "@/lib/db/queries/profiles";
-import { igCard, type IgRow } from "@/lib/igCard";
+import { igCard } from "@/lib/igCard";
+import { editorialCard } from "@/lib/sharecard/editorialCard";
+import { loadCardFonts } from "@/lib/sharecard/cardFonts";
 import { generateAndStoreHero, heroGenerationConfigured } from "@/lib/sharecard/generate";
 import { pickHeroProducts } from "@/lib/sharecard/prompt";
 import { claimListHero, setListHero } from "@/lib/sharecard/heroes";
@@ -35,9 +37,6 @@ export async function GET(_req: Request, { params }: Params) {
   // list is non-null here, so dbi was non-null too (the query above used it).
   const owner = list.ownerId ? await getProfileById(dbi!, list.ownerId) : null;
   const count = list.items.length;
-  const rows: IgRow[] = list.items
-    .slice(0, 5)
-    .map((it) => ({ name: it.product.name, sub: it.product.brand ?? null }));
 
   // Lazy-on-first-share: no hero yet → generate one in the background from the list's top imaged
   // products, cache it, and it appears on the next fetch. Best-effort; never blocks or breaks the card,
@@ -64,21 +63,35 @@ export async function GET(_req: Request, { params }: Params) {
     }
   }
 
-  return new ImageResponse(
-    igCard({
-      seed: list.slug,
-      eyebrow: "A BALOO LIST",
-      title: list.title,
-      chip: owner ? `@${owner.handle}` : null,
-      meta: `${count} ${count === 1 ? "product" : "products"}`,
-      rows,
-      moreCount: Math.max(0, count - rows.length),
-      heroUrl: list.heroUrl ?? null, // the generated hero photo, once db:heroes has run; else flat card
-    }),
-    {
-      width: 1080,
-      height: 1350,
-      headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400" },
-    },
-  );
+  const subtitle = Array.isArray(list.tags) && list.tags.length ? list.tags.slice(0, 3).join(" · ") : null;
+  const headers = { "Cache-Control": "public, max-age=3600, s-maxage=86400" };
+
+  try {
+    const fonts = await loadCardFonts();
+    return new ImageResponse(
+      editorialCard({
+        title: list.title,
+        subtitle,
+        heroUrl: list.heroUrl ?? null,
+        ownerName: owner?.displayName ?? null,
+        handle: owner?.handle ?? null,
+        productCount: count,
+      }),
+      { width: 1080, height: 1350, fonts, headers },
+    );
+  } catch (err) {
+    // A font-load / Satori failure must never break the share card — degrade to the flat card.
+    console.error("editorial card render failed, using flat card:", err);
+    return new ImageResponse(
+      igCard({
+        seed: list.slug,
+        eyebrow: "A BALOO LIST",
+        title: list.title,
+        chip: owner ? `@${owner.handle}` : null,
+        meta: `${count} ${count === 1 ? "product" : "products"}`,
+        heroUrl: list.heroUrl ?? null,
+      }),
+      { width: 1080, height: 1350, headers },
+    );
+  }
 }

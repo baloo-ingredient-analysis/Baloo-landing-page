@@ -131,5 +131,7 @@ another provider (fal.ai, Replicate) means adding one `renderWith…()` function
 | Image provider (OpenAI `gpt-image-1`) + Supabase storage | **shipped** — needs the 3 env vars + bucket |
 | Lazy-on-first-share generation | **shipped** |
 | IG card uses the hero | **shipped** (Satori top band) |
-| Full editorial 3-format card (Chromium) | **planned** (V2) |
+| Editorial list card (4:5) — the mockup look | **shipped** (V2, Satori + bundled Playfair/Caveat/Baloo 2 fonts; `lib/sharecard/editorialCard.tsx`) |
+| Editorial product card + 9:16 story + 1.91:1 unfurl | **planned** |
+| Hero label fidelity (compositing vs generative) | **open** — generative models occasionally misspell packaging text; compositing real cutouts is the faithful alternative |
 | Video | **planned** (after images) |
