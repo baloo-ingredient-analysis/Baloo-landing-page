@@ -45,6 +45,25 @@ function listProducts(products: HeroProductRef[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
+/** Pick up to `max` products for a list hero, preferring DISTINCT brands so the scene shows variety —
+ *  a list whose top rows are three Coke variants shouldn't render three identical bottles. Keeps label
+ *  order; only repeats a brand if there aren't enough distinct ones to fill `max`. */
+export function pickHeroProducts<T extends { brand?: string | null }>(products: T[], max = 4): T[] {
+  const seen = new Set<string>();
+  const distinct: T[] = [];
+  const rest: T[] = [];
+  for (const p of products) {
+    const key = (p.brand ?? "").trim().toLowerCase();
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      distinct.push(p);
+    } else {
+      rest.push(p);
+    }
+  }
+  return [...distinct, ...rest].slice(0, max);
+}
+
 /** The reference packshot URLs the generator should pass to the model (deduped, capped). */
 export function heroReferenceUrls(input: HeroInput): string[] {
   const seen = new Set<string>();

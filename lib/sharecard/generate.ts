@@ -58,6 +58,9 @@ async function renderHero(input: HeroInput): Promise<ArrayBuffer | null> {
   form.append("prompt", buildHeroPrompt(input));
   form.append("size", sizeFor(input.ratio));
   form.append("quality", IMAGE_QUALITY);
+  // Keep brand logos + packaging text faithful to the reference packshots (gpt-image-1 edits default is
+  // "low", which garbles labels). "high" is OpenAI's recommended setting for logos/details.
+  form.append("input_fidelity", "high");
   // gpt-image-1 image edit accepts multiple reference images under `image[]` (PNG/WEBP/JPG, <25MB each).
   blobs.forEach((b, i) => {
     const ext = b.type.includes("png") ? "png" : b.type.includes("webp") ? "webp" : "jpg";

@@ -5,6 +5,7 @@ import { getListBySlug } from "@/lib/db/queries/lists";
 import { getProfileById } from "@/lib/db/queries/profiles";
 import { igCard, type IgRow } from "@/lib/igCard";
 import { generateAndStoreHero, heroGenerationConfigured } from "@/lib/sharecard/generate";
+import { pickHeroProducts } from "@/lib/sharecard/prompt";
 import { setListHero } from "@/lib/sharecard/heroes";
 
 // Per-list Instagram card (4:5, 1080×1350) — the portrait share asset for a public list. Private
@@ -42,11 +43,10 @@ export async function GET(_req: Request, { params }: Params) {
   // products, cache it, and it appears on the next fetch. Best-effort; never blocks or breaks the card,
   // and a no-op when generation isn't configured. Runs once per list (hero_url is then set).
   if (!list.heroUrl && heroGenerationConfigured()) {
-    const heroProducts = list.items
-      .map((it) => it.product)
-      .filter((p) => p.imageUrl)
-      .slice(0, 4)
-      .map((p) => ({ name: p.name, brand: p.brand, packshotUrl: p.imageUrl as string }));
+    const heroProducts = pickHeroProducts(
+      list.items.map((it) => it.product).filter((p) => p.imageUrl),
+      4,
+    ).map((p) => ({ name: p.name, brand: p.brand, packshotUrl: p.imageUrl as string }));
     if (heroProducts.length > 0) {
       after(async () => {
         try {

@@ -7,7 +7,7 @@
 import { and, asc, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { listItems, lists, products } from "../db/schema";
-import type { HeroProductRef } from "./prompt";
+import { pickHeroProducts, type HeroProductRef } from "./prompt";
 
 /** Products that have a packshot but no generated hero yet (and are analysed). The generation job's
  *  per-product queue; each becomes a single-product hero reused anywhere that product appears. */
@@ -51,14 +51,15 @@ export async function listsNeedingHero(dbi: Db, limit = 50, maxProductsPerList =
 
   const out: ListHeroCandidate[] = [];
   for (const l of candidateLists) {
-    const items = await dbi
+    const rawItems = await dbi
       .select({ name: products.name, brand: products.brand, packshotUrl: products.imageUrl })
       .from(listItems)
       .innerJoin(products, eq(products.id, listItems.productId))
       .where(and(eq(listItems.listId, l.id), isNotNull(products.imageUrl)))
       .orderBy(asc(listItems.position))
-      .limit(maxProductsPerList);
-    if (items.length === 0) continue; // nothing imaged to render from yet
+      .limit(12);
+    if (rawItems.length === 0) continue; // nothing imaged to render from yet
+    const items = pickHeroProducts(rawItems, maxProductsPerList); // distinct brands for a varied scene
     out.push({
       listId: l.id,
       slug: l.slug,

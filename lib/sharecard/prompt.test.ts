@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildHeroPrompt, heroReferenceUrls, type HeroInput } from "./prompt";
+import { buildHeroPrompt, heroReferenceUrls, pickHeroProducts, type HeroInput } from "./prompt";
 
 const product = (name: string, brand: string | null, packshotUrl: string) => ({ name, brand, packshotUrl });
 
@@ -40,6 +40,23 @@ describe("buildHeroPrompt", () => {
     });
     expect(p).toContain("single product: Nutella");
     expect(p).not.toContain("Nutella Nutella");
+  });
+
+  it("prefers distinct brands, keeping order, filling with repeats only if needed", () => {
+    const items = [
+      { brand: "Coca-Cola", name: "Zero" },
+      { brand: "Coca-Cola", name: "Zero Sugar" },
+      { brand: "Oreo", name: "Original" },
+      { brand: "Coca-Cola", name: "Classic" },
+      { brand: "Doritos", name: "Nacho" },
+    ];
+    // Three distinct brands come first (Coca-Cola, Oreo, Doritos), then a repeat Coke fills the 4th slot.
+    expect(pickHeroProducts(items, 4).map((p) => `${p.brand}/${p.name}`)).toEqual([
+      "Coca-Cola/Zero",
+      "Oreo/Original",
+      "Doritos/Nacho",
+      "Coca-Cola/Zero Sugar",
+    ]);
   });
 
   it("dedupes and caps reference packshots at four", () => {
