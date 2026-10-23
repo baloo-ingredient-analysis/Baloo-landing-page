@@ -18,14 +18,15 @@ const fonts = [
 
 const heroPath = process.argv[2];
 const outPath = process.argv[3] || "/tmp/preview-v2.png";
-const heroUrl = heroPath ? `data:image/png;base64,${readFileSync(heroPath).toString("base64")}` : null;
+const heroMime = heroPath && /\.jpe?g$/i.test(heroPath) ? "image/jpeg" : "image/png";
+const heroUrl = heroPath ? `data:${heroMime};base64,${readFileSync(heroPath).toString("base64")}` : null;
 
 const el = editorialCard({
-  title: "UK cupboard basics",
-  subtitle: "Pantry · Drinks · Spreads",
+  title: "Weeknight dinners",
+  subtitle: "Dinner · Quick meals · Snacks",
   heroUrl,
-  ownerName: "Tom Hedley",
-  handle: "tomreadslabels",
+  ownerName: "Marco Ferri",
+  handle: "marcocooks",
   productCount: 5,
 });
 
