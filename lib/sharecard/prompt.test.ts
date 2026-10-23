@@ -14,7 +14,7 @@ describe("buildHeroPrompt", () => {
     expect(p).toContain("Barilla Penne Rigate N°73");
     expect(p).toContain("single product");
     expect(p).toMatch(/no shelves|no clutter|no price tags/);
-    expect(p).toContain("accurate and legible");
+    expect(p).toMatch(/reproduce each product exactly/i);
   });
 
   it("lists multiple products as a group (A, B and C)", () => {

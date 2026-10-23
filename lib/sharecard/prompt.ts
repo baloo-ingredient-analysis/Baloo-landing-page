@@ -53,7 +53,9 @@ export function pickHeroProducts<T extends { brand?: string | null }>(products: 
   const distinct: T[] = [];
   const rest: T[] = [];
   for (const p of products) {
-    const key = (p.brand ?? "").trim().toLowerCase();
+    // Dedupe on the FIRST brand token so messy variants collapse: "Coca-Cola", "Coca cola zero" and
+    // "Coca Cola Zero Sugar" all key on "coca" → one Coke in the scene, leaving room for other brands.
+    const key = (p.brand ?? "").trim().toLowerCase().split(/[\s\-/]+/)[0] ?? "";
     if (key && !seen.has(key)) {
       seen.add(key);
       distinct.push(p);
@@ -89,8 +91,11 @@ export function buildHeroPrompt(input: HeroInput): string {
   return [
     `Editorial product still life: ${grouping},`,
     "presented on a warm cream marble surface in soft natural daylight from the left, with gentle, long, soft shadows.",
+    // Strong preservation clause: image-edit models (gpt-image-1 especially) will otherwise re-draw and
+    // garble the packaging. Tell it to treat this as a background/lighting restage, NOT a redraw.
+    "Reproduce each product EXACTLY as in the reference photos: keep every logo, label, wording, font and colour identical, crisp and unchanged — do not redraw, re-letter, translate, invent or stylise any text on the packaging.",
+    "Change only the surface, background and lighting around the products.",
     "Calm, premium, boutique still-life look; warm cream-beige seamless background with generous negative space above the products.",
-    "Keep each product's real packaging, brand logos, and colours accurate and legible.",
     "Studio-clean: no shelves, no price tags, no clutter, no people, no added text, no logos other than the products' own.",
     "Magazine-quality.",
   ].join(" ");
