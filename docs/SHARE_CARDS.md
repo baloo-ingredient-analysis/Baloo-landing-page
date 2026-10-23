@@ -173,7 +173,8 @@ front-face label scan → reads as a pasted rectangle; a serving-suggestion / li
 | IG card uses the hero | **shipped** (Satori top band) |
 | Editorial list card (4:5) — the mockup look | **shipped** (V2, Satori + bundled Playfair/Caveat/Baloo 2 fonts; `lib/sharecard/editorialCard.tsx`) |
 | Editorial 1.91:1 unfurl (link previews) | **shipped** (`wideCard.tsx`, wired into `/api/og/list`; photo + no-photo, same ladder) |
-| Editorial product card + 9:16 story | **planned** |
+| Editorial 9:16 story | **shipped** — `/api/share/list/[slug]?format=story`; same cards at 1080×1920, "Save for Stories" in the share sheet |
+| Editorial product card (4:5 / unfurl) | **planned** — product share/OG still use the flat igCard/ogCard |
 | Packshot quality detector + fallback ladder | **shipped** (Slice 4) — Claude-vision grade gates generation; only clean 3D packshots reach the model |
 | Author cover wins over generated hero (consent-first) | **shipped** — `lists.cover_url` is the top rung of the list card |
 | Designed no-photo card (title + numbered list + motif) | **shipped** (v0, `designedCard.tsx`) — the accurate/free fallback; Kat to refine |

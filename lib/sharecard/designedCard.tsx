@@ -31,16 +31,16 @@ export type DesignedCardProps = {
   handle?: string | null;
   productCount: number;
   cta?: string;
+  /** How many product rows to show. Default 6 (the 4:5 feed); the 9:16 story passes more to fill. */
+  maxRows?: number;
 };
 
-const MAX_ROWS = 6;
-
 export function designedCard(p: DesignedCardProps) {
-  const { title, subtitle, items, ownerName, handle, productCount, cta = "See the full list →" } = p;
+  const { title, subtitle, items, ownerName, handle, productCount, cta = "See the full list →", maxRows = 6 } = p;
   const who = ownerName ? `A list by ${ownerName.split(" ")[0]}` : "A Baloo list";
   const count = `${productCount} ${productCount === 1 ? "product" : "products"}`;
   const meta = handle ? `${count} · @${handle}` : count;
-  const rows = items.filter(Boolean).slice(0, MAX_ROWS);
+  const rows = items.filter(Boolean).slice(0, maxRows);
   const more = Math.max(0, productCount - rows.length);
 
   return (

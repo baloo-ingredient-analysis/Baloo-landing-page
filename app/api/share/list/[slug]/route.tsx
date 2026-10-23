@@ -11,8 +11,10 @@ import { generateAndStoreHero, heroGenerationConfigured } from "@/lib/sharecard/
 import { classifyAndPlanHero } from "@/lib/sharecard/packshotQuality";
 import { claimListHero, setListHero } from "@/lib/sharecard/heroes";
 
-// Per-list Instagram card (4:5, 1080×1350) — the portrait share asset for a public list. Private
-// lists and a missing DB degrade to a generic Baloo card (no existence leak). nodejs runtime.
+// Per-list Instagram card — the portrait share asset for a public list. `?format=story` gives the 9:16
+// story (1080×1920); the default is the 4:5 feed (1080×1350). Same editorial/designed cards, same image
+// ladder; only the canvas height (and the designed card's row count) changes. Private lists and a missing
+// DB degrade to a generic Baloo card (no existence leak). nodejs runtime.
 export const runtime = "nodejs";
 // Give the background hero render (OpenAI, in after()) room to finish — it outlives the response.
 export const maxDuration = 60;
@@ -26,13 +28,15 @@ const GENERIC = igCard({
   meta: "Know what's in your food",
 });
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
   const { slug } = await params;
+  const story = new URL(req.url).searchParams.get("format") === "story";
+  const size = { width: 1080, height: story ? 1920 : 1350 };
   const dbi = db();
   const list = dbi ? await getListBySlug(dbi, slug) : null;
 
   if (!list || !list.isPublic) {
-    return new ImageResponse(GENERIC, { width: 1080, height: 1350 });
+    return new ImageResponse(GENERIC, size);
   }
 
   // list is non-null here, so dbi was non-null too (the query above used it).
@@ -99,8 +103,9 @@ export async function GET(_req: Request, { params }: Params) {
           ownerName: owner?.displayName ?? null,
           handle: owner?.handle ?? null,
           productCount: count,
+          maxRows: story ? 9 : 6, // the taller story fits more of the list
         });
-    return new ImageResponse(card, { width: 1080, height: 1350, fonts, headers });
+    return new ImageResponse(card, { ...size, fonts, headers });
   } catch (err) {
     // A font-load / Satori failure must never break the share card — degrade to the flat card.
     console.error("editorial card render failed, using flat card:", err);
@@ -113,7 +118,7 @@ export async function GET(_req: Request, { params }: Params) {
         meta: `${count} ${count === 1 ? "product" : "products"}`,
         heroUrl: listImage,
       }),
-      { width: 1080, height: 1350, headers },
+      { ...size, headers },
     );
   }
 }

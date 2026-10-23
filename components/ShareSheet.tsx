@@ -78,6 +78,10 @@ export function ShareSheet({
       (window.matchMedia?.("(pointer: coarse)")?.matches === true && (navigator.maxTouchPoints ?? 0) > 0));
   // Prefer the portrait 4:5 card for anything that becomes a social post; fall back to the OG card.
   const shareCard = igCardPath ?? cardPath;
+  // The 9:16 story asset is the same portrait route with ?format=story — offered as a direct save.
+  const storyCardPath = igCardPath
+    ? `${igCardPath}${igCardPath.includes("?") ? "&" : "?"}format=story`
+    : null;
 
   async function copy() {
     try {
@@ -208,14 +212,27 @@ export function ShareSheet({
         )}
       </div>
 
-      {cardPath && (
-        <a
-          href={cardPath}
-          download="baloo-card.png"
-          className="mt-3 block text-center text-xs text-muted underline decoration-line underline-offset-2 transition hover:text-ink"
-        >
-          Save image
-        </a>
+      {(cardPath || storyCardPath) && (
+        <div className="mt-3 flex items-center justify-center gap-4 text-xs text-muted">
+          {cardPath && (
+            <a
+              href={cardPath}
+              download="baloo-card.png"
+              className="underline decoration-line underline-offset-2 transition hover:text-ink"
+            >
+              Save image
+            </a>
+          )}
+          {storyCardPath && (
+            <a
+              href={storyCardPath}
+              download="baloo-story.png"
+              className="underline decoration-line underline-offset-2 transition hover:text-ink"
+            >
+              Save for Stories (9:16)
+            </a>
+          )}
+        </div>
       )}
     </Modal>
   );
