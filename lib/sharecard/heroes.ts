@@ -4,7 +4,7 @@
 // lib/db/queries/*). Nothing here calls an image API — generation is an offline job, the app only
 // reads the cached hero.
 
-import { and, asc, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { listItems, lists, products } from "../db/schema";
 import { pickHeroProducts, type HeroProductRef } from "./prompt";
@@ -30,6 +30,43 @@ export async function setProductHero(dbi: Db, productId: string, heroUrl: string
     .update(products)
     .set({ heroUrl, heroGeneratedAt: sql`now()` })
     .where(eq(products.id, productId));
+}
+
+// Minutes a failed/in-flight generation "holds" the row before another attempt is allowed — stops a
+// burst of fetches (e.g. a crawler, or a poll loop) from each spending a render on the same item.
+const HERO_CLAIM_COOLDOWN = sql`now() - interval '5 minutes'`;
+
+/** Atomically claim a product for hero generation. Returns true only to the caller that wins the claim
+ *  (no hero yet, and no attempt in the last 5 min); everyone else gets false and must not generate. */
+export async function claimProductHero(dbi: Db, productId: string): Promise<boolean> {
+  const rows = await dbi
+    .update(products)
+    .set({ heroGeneratedAt: sql`now()` })
+    .where(
+      and(
+        eq(products.id, productId),
+        isNull(products.heroUrl),
+        or(isNull(products.heroGeneratedAt), lt(products.heroGeneratedAt, HERO_CLAIM_COOLDOWN)),
+      ),
+    )
+    .returning({ id: products.id });
+  return rows.length > 0;
+}
+
+/** Atomically claim a list for hero generation (see claimProductHero). */
+export async function claimListHero(dbi: Db, listId: string): Promise<boolean> {
+  const rows = await dbi
+    .update(lists)
+    .set({ heroGeneratedAt: sql`now()` })
+    .where(
+      and(
+        eq(lists.id, listId),
+        isNull(lists.heroUrl),
+        or(isNull(lists.heroGeneratedAt), lt(lists.heroGeneratedAt, HERO_CLAIM_COOLDOWN)),
+      ),
+    )
+    .returning({ id: lists.id });
+  return rows.length > 0;
 }
 
 /** A public list that needs a hero, with its top products that have packshots (label order), ready to

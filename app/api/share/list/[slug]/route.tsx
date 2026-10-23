@@ -6,7 +6,7 @@ import { getProfileById } from "@/lib/db/queries/profiles";
 import { igCard, type IgRow } from "@/lib/igCard";
 import { generateAndStoreHero, heroGenerationConfigured } from "@/lib/sharecard/generate";
 import { pickHeroProducts } from "@/lib/sharecard/prompt";
-import { setListHero } from "@/lib/sharecard/heroes";
+import { claimListHero, setListHero } from "@/lib/sharecard/heroes";
 
 // Per-list Instagram card (4:5, 1080×1350) — the portrait share asset for a public list. Private
 // lists and a missing DB degrade to a generic Baloo card (no existence leak). nodejs runtime.
@@ -50,11 +50,13 @@ export async function GET(_req: Request, { params }: Params) {
     if (heroProducts.length > 0) {
       after(async () => {
         try {
+          if (!(await claimListHero(dbi!, list.id))) return; // another request is already generating
           const heroUrl = await generateAndStoreHero(
             { kind: "list", ratio: "4:5", products: heroProducts },
             `list/${list.id}`,
           );
           if (heroUrl) await setListHero(dbi!, list.id, heroUrl);
+          // on failure hero_generated_at stays set → a short cooldown before the next attempt
         } catch (err) {
           console.error("lazy list hero error (ignored):", err);
         }

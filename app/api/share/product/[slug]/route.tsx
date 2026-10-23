@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getProductForPage } from "@/lib/db/queries/products";
 import { igCard, type IgRow } from "@/lib/igCard";
 import { generateAndStoreHero, heroGenerationConfigured } from "@/lib/sharecard/generate";
-import { setProductHero } from "@/lib/sharecard/heroes";
+import { claimProductHero, setProductHero } from "@/lib/sharecard/heroes";
 
 // Per-product Instagram card (4:5, 1080×1350) — the portrait share asset for a product, used by the
 // share sheet's Instagram action. Shows the first ingredients WITH their Natural/Processed badge (the
@@ -32,11 +32,12 @@ export async function GET(_req: Request, { params }: Params) {
     const { id, name, brand, imageUrl } = data.product;
     after(async () => {
       try {
+        if (!dbi || !(await claimProductHero(dbi, id))) return; // another request is already generating
         const heroUrl = await generateAndStoreHero(
           { kind: "product", ratio: "4:5", products: [{ name, brand, packshotUrl: imageUrl }] },
           `product/${id}`,
         );
-        if (heroUrl && dbi) await setProductHero(dbi, id, heroUrl);
+        if (heroUrl) await setProductHero(dbi, id, heroUrl);
       } catch (err) {
         console.error("lazy product hero error (ignored):", err);
       }
