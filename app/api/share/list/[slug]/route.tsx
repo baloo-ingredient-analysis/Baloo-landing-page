@@ -1,8 +1,11 @@
 import { ImageResponse } from "next/og";
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import { getListBySlug } from "@/lib/db/queries/lists";
 import { getProfileById } from "@/lib/db/queries/profiles";
 import { igCard, type IgRow } from "@/lib/igCard";
+import { generateAndStoreHero, heroGenerationConfigured } from "@/lib/sharecard/generate";
+import { setListHero } from "@/lib/sharecard/heroes";
 
 // Per-list Instagram card (4:5, 1080×1350) — the portrait share asset for a public list. Private
 // lists and a missing DB degrade to a generic Baloo card (no existence leak). nodejs runtime.
@@ -32,6 +35,30 @@ export async function GET(_req: Request, { params }: Params) {
   const rows: IgRow[] = list.items
     .slice(0, 5)
     .map((it) => ({ name: it.product.name, sub: it.product.brand ?? null }));
+
+  // Lazy-on-first-share: no hero yet → generate one in the background from the list's top imaged
+  // products, cache it, and it appears on the next fetch. Best-effort; never blocks or breaks the card,
+  // and a no-op when generation isn't configured. Runs once per list (hero_url is then set).
+  if (!list.heroUrl && heroGenerationConfigured()) {
+    const heroProducts = list.items
+      .map((it) => it.product)
+      .filter((p) => p.imageUrl)
+      .slice(0, 4)
+      .map((p) => ({ name: p.name, brand: p.brand, packshotUrl: p.imageUrl as string }));
+    if (heroProducts.length > 0) {
+      after(async () => {
+        try {
+          const heroUrl = await generateAndStoreHero(
+            { kind: "list", ratio: "4:5", products: heroProducts },
+            `list/${list.id}`,
+          );
+          if (heroUrl) await setListHero(dbi!, list.id, heroUrl);
+        } catch (err) {
+          console.error("lazy list hero error (ignored):", err);
+        }
+      });
+    }
+  }
 
   return new ImageResponse(
     igCard({

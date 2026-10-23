@@ -1,7 +1,10 @@
 import { ImageResponse } from "next/og";
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import { getProductForPage } from "@/lib/db/queries/products";
 import { igCard, type IgRow } from "@/lib/igCard";
+import { generateAndStoreHero, heroGenerationConfigured } from "@/lib/sharecard/generate";
+import { setProductHero } from "@/lib/sharecard/heroes";
 
 // Per-product Instagram card (4:5, 1080×1350) — the portrait share asset for a product, used by the
 // share sheet's Instagram action. Shows the first ingredients WITH their Natural/Processed badge (the
@@ -20,6 +23,23 @@ export async function GET(_req: Request, { params }: Params) {
   const rows: IgRow[] = data
     ? data.items.slice(0, 5).map((i) => ({ name: i.name, tag: (i.tag as IgRow["tag"]) ?? null }))
     : [];
+
+  // Lazy-on-first-share: no hero yet but we have a packshot → generate one in the background and cache
+  // it; it shows on the next fetch. Best-effort, never blocks the card, no-op when unconfigured.
+  if (data && !data.product.heroUrl && data.product.imageUrl && heroGenerationConfigured()) {
+    const { id, name, brand, imageUrl } = data.product;
+    after(async () => {
+      try {
+        const heroUrl = await generateAndStoreHero(
+          { kind: "product", ratio: "4:5", products: [{ name, brand, packshotUrl: imageUrl }] },
+          `product/${id}`,
+        );
+        if (heroUrl && dbi) await setProductHero(dbi, id, heroUrl);
+      } catch (err) {
+        console.error("lazy product hero error (ignored):", err);
+      }
+    });
+  }
 
   return new ImageResponse(
     igCard({

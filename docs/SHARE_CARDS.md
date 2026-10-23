@@ -79,17 +79,18 @@ Validated Oct 2026 against **Higgsfield `marketing_studio_image`**:
 - **Caveat:** very small on-pack text (nutrition panels, net weight) can garble. Main brand marks and
   titles hold up; invisible at card size. Mitigate with higher resolution and framing.
 
-### The provider boundary
+### The provider
 
-`lib/` stays portable (no image-API dependency). The provider is injected in
-`scripts/generate-heroes.ts` → `makeProvider()`. The validated Higgsfield flow:
+`lib/sharecard/generate.ts` renders the hero with **OpenAI `gpt-image-1`** (image *edit*, with the
+packshots passed as references to keep the real packaging) and uploads the PNG to **Supabase Storage**
+(public `share-heroes` bucket), returning the public URL. fetch-based, no SDK — `lib/` stays portable.
+Used by both the offline job and the lazy trigger.
 
-1. import each reference packshot → a media id,
-2. POST a generation `{ model: "marketing_studio_image", prompt, aspect_ratio, resolution, medias:[…] }`,
-3. poll the job(s) → download `result_url`.
-
-Needs `HIGGSFIELD_API_KEY` (a new **server-side** secret) + storage credentials
-(`SUPABASE_SERVICE_ROLE_KEY`). Without them the job stays in `--dry-run`.
+Needs these **server-side** env vars: `OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+`NEXT_PUBLIC_SUPABASE_URL` (+ a public `share-heroes` bucket). Without them generation is a no-op and the
+card falls back to the flat packshot. To swap providers (Higgsfield, fal.ai, Replicate) change
+`renderHero()` only. In testing Higgsfield `marketing_studio_image` cleaned messy OFF shop-shelf photos
+into a studio still life (~2 credits / ~30s); `gpt-image-1` is the default for lowest setup friction.
 
 ### The prompt (verbatim intent)
 
@@ -104,7 +105,13 @@ Needs `HIGGSFIELD_API_KEY` (a new **server-side** secret) + storage credentials
 
 - **Now:** the portrait IG card (`lib/igCard.tsx`, used by `/api/share/{list,product}/[slug]`) renders
   the generated hero photo in its top band when `hero_url` is set, and falls back to the flat tint card
-  otherwise. So the cards light up automatically once `db:heroes` has run — no further wiring.
+  otherwise.
+- **Lazy-on-first-share:** when a list/product share card is fetched and has no hero yet (and generation
+  is configured), the share route generates one in `after()` and caches it — so the FIRST share triggers
+  one render, every share after is instant, and you only ever pay for products people actually share.
+  Best-effort: a failure just leaves the flat card, never breaks the share. No scripts to run — deploy
+  with the keys set and sharing populates heroes on its own. `npm run db:heroes` is the bulk/backfill
+  alternative.
 - **Next (V2 — the full editorial look):** the three-format editorial template (feed / story / unfurl)
   that matches the mockups pixel-for-pixel is best rendered with **headless Chromium** (Playwright is
   already available in the build image), for real serif fonts, the script accent, layered gradients and
@@ -116,8 +123,10 @@ Needs `HIGGSFIELD_API_KEY` (a new **server-side** secret) + storage credentials
 
 | Piece | State |
 | --- | --- |
-| Packshot ingestion (`image_url`) | **shipped** (Slice 1) + 27 existing products backfilled |
-| Hero storage + prompt + job | **shipped** (Slice 2); provider needs `HIGGSFIELD_API_KEY` + storage |
-| IG card uses the hero | **shipped** (Slice 3, Satori top band) |
+| Packshot ingestion (`image_url`) | **shipped** — all flows incl. web paste (og:image); 27 backfilled |
+| Hero storage + prompt + job | **shipped** (Slice 2) |
+| Image provider (OpenAI `gpt-image-1`) + Supabase storage | **shipped** — needs the 3 env vars + bucket |
+| Lazy-on-first-share generation | **shipped** |
+| IG card uses the hero | **shipped** (Satori top band) |
 | Full editorial 3-format card (Chromium) | **planned** (V2) |
-| Video (Higgsfield) | **planned** (after images) |
+| Video | **planned** (after images) |
