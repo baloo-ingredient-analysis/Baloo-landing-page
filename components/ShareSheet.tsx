@@ -69,6 +69,13 @@ export function ShareSheet({
   const text = `${title} — on Baloo`;
   const targets = shareTargets({ url, text });
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  // navigator.share ALSO exists on desktop (Windows/macOS pop an OS share sheet) — but that sheet does
+  // NOT include Instagram; only a mobile device's does. So the Instagram hand-off to the native sheet is
+  // gated on a touch-primary (mobile/tablet) device. On desktop, IG saves the card + opens Instagram.
+  const isTouchPrimary =
+    typeof window !== "undefined" &&
+    (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (window.matchMedia?.("(pointer: coarse)")?.matches === true && (navigator.maxTouchPoints ?? 0) > 0));
   // Prefer the portrait 4:5 card for anything that becomes a social post; fall back to the OG card.
   const shareCard = igCardPath ?? cardPath;
 
@@ -113,7 +120,9 @@ export function ShareSheet({
   // can't prefill a post from the browser. So we do the best real thing: on mobile, the native share
   // sheet (with the card image) lists Instagram; on desktop, save the card and open Instagram to post.
   async function instagram() {
-    if (canNativeShare && shareCard) return nativeShare();
+    // Mobile only: the native sheet lists Instagram. On desktop navigator.share exists but its sheet
+    // has no Instagram, so skip it and go straight to save-the-card + open Instagram.
+    if (canNativeShare && isTouchPrimary && shareCard) return nativeShare();
     if (shareCard) {
       try {
         const a = document.createElement("a");
@@ -122,8 +131,8 @@ export function ShareSheet({
         document.body.appendChild(a);
         a.click();
         a.remove();
-        setNote("Card image saved — open Instagram and post it.");
-        setTimeout(() => setNote(null), 4000);
+        setNote("Card saved — post it to Instagram from your phone or the web uploader.");
+        setTimeout(() => setNote(null), 5000);
       } catch {
         /* download blocked — still open Instagram below */
       }
