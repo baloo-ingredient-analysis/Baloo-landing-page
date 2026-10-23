@@ -81,16 +81,19 @@ Validated Oct 2026 against **Higgsfield `marketing_studio_image`**:
 
 ### The provider
 
-`lib/sharecard/generate.ts` renders the hero with **OpenAI `gpt-image-1`** (image *edit*, with the
-packshots passed as references to keep the real packaging) and uploads the PNG to **Supabase Storage**
-(public `share-heroes` bucket), returning the public URL. fetch-based, no SDK — `lib/` stays portable.
-Used by both the offline job and the lazy trigger.
+`lib/sharecard/generate.ts` renders the hero and uploads it to **Supabase Storage** (public
+`share-heroes` bucket), returning the public URL. fetch-based, no SDK — `lib/` stays portable. Used by
+both the offline job and the lazy trigger. The provider is chosen by which key is set:
 
-Needs these **server-side** env vars: `OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-`NEXT_PUBLIC_SUPABASE_URL` (+ a public `share-heroes` bucket). Without them generation is a no-op and the
-card falls back to the flat packshot. To swap providers (Higgsfield, fal.ai, Replicate) change
-`renderHero()` only. In testing Higgsfield `marketing_studio_image` cleaned messy OFF shop-shelf photos
-into a studio still life (~2 credits / ~30s); `gpt-image-1` is the default for lowest setup friction.
+- **Higgsfield Marketing Studio Image (primary)** — `HIGGSFIELD_API_KEY="KEY_ID:KEY_SECRET"`. Async:
+  POST `api.higgsfield.ai/marketing-studio/image` with `image_urls` (the packshots) → poll
+  `/requests/{id}/status` → `images[0].url`. Keeps brand logos/packaging faithful.
+- **OpenAI `gpt-image-1` (fallback)** — `OPENAI_API_KEY`. Synchronous image *edit*. Cheaper setup, but
+  it garbles brand text (tested: "Coca-Cola" → "Coca Coup"), so it's the fallback, not the default.
+
+Plus storage: `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL` (+ the public bucket). Without a
+provider or storage, generation is a no-op and the card falls back to the flat packshot. Swapping to
+another provider (fal.ai, Replicate) means adding one `renderWith…()` function.
 
 ### The prompt (verbatim intent)
 

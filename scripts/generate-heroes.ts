@@ -8,9 +8,10 @@
 //   npm run db:heroes -- --lists            # generate list heroes (composite of a list's top products)
 //   npm run db:heroes -- --products --limit 10
 //
-// Needs, in .env.local (or the shell): DATABASE_URL, OPENAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY,
-// NEXT_PUBLIC_SUPABASE_URL, plus a public Storage bucket `share-heroes`. Without them --dry-run still
-// works so you can validate the queue. See docs/SHARE_CARDS.md.
+// Needs, in .env.local (or the shell): DATABASE_URL, a provider key (HIGGSFIELD_API_KEY="ID:SECRET",
+// or OPENAI_API_KEY as fallback), SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SUPABASE_URL, plus a public
+// Storage bucket `share-heroes`. Without them --dry-run still works so you can validate the queue.
+// See docs/SHARE_CARDS.md.
 
 import { config } from "dotenv";
 config({ path: ".env.local" });
@@ -50,7 +51,7 @@ async function main() {
   }
   if (!dryRun && !heroGenerationConfigured()) {
     console.error(
-      "Not configured: set OPENAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL (and a public `share-heroes` bucket). Use --dry-run to preview without them.",
+      "Not configured: set a provider key (HIGGSFIELD_API_KEY=\"ID:SECRET\" or OPENAI_API_KEY), plus SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL (and a public `share-heroes` bucket). Use --dry-run to preview without them.",
     );
     process.exit(1);
   }

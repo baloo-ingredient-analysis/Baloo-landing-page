@@ -1,35 +1,113 @@
 // Hero generation + storage (server-only, fetch-based — no SDK, so lib/ stays portable). Turns a
-// product's packshot(s) into a warm "presented product" scene (OpenAI gpt-image-1, image edit with the
-// packshots as references) and stores it in Supabase Storage, returning the public URL. Used by BOTH
-// the offline job (scripts/generate-heroes.ts) and the lazy-on-first-share trigger in the share routes.
+// product's packshot(s) into a warm "presented product" scene and stores it in Supabase Storage,
+// returning the public URL. Used by BOTH the offline job (scripts/generate-heroes.ts) and the
+// lazy-on-first-share trigger in the share routes.
 //
-// Optional-infra: returns null (a no-op) when OPENAI_API_KEY or the Supabase storage creds are absent,
-// or on any provider/storage failure — the card then falls back to the flat packshot. Never throws to
-// the caller; callers run it in after() and ignore the result beyond the returned URL.
+// Provider is pluggable and chosen by which key is set (Higgsfield preferred — it keeps brand logos
+// faithful, which gpt-image-1 does not; OpenAI gpt-image-1 is the fallback):
+//   • HIGGSFIELD_API_KEY = "KEY_ID:KEY_SECRET"  → Higgsfield Marketing Studio Image (async submit+poll)
+//   • OPENAI_API_KEY                            → OpenAI gpt-image-1 (image edit, synchronous)
+// Plus storage: SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL and a public `share-heroes` bucket.
 //
-// Cost: ~2-4¢ per render (gpt-image-1, medium), ONCE per product/list, then cached. See docs/SHARE_CARDS.md.
+// Optional-infra: returns null (a no-op) when no provider or storage is configured, or on any failure —
+// the card then falls back to the flat packshot. Never throws to the caller. See docs/SHARE_CARDS.md.
 
-import { buildHeroPrompt, heroReferenceUrls, type HeroInput } from "./prompt";
+import { buildHeroPrompt, heroReferenceUrls, type HeroInput, type HeroRatio } from "./prompt";
 
-const OPENAI_IMAGE_MODEL = "gpt-image-1";
 const HERO_BUCKET = process.env.HERO_BUCKET || "share-heroes";
-// gpt-image-1 quality: "low" | "medium" | "high" | "auto". Medium is the cost/quality sweet spot.
-const IMAGE_QUALITY = process.env.HERO_IMAGE_QUALITY || "medium";
 
-/** True when both the image provider and storage are configured (else generation is a no-op). */
+type Rendered = { bytes: ArrayBuffer; contentType: string };
+
+/** True when some provider AND storage are configured (else generation is a no-op). */
 export function heroGenerationConfigured(): boolean {
+  const hasProvider = Boolean(process.env.HIGGSFIELD_API_KEY || process.env.OPENAI_API_KEY);
   return Boolean(
-    process.env.OPENAI_API_KEY &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY &&
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
+    hasProvider && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL,
   );
 }
 
-// Our ratio → the nearest gpt-image-1 size (it supports 1024² and the two 2:3 portraits/landscapes).
-function sizeFor(ratio: HeroInput["ratio"]): string {
+async function download(url: string): Promise<Rendered | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return { bytes: await res.arrayBuffer(), contentType: res.headers.get("content-type") || "image/jpeg" };
+  } catch {
+    return null;
+  }
+}
+
+// ── Higgsfield Marketing Studio Image (primary) ─────────────────────────────────────────────────────
+
+const HF_BASE = "https://api.higgsfield.ai";
+const HF_POLL_MS = 4000;
+const HF_TIMEOUT_MS = 55_000;
+
+function hfAspect(ratio: HeroRatio): string {
+  if (ratio === "1:1") return "1:1";
+  if (ratio === "9:16") return "9:16";
+  return "3:4"; // 4:5 isn't offered; 3:4 is the nearest portrait (the card crops anyway)
+}
+
+async function renderWithHiggsfield(input: HeroInput): Promise<Rendered | null> {
+  const key = process.env.HIGGSFIELD_API_KEY; // "KEY_ID:KEY_SECRET"
+  if (!key) return null;
+  const refs = heroReferenceUrls(input);
+  if (refs.length === 0) return null; // no packshot to steer from
+  const auth = { Authorization: `Key ${key}` };
+
+  try {
+    const submitRes = await fetch(`${HF_BASE}/marketing-studio/image`, {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({
+        prompt: buildHeroPrompt(input),
+        image_urls: refs, // editing mode: the packshots steer the real packaging
+        resolution: "2k",
+        aspect_ratio: hfAspect(input.ratio),
+      }),
+    });
+    if (!submitRes.ok) {
+      console.error("hero render (Higgsfield submit) failed:", submitRes.status, await submitRes.text().catch(() => ""));
+      return null;
+    }
+    const submit = await submitRes.json();
+    const statusUrl: string | undefined =
+      submit?.status_url ?? (submit?.request_id ? `${HF_BASE}/requests/${submit.request_id}/status` : undefined);
+    if (!statusUrl) return null;
+
+    const deadline = Date.now() + HF_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, HF_POLL_MS));
+      const stRes = await fetch(statusUrl, { headers: auth });
+      if (!stRes.ok) continue;
+      const st = await stRes.json();
+      const status: string | undefined = st?.status;
+      if (status === "completed") {
+        const url: string | undefined = st?.images?.[0]?.url ?? st?.results?.[0]?.url;
+        return url ? download(url) : null;
+      }
+      if (status === "failed" || status === "nsfw" || status === "canceled") {
+        console.error("hero render (Higgsfield) ended:", status);
+        return null;
+      }
+      // queued / in_progress → keep polling
+    }
+    console.error("hero render (Higgsfield) timed out");
+    return null;
+  } catch (err) {
+    console.error("hero render (Higgsfield) error:", err);
+    return null;
+  }
+}
+
+// ── OpenAI gpt-image-1 (fallback) ───────────────────────────────────────────────────────────────────
+
+const OPENAI_IMAGE_MODEL = "gpt-image-1";
+const IMAGE_QUALITY = process.env.HERO_IMAGE_QUALITY || "medium";
+
+function openaiSize(ratio: HeroRatio): string {
   if (ratio === "1:1") return "1024x1024";
-  if (ratio === "9:16") return "1024x1536";
-  return "1024x1536"; // 4:5 → nearest portrait; the card crops to 4:5
+  return "1024x1536"; // portrait; the card crops to 4:5
 }
 
 async function fetchImageBlob(url: string): Promise<Blob | null> {
@@ -37,31 +115,25 @@ async function fetchImageBlob(url: string): Promise<Blob | null> {
     const res = await fetch(url);
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
-    const type = res.headers.get("content-type") || "image/jpeg";
-    return new Blob([buf], { type });
+    return new Blob([buf], { type: res.headers.get("content-type") || "image/jpeg" });
   } catch {
     return null;
   }
 }
 
-/** Render the hero via OpenAI image edit (the packshots steer the real packaging). PNG bytes, or null. */
-async function renderHero(input: HeroInput): Promise<ArrayBuffer | null> {
+async function renderWithOpenAI(input: HeroInput): Promise<Rendered | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
-
   const refs = heroReferenceUrls(input);
   const blobs = (await Promise.all(refs.map(fetchImageBlob))).filter((b): b is Blob => b !== null);
-  if (blobs.length === 0) return null; // no packshot to steer from → nothing faithful to render
+  if (blobs.length === 0) return null;
 
   const form = new FormData();
   form.append("model", OPENAI_IMAGE_MODEL);
   form.append("prompt", buildHeroPrompt(input));
-  form.append("size", sizeFor(input.ratio));
+  form.append("size", openaiSize(input.ratio));
   form.append("quality", IMAGE_QUALITY);
-  // Keep brand logos + packaging text faithful to the reference packshots (gpt-image-1 edits default is
-  // "low", which garbles labels). "high" is OpenAI's recommended setting for logos/details.
-  form.append("input_fidelity", "high");
-  // gpt-image-1 image edit accepts multiple reference images under `image[]` (PNG/WEBP/JPG, <25MB each).
+  form.append("input_fidelity", "high"); // keep logos/text faithful (still weaker than Higgsfield)
   blobs.forEach((b, i) => {
     const ext = b.type.includes("png") ? "png" : b.type.includes("webp") ? "webp" : "jpg";
     form.append("image[]", b, `ref-${i}.${ext}`);
@@ -80,19 +152,27 @@ async function renderHero(input: HeroInput): Promise<ArrayBuffer | null> {
     const data = await res.json();
     const b64: string | undefined = data?.data?.[0]?.b64_json;
     if (!b64) return null;
-    // Copy into a fresh ArrayBuffer (a clean BlobPart; avoids Node Buffer / SharedArrayBuffer typing).
     const nodeBuf = Buffer.from(b64, "base64");
     const ab = new ArrayBuffer(nodeBuf.byteLength);
     new Uint8Array(ab).set(nodeBuf);
-    return ab;
+    return { bytes: ab, contentType: "image/png" };
   } catch (err) {
     console.error("hero render (OpenAI) error:", err);
     return null;
   }
 }
 
+// ── Dispatch + storage ──────────────────────────────────────────────────────────────────────────────
+
+/** Render the hero with the configured provider (Higgsfield preferred). Null on any failure. */
+async function renderHero(input: HeroInput): Promise<Rendered | null> {
+  if (process.env.HIGGSFIELD_API_KEY) return renderWithHiggsfield(input);
+  if (process.env.OPENAI_API_KEY) return renderWithOpenAI(input);
+  return null;
+}
+
 /** Upload bytes to the Supabase Storage bucket (upsert) and return the public URL, or null. */
-async function uploadToSupabase(objectKey: string, bytes: ArrayBuffer, contentType = "image/png"): Promise<string | null> {
+async function uploadToSupabase(objectKey: string, bytes: ArrayBuffer, contentType: string): Promise<string | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
@@ -100,12 +180,7 @@ async function uploadToSupabase(objectKey: string, bytes: ArrayBuffer, contentTy
   try {
     const res = await fetch(`${base}/storage/v1/object/${HERO_BUCKET}/${objectKey}`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        apikey: key,
-        "Content-Type": contentType,
-        "x-upsert": "true",
-      },
+      headers: { Authorization: `Bearer ${key}`, apikey: key, "Content-Type": contentType, "x-upsert": "true" },
       body: new Blob([bytes], { type: contentType }),
     });
     if (!res.ok) {
@@ -123,7 +198,8 @@ async function uploadToSupabase(objectKey: string, bytes: ArrayBuffer, contentTy
  *  `objectKey` is the storage path without extension, e.g. "product/<id>" or "list/<id>". */
 export async function generateAndStoreHero(input: HeroInput, objectKey: string): Promise<string | null> {
   if (!heroGenerationConfigured()) return null;
-  const bytes = await renderHero(input);
-  if (!bytes) return null;
-  return uploadToSupabase(`${objectKey}.png`, bytes, "image/png");
+  const rendered = await renderHero(input);
+  if (!rendered) return null;
+  const ext = rendered.contentType.includes("png") ? "png" : rendered.contentType.includes("webp") ? "webp" : "jpg";
+  return uploadToSupabase(`${objectKey}.${ext}`, rendered.bytes, rendered.contentType);
 }
