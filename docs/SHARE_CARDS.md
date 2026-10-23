@@ -116,11 +116,24 @@ front-face label scan → reads as a pasted rectangle; a serving-suggestion / li
   vision call (same "Claude is the extraction layer" philosophy): `studio_3d` | `flat_scan` | `lifestyle`
   | `unusable`. Optional-infra (no `ANTHROPIC_API_KEY` → null), best-effort (any error → null). Pure
   helpers `finalize()` and `planHero()` turn grades into a strategy; unit-tested in `packshotQuality.test.ts`.
-- **The ladder (`planHero`):**
-  1. any confidently-clean 3D packshot → **`hybrid`** scene from those (brand-deduped, capped at 4);
-  2. classifier fully unavailable → **`hybrid`** on what we have, `verified: false` (no regression);
-  3. no clean 3D shot but a faithful flat packshot → **`flat`** (show the real packshot on a tint card);
-  4. nothing usable → **`brand`** (the generic flat card).
+- **The image ladder (whole-card priority, most-preferred first):**
+  0. **Author cover** (`lists.cover_url`) — the curator's own chosen photo. Consented and always accurate,
+     zero rights/accuracy risk; wins over everything and never triggers generation (Igor's "a cover the
+     list author chooses", wired in the list share route).
+  1. **Real packshot, faithfully presented** — `planHero` over the products' packshots:
+     a. any confidently-clean 3D packshot → **`hybrid`** scene from those (brand-deduped, capped at 4);
+     b. classifier fully unavailable → **`hybrid`** on what we have, `verified: false` (no regression);
+     c. no clean 3D shot but a faithful flat packshot → **`flat`** (show the real packshot on a tint card).
+  2. **Designed card** — nothing usable → **`brand`** today (the generic flat card); the planned upgrade is
+     a category-illustration card (tomatoes + basil for sauces, etc. — Igor's suggestion #1): always
+     accurate, free, no rights risk. Kat (design) owns the visual; the rung already exists in the ladder.
+
+> **Accuracy guarantee (the crux of the Igor/Jitain thread):** the hybrid is **not** AI-generated
+> packaging. Only the *backdrop + lighting* are generated; the packaging pixels are the **real** OFF
+> cutout, unchanged — so it carries the same accuracy guarantee as showing the flat photo, just presented
+> on cream marble instead of a flat tint. We never redraw, re-letter or invent a label (the prompt forbids
+> it and the detector refuses messy inputs). OFF photos are free to reuse **with attribution** — crediting
+> them is a to-do (no `image_source` column yet).
 - **Wired as the gate** (`classifyAndPlanHero`) in both share routes and `generate-heroes.ts`: only a
   `hybrid` plan reaches the image model, so a flat-scan/lifestyle-only list keeps its faithful flat/brand
   card and never burns a generation credit. `--dry-run` skips classification to stay zero-spend.

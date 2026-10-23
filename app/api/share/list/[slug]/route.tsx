@@ -38,10 +38,16 @@ export async function GET(_req: Request, { params }: Params) {
   const owner = list.ownerId ? await getProfileById(dbi!, list.ownerId) : null;
   const count = list.items.length;
 
-  // Lazy-on-first-share: no hero yet → generate one in the background from the list's top imaged
-  // products, cache it, and it appears on the next fetch. Best-effort; never blocks or breaks the card,
-  // and a no-op when generation isn't configured. Runs once per list (hero_url is then set).
-  if (!list.heroUrl && heroGenerationConfigured()) {
+  // Image priority (the agreed ladder): the author's OWN chosen cover wins — it's consented and always
+  // accurate, zero rights/accuracy risk (Igor's "a cover the list author chooses"). Only when there is
+  // no cover do we fall to a generated product hero.
+  const listImage = list.coverUrl ?? list.heroUrl ?? null;
+
+  // Lazy-on-first-share: no cover AND no hero yet → generate one in the background from the list's top
+  // imaged products, cache it, and it appears on the next fetch. Best-effort; never blocks or breaks the
+  // card, and a no-op when generation isn't configured. Runs once per list (hero_url is then set). A list
+  // with an author cover never triggers generation (and never spends a credit).
+  if (!list.coverUrl && !list.heroUrl && heroGenerationConfigured()) {
     const imaged = list.items
       .map((it) => it.product)
       .filter((p) => p.imageUrl)
@@ -77,7 +83,7 @@ export async function GET(_req: Request, { params }: Params) {
       editorialCard({
         title: list.title,
         subtitle,
-        heroUrl: list.heroUrl ?? null,
+        heroUrl: listImage,
         ownerName: owner?.displayName ?? null,
         handle: owner?.handle ?? null,
         productCount: count,
@@ -94,7 +100,7 @@ export async function GET(_req: Request, { params }: Params) {
         title: list.title,
         chip: owner ? `@${owner.handle}` : null,
         meta: `${count} ${count === 1 ? "product" : "products"}`,
-        heroUrl: list.heroUrl ?? null,
+        heroUrl: listImage,
       }),
       { width: 1080, height: 1350, headers },
     );
