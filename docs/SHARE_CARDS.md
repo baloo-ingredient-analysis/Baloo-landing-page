@@ -104,6 +104,31 @@ another provider (fal.ai, Replicate) means adding one `renderWith…()` function
 > colours accurate and legible. Studio-clean: no shelves, no price tags, no clutter, no people, no added
 > text. Magazine-quality.
 
+## Packshot quality detector + fallback ladder (shipped — Slice 4)
+
+The hybrid hero (composite the REAL product cutout onto a generated studio backdrop, so packaging text is
+never AI-invented — Jitain's hard requirement) only looks right when the source packshot is a **clean 3D
+studio photo**. Validated Oct 2026 across varied lists (jars, bags, cartons, bottles → excellent; a flat
+front-face label scan → reads as a pasted rectangle; a serving-suggestion / lifestyle shot → breaks). As
+~half the Open Food Facts catalogue is messy, packshots must be **sorted before compositing**.
+
+- **`lib/sharecard/packshotQuality.ts`** — `classifyPackshot(url)` grades one image with a single Claude
+  vision call (same "Claude is the extraction layer" philosophy): `studio_3d` | `flat_scan` | `lifestyle`
+  | `unusable`. Optional-infra (no `ANTHROPIC_API_KEY` → null), best-effort (any error → null). Pure
+  helpers `finalize()` and `planHero()` turn grades into a strategy; unit-tested in `packshotQuality.test.ts`.
+- **The ladder (`planHero`):**
+  1. any confidently-clean 3D packshot → **`hybrid`** scene from those (brand-deduped, capped at 4);
+  2. classifier fully unavailable → **`hybrid`** on what we have, `verified: false` (no regression);
+  3. no clean 3D shot but a faithful flat packshot → **`flat`** (show the real packshot on a tint card);
+  4. nothing usable → **`brand`** (the generic flat card).
+- **Wired as the gate** (`classifyAndPlanHero`) in both share routes and `generate-heroes.ts`: only a
+  `hybrid` plan reaches the image model, so a flat-scan/lifestyle-only list keeps its faithful flat/brand
+  card and never burns a generation credit. `--dry-run` skips classification to stay zero-spend.
+
+> Note: this is the SELECTION gate. The automatic hybrid *compositor* (generate backdrop → cut out real
+> packshots → composite with contact shadows), prototyped by hand this round, is the next slice; today a
+> `hybrid` plan still goes through the generative provider below.
+
 ## Composing the card (Slice 3)
 
 - **Now:** the portrait IG card (`lib/igCard.tsx`, used by `/api/share/{list,product}/[slug]`) renders
@@ -133,5 +158,7 @@ another provider (fal.ai, Replicate) means adding one `renderWith…()` function
 | IG card uses the hero | **shipped** (Satori top band) |
 | Editorial list card (4:5) — the mockup look | **shipped** (V2, Satori + bundled Playfair/Caveat/Baloo 2 fonts; `lib/sharecard/editorialCard.tsx`) |
 | Editorial product card + 9:16 story + 1.91:1 unfurl | **planned** |
+| Packshot quality detector + fallback ladder | **shipped** (Slice 4) — Claude-vision grade gates generation; only clean 3D packshots reach the model |
+| Automatic hybrid compositor (backdrop + real cutouts) | **planned** — prototyped by hand (validated across varied lists); automate next |
 | Hero label fidelity (compositing vs generative) | **open** — generative models occasionally misspell packaging text; compositing real cutouts is the faithful alternative |
 | Video | **planned** (after images) |

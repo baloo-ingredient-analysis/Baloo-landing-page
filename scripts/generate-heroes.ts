@@ -20,6 +20,7 @@ config({ path: ".env.development.local" });
 import { db } from "../lib/db";
 import { buildHeroPrompt, heroReferenceUrls, type HeroInput, type HeroRatio } from "../lib/sharecard/prompt";
 import { generateAndStoreHero, heroGenerationConfigured } from "../lib/sharecard/generate";
+import { classifyAndPlanHero } from "../lib/sharecard/packshotQuality";
 import {
   listsNeedingHero,
   productsNeedingHero,
@@ -56,6 +57,27 @@ async function main() {
     process.exit(1);
   }
 
+  // Classify the packshots and keep only a CLEAN 3D-packshot ("hybrid") plan; a flat-scan/lifestyle-only
+  // row is skipped here and keeps its flat/brand card. Skipped in --dry-run so a preview stays zero-spend.
+  async function planAndRun(
+    kind: "product" | "list",
+    id: string,
+    ratio: HeroRatio,
+    products: HeroInput["products"],
+    objectKey: string,
+  ) {
+    let chosen = products;
+    if (!dryRun) {
+      const plan = await classifyAndPlanHero(products, kind === "product" ? 1 : 4);
+      if (plan.strategy !== "hybrid") {
+        console.log(`– ${kind} ${id}: skipped — no clean 3D packshot (${plan.strategy})`);
+        return;
+      }
+      chosen = plan.products;
+    }
+    await run(kind, id, { kind, ratio, products: chosen }, objectKey);
+  }
+
   async function run(kind: "product" | "list", id: string, input: HeroInput, objectKey: string) {
     if (dryRun) {
       console.log(`\n[dry-run] ${kind} ${id}\n  refs: ${heroReferenceUrls(input).length}\n  prompt: ${buildHeroPrompt(input)}`);
@@ -75,10 +97,11 @@ async function main() {
     const queue = await productsNeedingHero(dbi, limit);
     console.log(`Products needing a hero: ${queue.length}`);
     for (const p of queue) {
-      await run(
+      await planAndRun(
         "product",
         p.id,
-        { kind: "product", ratio: PRODUCT_RATIO, products: [{ name: p.name, brand: p.brand, packshotUrl: p.packshotUrl }] },
+        PRODUCT_RATIO,
+        [{ name: p.name, brand: p.brand, packshotUrl: p.packshotUrl }],
         `product/${p.id}`,
       );
     }
@@ -88,7 +111,7 @@ async function main() {
     const queue = await listsNeedingHero(dbi, limit);
     console.log(`Lists needing a hero: ${queue.length}`);
     for (const l of queue) {
-      await run("list", l.listId, { kind: "list", ratio: LIST_RATIO, products: l.products }, `list/${l.listId}`);
+      await planAndRun("list", l.listId, LIST_RATIO, l.products, `list/${l.listId}`);
     }
   }
 

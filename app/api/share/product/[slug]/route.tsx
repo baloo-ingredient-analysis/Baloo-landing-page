@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getProductForPage } from "@/lib/db/queries/products";
 import { igCard, type IgRow } from "@/lib/igCard";
 import { generateAndStoreHero, heroGenerationConfigured } from "@/lib/sharecard/generate";
+import { classifyAndPlanHero } from "@/lib/sharecard/packshotQuality";
 import { claimProductHero, setProductHero } from "@/lib/sharecard/heroes";
 
 // Per-product Instagram card (4:5, 1080×1350) — the portrait share asset for a product, used by the
@@ -33,8 +34,12 @@ export async function GET(_req: Request, { params }: Params) {
     after(async () => {
       try {
         if (!dbi || !(await claimProductHero(dbi, id))) return; // another request is already generating
+        // Gate on packshot quality: only a clean 3D packshot gets restaged into a hero. A flat-scan or
+        // lifestyle photo keeps the flat/brand card (faithful, free) instead of a poor generated hero.
+        const plan = await classifyAndPlanHero([{ name, brand, packshotUrl: imageUrl }], 1);
+        if (plan.strategy !== "hybrid") return;
         const heroUrl = await generateAndStoreHero(
-          { kind: "product", ratio: "4:5", products: [{ name, brand, packshotUrl: imageUrl }] },
+          { kind: "product", ratio: "4:5", products: plan.products },
           `product/${id}`,
         );
         if (heroUrl) await setProductHero(dbi, id, heroUrl);

@@ -22,6 +22,16 @@ slices. See [`SHARE_CARDS.md`](SHARE_CARDS.md).
   shop-shelf photos into a studio still life).
 - **Slice 3 — compose:** the portrait IG card (`lib/igCard.tsx`) shows the generated hero in its top band
   when `hero_url` is set, else the flat card. The full 3-format editorial card (Chromium) is the planned V2.
+- **Slice 4 — packshot quality detector + fallback ladder:** the hybrid hero (real product cutout on a
+  generated backdrop, so packaging text is never AI-invented — Jitain's accuracy rule) only works from a
+  clean 3D packshot, and ~half the OFF catalogue is messy (flat label scans, serving-suggestion shots).
+  `lib/sharecard/packshotQuality.ts` grades each packshot with one Claude vision call
+  (`studio_3d`/`flat_scan`/`lifestyle`/`unusable`) and a pure, tested `planHero` ladder picks the
+  strategy (`hybrid` → `flat` → `brand`). Wired as the gate (`classifyAndPlanHero`) in both share routes
+  and the offline job: only a clean-3D (`hybrid`) plan reaches the image model, so messy-packshot lists
+  keep their faithful flat/brand card and no credit is wasted. Optional-infra + best-effort; `--dry-run`
+  stays zero-spend. The automatic hybrid *compositor* is the next slice (prototyped by hand this round,
+  validated across varied lists).
 
 ### Two-axis ingredient tags (origin × processed) — `feat/two-axis-tags`
 Resolved the long-pending 2-vs-3 tag decision (team, 16 Oct 2026): the single Natural/Processed badge

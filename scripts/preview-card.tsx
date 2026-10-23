@@ -22,12 +22,12 @@ const heroMime = heroPath && /\.jpe?g$/i.test(heroPath) ? "image/jpeg" : "image/
 const heroUrl = heroPath ? `data:${heroMime};base64,${readFileSync(heroPath).toString("base64")}` : null;
 
 const el = editorialCard({
-  title: "Weeknight dinners",
-  subtitle: "Dinner · Quick meals · Snacks",
+  title: process.env.CARD_TITLE || "Weeknight dinners",
+  subtitle: process.env.CARD_SUBTITLE || "Dinner · Quick meals · Snacks",
   heroUrl,
-  ownerName: "Marco Ferri",
-  handle: "marcocooks",
-  productCount: 5,
+  ownerName: process.env.CARD_OWNER || "Marco Ferri",
+  handle: process.env.CARD_HANDLE || "marcocooks",
+  productCount: Number(process.env.CARD_COUNT || 5),
 });
 
 (async () => {

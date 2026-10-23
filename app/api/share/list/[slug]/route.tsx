@@ -7,7 +7,7 @@ import { igCard } from "@/lib/igCard";
 import { editorialCard } from "@/lib/sharecard/editorialCard";
 import { loadCardFonts } from "@/lib/sharecard/cardFonts";
 import { generateAndStoreHero, heroGenerationConfigured } from "@/lib/sharecard/generate";
-import { pickHeroProducts } from "@/lib/sharecard/prompt";
+import { classifyAndPlanHero } from "@/lib/sharecard/packshotQuality";
 import { claimListHero, setListHero } from "@/lib/sharecard/heroes";
 
 // Per-list Instagram card (4:5, 1080×1350) — the portrait share asset for a public list. Private
@@ -42,16 +42,21 @@ export async function GET(_req: Request, { params }: Params) {
   // products, cache it, and it appears on the next fetch. Best-effort; never blocks or breaks the card,
   // and a no-op when generation isn't configured. Runs once per list (hero_url is then set).
   if (!list.heroUrl && heroGenerationConfigured()) {
-    const heroProducts = pickHeroProducts(
-      list.items.map((it) => it.product).filter((p) => p.imageUrl),
-      4,
-    ).map((p) => ({ name: p.name, brand: p.brand, packshotUrl: p.imageUrl as string }));
-    if (heroProducts.length > 0) {
+    const imaged = list.items
+      .map((it) => it.product)
+      .filter((p) => p.imageUrl)
+      .map((p) => ({ name: p.name, brand: p.brand, packshotUrl: p.imageUrl as string }));
+    if (imaged.length > 0) {
       after(async () => {
         try {
           if (!(await claimListHero(dbi!, list.id))) return; // another request is already generating
+          // Gate on packshot quality: only feed CLEAN 3D packshots to the generator (the quality
+          // detector). A flat-scan-only or lifestyle-only list keeps its flat/brand card instead of a
+          // poor hero, and never burns a generation credit.
+          const plan = await classifyAndPlanHero(imaged, 4);
+          if (plan.strategy !== "hybrid") return;
           const heroUrl = await generateAndStoreHero(
-            { kind: "list", ratio: "4:5", products: heroProducts },
+            { kind: "list", ratio: "4:5", products: plan.products },
             `list/${list.id}`,
           );
           if (heroUrl) await setListHero(dbi!, list.id, heroUrl);
