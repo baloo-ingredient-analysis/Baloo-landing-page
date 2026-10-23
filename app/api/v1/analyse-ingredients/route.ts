@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type Body = {
-  product?: { name?: string; brand?: string; size?: string; retailer?: string; barcode?: string };
+  product?: { name?: string; brand?: string; size?: string; retailer?: string; barcode?: string; imageUrl?: string };
   ingredients?: string[];
   percentages?: { ingredient: string; percentage: string }[];
   nutrition?: Nutrition;
@@ -65,6 +65,7 @@ export async function POST(req: Request) {
       brand: body.product?.brand?.trim() || null,
       barcode: body.product?.barcode?.trim() || null,
       retailer: body.product?.retailer?.trim() || null,
+      imageUrl: body.product?.imageUrl?.trim() || null,
       ingredients_list: ingredients,
       percentages: Array.isArray(body.percentages) ? body.percentages : [],
       nutrition: body.nutrition ?? null,

@@ -23,6 +23,9 @@ export type AnalyseAndCacheInput = {
   ingredients_list: string[];
   percentages: { ingredient: string; percentage: string }[];
   nutrition?: Nutrition | null;
+  // Packshot the mobile engine captured for this product (its best identified front image). Persisted
+  // to products.image_url; ingest also backfills from OFF by barcode when this is absent.
+  imageUrl?: string | null;
 };
 
 export type AnalyseResponse = {
@@ -99,6 +102,7 @@ export async function analyseAndCache(
       barcode: input.barcode,
       retailer: input.retailer ?? null,
       url: input.url ?? null,
+      imageUrl: input.imageUrl ?? null,
       ingredients: analysis.ingredients,
       product_summary: analysis.product_summary ?? null,
       nutrition,

@@ -53,6 +53,7 @@ export async function importOffMapped(dbi: Db, off: OffProduct): Promise<ImportR
     brand: off.brand,
     barcode: off.barcode,
     retailer: null, // not a store-sourced product
+    imageUrl: off.imageUrl, // OFF packshot (image_front_url) → products.image_url; feeds share-card heroes
     ingredients: analysis.ingredients,
     product_summary: analysis.product_summary ?? null,
     nutrition: off.nutrition ?? undefined,

@@ -235,6 +235,24 @@ export async function getOffProductByBarcode(barcode: string): Promise<OffProduc
   return mapOffProduct(data.product);
 }
 
+/** Just the packshot URL for a barcode (image_front_url, else image_url) — fetches only the image
+ *  fields, so it's cheap. Null when OFF has no image or the fetch fails. Used to backfill
+ *  products.image_url for barcoded products from any flow, so a share-card hero can be generated. */
+export async function getOffImageByBarcode(barcode: string): Promise<string | null> {
+  const code = barcode.replace(/\D/g, "");
+  if (code.length < 8) return null;
+  const data = (await offFetch(
+    `${OFF_BASE}/api/v2/product/${code}.json?fields=code,image_front_url,image_url`,
+  )) as { status?: number; product?: Record<string, unknown> } | null;
+  if (!data || data.status !== 1 || !data.product) return null;
+  const p = data.product;
+  return (
+    (typeof p.image_front_url === "string" && p.image_front_url) ||
+    (typeof p.image_url === "string" && p.image_url) ||
+    null
+  );
+}
+
 // A lightweight search hit — enough to pick a product, then hydrate the full one by barcode. We use
 // OFF's dedicated search service (search-a-licious): ~10x faster than the legacy cgi/search.pl, better
 // ranked, and it returns clean JSON (search.pl intermittently returns an HTML error page).

@@ -15,6 +15,7 @@ import {
 import { upsertProductByCanonicalKey } from "./db/queries/products";
 import { upsertOffer } from "./db/queries/offers";
 import { canonicalKey, ingredientKey, productSlug } from "./canonical";
+import { getOffImageByBarcode } from "./openfoodfacts";
 import { embedText, productEmbeddingText } from "./embeddings";
 import type { Ingredient, Nutrition } from "./schema";
 import { deriveTag } from "./schema";
@@ -28,6 +29,10 @@ export type IngestInput = {
   // converge on ONE row — but only when the identity actually matches.
   brand?: string | null;
   barcode?: string | null;
+  // Product packshot (OFF image_front_url, or a mobile-engine capture). Persisted so the product page
+  // and share cards can show it — and so the share-card hero can be generated from it. Best-effort:
+  // null when a source has no image; a null never overwrites a packshot we already hold (see upsert).
+  imageUrl?: string | null;
   ingredients: Ingredient[];
   product_summary?: string | null;
   nutrition?: Nutrition | null;
@@ -50,6 +55,19 @@ export async function ingestAnalysis(
     });
     const slug = productSlug(input.product_name, key);
 
+    // Packshot: use the image the source gave us; otherwise, when we have a barcode, backfill it from
+    // Open Food Facts (best-effort, never fatal). We already run inside after(), so this lookup is off
+    // the user's path — and it gives barcoded products (mobile scans, pasted links OFF knows) a hero
+    // source even when the originating flow carried no image.
+    let imageUrl = input.imageUrl ?? null;
+    if (!imageUrl && input.barcode) {
+      try {
+        imageUrl = await getOffImageByBarcode(input.barcode);
+      } catch {
+        /* best-effort: a missing packshot never blocks ingest */
+      }
+    }
+
     // Dedup: converge on one row per canonical_key (descriptive fields refresh on re-scan).
     const product = await upsertProductByCanonicalKey(dbi, {
       canonicalKey: key,
@@ -58,6 +76,7 @@ export async function ingestAnalysis(
       brand: input.brand ?? null,
       barcode: input.barcode ?? null,
       retailer: input.retailer ?? null,
+      imageUrl,
       countries: input.countries ?? null,
       source: "user_scan",
     });
