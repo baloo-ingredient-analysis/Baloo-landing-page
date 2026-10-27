@@ -1,5 +1,9 @@
 # Baloo — ingredient tool + community platform
 
+> **New session? Read [`docs/SESSION_CONTEXT.md`](docs/SESSION_CONTEXT.md) first** — cross-session
+> continuity: where things live (incl. the Notion hub + the 17-screen design doc), current share-card
+> state, the people (Miquel/Jitain/Igor), and working preferences. Keep it current.
+
 ## What this is
 A Next.js (App Router) web tool on baloo.life. The user pastes a supermarket product URL, hits
 Analyse, and gets a streamed, per-ingredient breakdown: what each ingredient is, why it's in this
