@@ -3,8 +3,9 @@
 // returning the public URL. Used by BOTH the offline job (scripts/generate-heroes.ts) and the
 // lazy-on-first-share trigger in the share routes.
 //
-// Provider is pluggable and chosen by which key is set (Higgsfield preferred — it keeps brand logos
-// faithful, which gpt-image-1 does not; OpenAI gpt-image-1 is the fallback):
+// Provider is a setup-time choice, by which key is set (Higgsfield preferred — it keeps brand logos
+// faithful, which gpt-image-1 does not). It is NOT a per-call failover: see renderHero for why a failed
+// Higgsfield render returns null rather than falling over to the label-garbling OpenAI path.
 //   • HIGGSFIELD_API_KEY = "KEY_ID:KEY_SECRET"  → Higgsfield Marketing Studio Image (async submit+poll)
 //   • OPENAI_API_KEY                            → OpenAI gpt-image-1 (image edit, synchronous)
 // Plus storage: SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL and a public `share-heroes` bucket.
@@ -40,7 +41,11 @@ async function download(url: string): Promise<Rendered | null> {
 
 const HF_BASE = "https://api.higgsfield.ai";
 const HF_POLL_MS = 4000;
-const HF_TIMEOUT_MS = 55_000;
+// Poll budget. The lazy-on-first-share path runs this inside after() under the route's maxDuration=60s,
+// AFTER the packshot classifier (up to ~4 parallel Claude vision calls, ~10s) and BEFORE the storage
+// upload (~3s). Keep it well under 60 − classify − upload so a slow render can't get the function killed
+// mid-flight (which would spend the claim's cooldown with no hero stored). Typical HF render is ~30s.
+const HF_TIMEOUT_MS = 40_000;
 
 function hfAspect(ratio: HeroRatio): string {
   if (ratio === "1:1") return "1:1";
@@ -164,7 +169,13 @@ async function renderWithOpenAI(input: HeroInput): Promise<Rendered | null> {
 
 // ── Dispatch + storage ──────────────────────────────────────────────────────────────────────────────
 
-/** Render the hero with the configured provider (Higgsfield preferred). Null on any failure. */
+/** Render the hero with the configured provider. Null on any failure.
+ *
+ *  Provider is a SETUP-TIME choice, not a per-call failover: Higgsfield when its key is set, else OpenAI.
+ *  This is deliberate — gpt-image-1 garbles brand text, so failing a Higgsfield render over to OpenAI could
+ *  publish a card with WRONG packaging (the one thing we never do). When Higgsfield fails we return null;
+ *  the caller then shows the designed/flat card, which is always accurate. To switch providers, change
+ *  which key is set. (OpenAI stays only as a cheap keyless-of-Higgsfield fallback for dev/testing.) */
 async function renderHero(input: HeroInput): Promise<Rendered | null> {
   if (process.env.HIGGSFIELD_API_KEY) return renderWithHiggsfield(input);
   if (process.env.OPENAI_API_KEY) return renderWithOpenAI(input);
