@@ -7,6 +7,19 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### Session 23–27 Oct 2026 — share cards, accuracy ladder, continuity — `fix/instagram-share-desktop-v9vkps`
+Full checklist (what + how) in [`SESSION_SUMMARY_2026-10_SHARE_CARDS.md`](SESSION_SUMMARY_2026-10_SHARE_CARDS.md). Headlines:
+- **Accuracy ladder shipped** — a Claude-vision **packshot quality detector** + a tested `planHero` ladder
+  (**author cover → real clean packshot → designed no-photo card → brand**) gate what reaches the image
+  model, so a credit is only spent on a genuinely clean photo and a messy-packshot list keeps an accurate
+  card. The hybrid composites the **real** OFF cutout on a generated backdrop — never AI-invented packaging.
+- **Full format set** — editorial card, designed no-photo card, ingredient-first product card, and all
+  three ratios (feed 4:5 · story 9:16 · unfurl 1.91:1); author cover wins over a generated hero.
+- **Video validated** — card → **first-frame image-to-video** (Higgsfield) keeps text crisp, ~20 credits/5s.
+- **Hardened** — reviewed ~4,900 lines, fixed 3 real bugs; typecheck + 142 tests green.
+- **Continuity** — `SESSION_CONTEXT.md` (durable memory, pointed to from `CLAUDE.md`) + a standing
+  "update docs before wrapping up" rule, after Notion memory turned out empty and at its free-block limit.
+
 ### Social share cards — real product heroes — `fix/instagram-share-desktop-v9vkps`
 The groundwork for share cards that carry a real, presented product photo (the Jetain mockups), built in
 slices. See [`SHARE_CARDS.md`](SHARE_CARDS.md).
