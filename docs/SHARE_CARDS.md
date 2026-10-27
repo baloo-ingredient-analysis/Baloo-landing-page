@@ -181,4 +181,4 @@ front-face label scan → reads as a pasted rectangle; a serving-suggestion / li
 | Designed no-photo card (title + numbered list + motif) | **shipped** (v0, `designedCard.tsx`) — the accurate/free fallback; Kat to refine |
 | Automatic hybrid compositor (backdrop + real cutouts) | **planned** — prototyped by hand (validated across varied lists); automate next |
 | Hero label fidelity (compositing vs generative) | **open** — generative models occasionally misspell packaging text; compositing real cutouts is the faithful alternative |
-| Video | **planned** (after images) |
+| Video / reel (9:16) | **experiment validated** (27 Oct 2026) — card → first-frame image-to-video (Higgsfield `grok_video_v15_lite`, `start_image`) keeps text crisp + adds premium motion, ~20 credits/5s; not yet wired into code |

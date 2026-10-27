@@ -40,10 +40,15 @@ Sign-in · Settings · Moderation. Mobile app screens: still to design.
   REAL Open Food Facts cutout onto a *generated backdrop* — not generative packaging. The generative
   hero path (Higgsfield marketing_studio) is still live and is the only thing that can produce a *wrong*
   card; recommendation on the table is to keep it OFF for launch and rely on real-photo + designed cards.
-- **Pending:** automate the hybrid compositor (prototyped by hand; ~half the OFF catalogue is too messy,
-  which is why the detector matters); video/reel share (experiment with Higgsfield before building);
-  profile share card + product unfurl still flat; category illustrations for the designed card (Kat);
-  OFF image attribution column.
+- **Video/reel share — EXPERIMENT DONE (27 Oct 2026), it works & is shareable.** Winning approach:
+  render the 9:16 card → **first-frame image-to-video** (Higgsfield `grok_video_v15_lite`, role
+  `start_image`). The card is literally frame 1 so text/labels stay crisp; the model only adds subtle
+  premium motion (slow push-in, drifting light). ~20 credits / 5s at 1080p. (seedance treated the image
+  as a *reference* and regenerated → text risk; avoid for this.) Not yet wired into code — it's a
+  validated manual flow.
+- **Other pending:** automate the hybrid compositor (prototyped by hand; ~half the OFF catalogue is too
+  messy, which is why the detector matters); profile share card + product unfurl still flat; category
+  illustrations for the designed card (Kat); OFF image attribution column.
 
 ## Live launch blocker
 - **baloo.life still serves the OLD Figma Make pitch deck, not the Vercel app** → all SEO + llms.txt /
