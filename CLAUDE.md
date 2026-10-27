@@ -2,7 +2,12 @@
 
 > **New session? Read [`docs/SESSION_CONTEXT.md`](docs/SESSION_CONTEXT.md) first** — cross-session
 > continuity: where things live (incl. the Notion hub + the 17-screen design doc), current share-card
-> state, the people (Miquel/Jitain/Igor), and working preferences. Keep it current.
+> state, the people (Miquel/Jitain/Igor), and working preferences.
+>
+> **Before wrapping up any session, update the docs so the next session stays current** — at minimum
+> `docs/SESSION_CONTEXT.md`, plus `docs/CHANGELOG.md` and any other doc a change touches. Treat this as
+> part of "done", not optional. (Notion memory is the preferred home but the workspace is at its
+> free-block limit, so the repo docs are the durable memory for now.)
 
 ## What this is
 A Next.js (App Router) web tool on baloo.life. The user pastes a supermarket product URL, hits

@@ -2,8 +2,12 @@
 
 > Each Claude/agent session starts blank. It only knows what's in this repo, what the user pastes, or
 > (when available) Notion memory. The Notion workspace is on the free plan and has hit its block limit,
-> so Notion memory can't be written yet — **this file is the durable memory in the meantime.** Keep it
-> current: when a decision lands or state changes, update the relevant section.
+> so Notion memory can't be written yet — **this file is the durable memory in the meantime.**
+>
+> **End-of-session rule (standing instruction from Miquel):** before wrapping up any session, update this
+> file to reflect new state and decisions, and update `docs/CHANGELOG.md` + any other doc a change
+> touched. This is part of "done". If Notion memory becomes writable later (workspace upgraded), mirror
+> this context there too (see `notion://docs/memory`).
 
 ## Where things live (so nothing gets re-derived)
 - **Code:** this repo, `baloo-ingredient-analysis/Baloo-landing-page`. Deep reference in `docs/`
