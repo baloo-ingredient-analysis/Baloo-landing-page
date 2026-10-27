@@ -25,6 +25,18 @@ Home/tool · Search results · Product page · Ingredient expanded · Nutrition 
 Profile · Feed/Following · Comments/discussion · Pantry · New list · List editor · Lists empty ·
 Sign-in · Settings · Moderation. Mobile app screens: still to design.
 
+## Already built — don't rebuild (check here first)
+- **Language / i18n shell is DONE** (Jitain's "UI shell for languages" big win). `lib/i18n/` has it all:
+  `config.ts` (locales `en`/`es`, `localizePath`/`stripLocale`, gated behind `NEXT_PUBLIC_I18N_ENABLED`),
+  `server.ts` (`getLocale`/`getServerDictionary` via the `x-locale` header), `context.tsx`
+  (`LocaleProvider`/`useT`/`useLocale`), a 221-line typed `dictionaries.ts` (`es` is `typeof en`, with
+  **real Spanish**), `metadata.ts`, `useLocalizedRouter.ts`, plus `middleware.ts` (routes `/es` →
+  `x-locale`, strips the prefix) and `components/LocaleToggle.tsx` / `components/i18n/LocalizedLink.tsx`.
+  ~20 surfaces are wired. It's OFF until the engine serves Spanish content. Remaining work is only
+  *extending dictionary coverage* to the not-yet-wired screens (product/list pages, settings, editor,
+  moderation, profile) — speculative while the flag is off, so not urgent.
+- **AI-bot text (llms.txt) is DONE** (see below). **Share cards** — see the share-cards section.
+
 ## Guardrail that never moves
 - **Score-free, forever.** No score, rating, traffic-light, or good/bad verdict anywhere. The
   Natural/Processed pill is the only meaningful colour.
