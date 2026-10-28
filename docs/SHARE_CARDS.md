@@ -179,6 +179,6 @@ front-face label scan → reads as a pasted rectangle; a serving-suggestion / li
 | Packshot quality detector + fallback ladder | **shipped** (Slice 4) — Claude-vision grade gates generation; only clean 3D packshots reach the model |
 | Author cover wins over generated hero (consent-first) | **shipped** — `lists.cover_url` is the top rung of the list card |
 | Designed no-photo card (title + numbered list + motif) | **shipped** (v0, `designedCard.tsx`) — the accurate/free fallback; Kat to refine |
-| Automatic hybrid compositor (backdrop + real cutouts) | **planned** — prototyped by hand (validated across varied lists); automate next |
-| Hero label fidelity (compositing vs generative) | **open** — generative models occasionally misspell packaging text; compositing real cutouts is the faithful alternative |
+| Automatic hybrid compositor (backdrop + real cutouts) | **shipped** — `lib/sharecard/composite.ts` (sharp) + `bgRemove.ts` + shipped `backdrops/cream-marble.jpg`; the primary hero renderer, generative demoted to `HERO_GENERATIVE=1`. ⚠️ the Higgsfield bg-removal REST endpoint needs one live-key check |
+| Hero label fidelity (compositing vs generative) | **resolved** — the compositor places the REAL cutout, never redraws packaging; generative is off by default |
 | Video / reel (9:16) | **experiment validated** (27 Oct 2026) — card → first-frame image-to-video (Higgsfield `grok_video_v15_lite`, `start_image`) keeps text crisp + adds premium motion, ~20 credits/5s; not yet wired into code |

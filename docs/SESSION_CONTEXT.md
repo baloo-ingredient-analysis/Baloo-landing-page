@@ -52,6 +52,14 @@ Sign-in · Settings · Moderation. Mobile app screens: still to design.
   REAL Open Food Facts cutout onto a *generated backdrop* — not generative packaging. The generative
   hero path (Higgsfield marketing_studio) is still live and is the only thing that can produce a *wrong*
   card; recommendation on the table is to keep it OFF for launch and rely on real-photo + designed cards.
+- **Hybrid compositor — AUTOMATED (28 Oct 2026).** `lib/sharecard/composite.ts` (sharp: scale + place +
+  contact shadows, layouts for 1–4) + `bgRemove.ts` (Higgsfield background removal, cutouts cached in
+  Supabase) + shipped backdrop `lib/sharecard/backdrops/cream-marble.jpg`. It's now the PRIMARY hero
+  renderer in `generate.ts` (`renderWithCompositor`); the generative path is off unless `HERO_GENERATIVE=1`.
+  Detector widened so clean **flat** fronts also composite (Jitain's call). **⚠️ One open check:** the
+  Higgsfield bg-removal REST path/shape (`bgRemove.ts` `HF_REMOVE_PATH`) couldn't be live-verified
+  in-session (no key in env) — confirm with a live key and adjust if needed; everything degrades safely
+  (no cutout → designed card) until then. Compositor itself validated locally against real cutouts.
 - **Video/reel share — EXPERIMENT DONE (27 Oct 2026), it works & is shareable.** Winning approach:
   render the 9:16 card → **first-frame image-to-video** (Higgsfield `grok_video_v15_lite`, role
   `start_image`). The card is literally frame 1 so text/labels stay crisp; the model only adds subtle

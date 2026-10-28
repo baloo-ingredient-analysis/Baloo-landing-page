@@ -6,11 +6,13 @@ const prod = (name: string, brand: string | null = null) => ({ name, brand });
 const graded = <T>(product: T, quality: ReturnType<typeof q> | null): GradedProduct<T> => ({ product, quality });
 
 describe("finalize", () => {
-  it("only a confident studio_3d is usable for the hybrid scene", () => {
+  it("a confident studio_3d OR clean flat scan is usable for the hybrid scene", () => {
     expect(q("studio_3d", 0.9).usableForHybrid).toBe(true);
+    expect(q("flat_scan", 0.9).usableForHybrid).toBe(true); // compositor handles flat fronts too
     expect(q("studio_3d", 0.3).usableForHybrid).toBe(false); // low confidence → fail safe
-    expect(q("flat_scan", 0.95).usableForHybrid).toBe(false);
+    expect(q("flat_scan", 0.3).usableForHybrid).toBe(false);
     expect(q("lifestyle", 0.95).usableForHybrid).toBe(false);
+    expect(q("unusable", 0.95).usableForHybrid).toBe(false);
   });
 
   it("studio and flat scans are both faithful enough to show flat on a tint card", () => {
@@ -22,16 +24,16 @@ describe("finalize", () => {
 });
 
 describe("planHero (fallback ladder)", () => {
-  it("1. composes only the clean 3D packshots, dropping flat/lifestyle ones", () => {
+  it("1. composes the clean packshots (3D or flat), dropping only lifestyle/unusable", () => {
     const plan = planHero([
       graded(prod("Nutella", "Nutella"), q("studio_3d")),
-      graded(prod("Actimel", "Actimel"), q("flat_scan")), // dropped from the scene
+      graded(prod("Actimel", "Actimel"), q("flat_scan")), // clean flat → now composited too
       graded(prod("Gazpacho", "Hacendado"), q("studio_3d")),
       graded(prod("Hummus", "Hacendado"), q("lifestyle")), // dropped
     ]);
     expect(plan.strategy).toBe("hybrid");
     expect(plan.verified).toBe(true);
-    expect(plan.products.map((p) => p.name)).toEqual(["Nutella", "Gazpacho"]);
+    expect(plan.products.map((p) => p.name)).toEqual(["Nutella", "Actimel", "Gazpacho"]);
   });
 
   it("1b. a single clean packshot still yields a (one-product) hybrid", () => {
@@ -50,12 +52,12 @@ describe("planHero (fallback ladder)", () => {
     expect(plan.products.map((p) => p.name)).toEqual(["A", "B"]);
   });
 
-  it("3. no clean 3D shot but a faithful flat scan → flat card with that one product", () => {
+  it("3. a clean flat scan alongside a lifestyle shot → hybrid with the flat one", () => {
     const plan = planHero([
       graded(prod("Actimel", "Actimel"), q("flat_scan")),
       graded(prod("Hummus", "Hacendado"), q("lifestyle")),
     ]);
-    expect(plan.strategy).toBe("flat");
+    expect(plan.strategy).toBe("hybrid");
     expect(plan.products.map((p) => p.name)).toEqual(["Actimel"]);
   });
 

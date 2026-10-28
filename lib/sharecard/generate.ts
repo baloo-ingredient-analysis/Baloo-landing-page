@@ -14,10 +14,19 @@
 // the card then falls back to the flat packshot. Never throws to the caller. See docs/SHARE_CARDS.md.
 
 import { buildHeroPrompt, heroReferenceUrls, type HeroInput, type HeroRatio } from "./prompt";
+import { compositeHero } from "./composite";
+import { getOrCreateCutout } from "./bgRemove";
+import { hashUrl } from "../hash";
 
 const HERO_BUCKET = process.env.HERO_BUCKET || "share-heroes";
 
 type Rendered = { bytes: ArrayBuffer; contentType: string };
+
+function toArrayBuffer(u8: Uint8Array): ArrayBuffer {
+  const ab = new ArrayBuffer(u8.byteLength);
+  new Uint8Array(ab).set(u8);
+  return ab;
+}
 
 /** True when some provider AND storage are configured (else generation is a no-op). */
 export function heroGenerationConfigured(): boolean {
@@ -167,17 +176,58 @@ async function renderWithOpenAI(input: HeroInput): Promise<Rendered | null> {
   }
 }
 
+// ── Faithful hybrid compositor (primary) ──────────────────────────────────────────────────────────────
+
+// The backdrop is a bundled asset (same pattern as the fonts) — loaded once per warm instance.
+let backdropCache: ArrayBuffer | null = null;
+async function loadBackdrop(): Promise<ArrayBuffer | null> {
+  if (backdropCache) return backdropCache;
+  try {
+    backdropCache = await fetch(new URL("./backdrops/cream-marble.jpg", import.meta.url)).then((r) => r.arrayBuffer());
+    return backdropCache;
+  } catch (err) {
+    console.error("backdrop load failed:", err);
+    return null;
+  }
+}
+
+/** The accuracy-first renderer: real cutouts (bg removed) composited on the cream backdrop — packaging
+ *  is NEVER redrawn. Needs the Higgsfield key (for bg removal) + the backdrop. Null → caller falls back. */
+async function renderWithCompositor(input: HeroInput): Promise<Rendered | null> {
+  const backdrop = await loadBackdrop();
+  if (!backdrop) return null;
+  const refs = input.products.slice(0, 4).filter((p) => p.packshotUrl);
+  // Cut out each product's background (cached per product by packshot hash), in parallel.
+  const cutouts = (
+    await Promise.all(refs.map((p) => getOrCreateCutout(hashUrl(p.packshotUrl), p.packshotUrl)))
+  ).filter((c): c is ArrayBuffer => c != null && c.byteLength > 0);
+  if (cutouts.length === 0) return null; // nothing usable → designed card
+  try {
+    const out = await compositeHero({
+      backdrop: Buffer.from(backdrop),
+      cutouts: cutouts.map((c) => Buffer.from(c)),
+      ratio: input.ratio,
+    });
+    return { bytes: toArrayBuffer(out), contentType: "image/jpeg" };
+  } catch (err) {
+    console.error("compositeHero failed:", err);
+    return null;
+  }
+}
+
 // ── Dispatch + storage ──────────────────────────────────────────────────────────────────────────────
 
-/** Render the hero with the configured provider. Null on any failure.
+/** Render the hero. Null on any failure.
  *
- *  Provider is a SETUP-TIME choice, not a per-call failover: Higgsfield when its key is set, else OpenAI.
- *  This is deliberate — gpt-image-1 garbles brand text, so failing a Higgsfield render over to OpenAI could
- *  publish a card with WRONG packaging (the one thing we never do). When Higgsfield fails we return null;
- *  the caller then shows the designed/flat card, which is always accurate. To switch providers, change
- *  which key is set. (OpenAI stays only as a cheap keyless-of-Higgsfield fallback for dev/testing.) */
+ *  Primary is the faithful COMPOSITOR (real cutouts on a generated backdrop) — packaging is never
+ *  AI-redrawn (Jitain's hard rule). The legacy GENERATIVE Higgsfield path is off by default; set
+ *  HERO_GENERATIVE=1 only to A/B it. OpenAI stays a keyless-dev fallback (it garbles text, so it's never
+ *  an automatic failover). A failed render returns null and the caller shows the always-accurate
+ *  designed/flat card. */
 async function renderHero(input: HeroInput): Promise<Rendered | null> {
-  if (process.env.HIGGSFIELD_API_KEY) return renderWithHiggsfield(input);
+  if (process.env.HIGGSFIELD_API_KEY) {
+    return process.env.HERO_GENERATIVE === "1" ? renderWithHiggsfield(input) : renderWithCompositor(input);
+  }
   if (process.env.OPENAI_API_KEY) return renderWithOpenAI(input);
   return null;
 }

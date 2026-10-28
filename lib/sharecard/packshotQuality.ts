@@ -100,13 +100,16 @@ export async function classifyPackshot(imageUrl: string | null | undefined): Pro
 /** Derive the usability flags from a grade + confidence (pure; exported for the selector + tests). */
 export function finalize(grade: PackshotGrade, confidence: number, reason: string): PackshotQuality {
   const confident = confidence >= MIN_CONFIDENCE;
+  const clean = grade === "studio_3d" || grade === "flat_scan";
   return {
     grade,
     confidence,
     reason,
-    // A low-confidence "studio_3d" is treated as not-clean-enough to composite (fail safe).
-    usableForHybrid: grade === "studio_3d" && confident,
-    usableAsFlatPackshot: grade === "studio_3d" || grade === "flat_scan",
+    // Compositing (real cutout on a generated backdrop + contact shadows) makes a clean FLAT front shot
+    // sit naturally too, not just a 3D packshot — so both feed the hybrid (Jitain's call). lifestyle /
+    // unusable never do. A low-confidence grade is treated as not-clean-enough (fail safe).
+    usableForHybrid: clean && confident,
+    usableAsFlatPackshot: clean,
   };
 }
 
