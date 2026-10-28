@@ -91,6 +91,13 @@ both the offline job and the lazy trigger. The provider is chosen by which key i
 - **OpenAI `gpt-image-1` (fallback)** — `OPENAI_API_KEY`. Synchronous image *edit*. Cheaper setup, but
   it garbles brand text (tested: "Coca-Cola" → "Coca Coup"), so it's the fallback, not the default.
 
+Background removal for the compositor (the cutout step, separate from the generative hero above):
+
+- **remove.bg** — `REMOVE_BG_API_KEY`. Synchronous POST `api.remove.bg/v1.0/removebg` with
+  `{image_url, size:"auto", format:"png", type:"product"}` → transparent-PNG bytes. A TRUE cutout (real
+  packaging preserved). Chosen because Higgsfield has no plain background-removal REST endpoint (its REST is
+  generative, which would redraw the pack). Cutouts cached in the `share-heroes` bucket (`cutout/<id>.png`).
+
 Plus storage: `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL` (+ the public bucket). Without a
 provider or storage, generation is a no-op and the card falls back to the flat packshot. Swapping to
 another provider (fal.ai, Replicate) means adding one `renderWith…()` function.
@@ -179,6 +186,6 @@ front-face label scan → reads as a pasted rectangle; a serving-suggestion / li
 | Packshot quality detector + fallback ladder | **shipped** (Slice 4) — Claude-vision grade gates generation; only clean 3D packshots reach the model |
 | Author cover wins over generated hero (consent-first) | **shipped** — `lists.cover_url` is the top rung of the list card |
 | Designed no-photo card (title + numbered list + motif) | **shipped** (v0, `designedCard.tsx`) — the accurate/free fallback; Kat to refine |
-| Automatic hybrid compositor (backdrop + real cutouts) | **shipped** — `lib/sharecard/composite.ts` (sharp) + `bgRemove.ts` + shipped `backdrops/cream-marble.jpg`; the primary hero renderer, generative demoted to `HERO_GENERATIVE=1`. ⚠️ the Higgsfield bg-removal REST endpoint needs one live-key check |
+| Automatic hybrid compositor (backdrop + real cutouts) | **shipped** — `lib/sharecard/composite.ts` (sharp) + `bgRemove.ts` (**remove.bg**) + shipped `backdrops/cream-marble.jpg`; the primary hero renderer, generative demoted to `HERO_GENERATIVE=1`. ⚠️ needs `REMOVE_BG_API_KEY` + one live end-to-end run to verify (Higgsfield has no plain bg-removal REST endpoint — its REST is generative — so switched to remove.bg) |
 | Hero label fidelity (compositing vs generative) | **resolved** — the compositor places the REAL cutout, never redraws packaging; generative is off by default |
 | Video / reel (9:16) | **experiment validated** (27 Oct 2026) — card → first-frame image-to-video (Higgsfield `grok_video_v15_lite`, `start_image`) keeps text crisp + adds premium motion, ~20 credits/5s; not yet wired into code |
