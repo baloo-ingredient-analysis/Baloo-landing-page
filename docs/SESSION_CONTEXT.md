@@ -8,6 +8,12 @@
 > file to reflect new state and decisions, and update `docs/CHANGELOG.md` + any other doc a change
 > touched. This is part of "done". If Notion memory becomes writable later (workspace upgraded), mirror
 > this context there too (see `notion://docs/memory`).
+>
+> **Write-then-harden rule (standing instruction from Miquel):** AI-written code isn't "done" when it
+> runs — after writing a non-trivial feature, do a review/harden pass over the NEW code (e.g. `/code-review`
+> on the diff) and fix the real bugs before calling it finished. This caught a real `sharp` overflow bug
+> in the compositor this session that would have silently dropped wide products. Treat review + fix as
+> part of shipping, not optional.
 
 ## Where things live (so nothing gets re-derived)
 - **Code:** this repo, `baloo-ingredient-analysis/Baloo-landing-page`. Deep reference in `docs/`
