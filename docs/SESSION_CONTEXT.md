@@ -15,6 +15,22 @@
 > in the compositor this session that would have silently dropped wide products. Treat review + fix as
 > part of shipping, not optional.
 
+## Writing style — avoid AI-writing tells (standing instruction from Miquel)
+Write so it doesn't read as AI-generated, in replies AND in any drafted text. Based on Wikipedia's
+"Signs of AI writing". Avoid:
+- **Filler vocabulary:** delve, crucial, pivotal, tapestry, showcase, underscore, vibrant, rich, nestled,
+  boasts, groundbreaking, "a testament to", "a pivotal moment", "setting the stage", "reflects broader trends".
+- **Copula avoidance:** "serves as / stands as / features / boasts" where "is/has" is meant.
+- **Negative parallelisms:** "not just X, but Y", "not X, but Y", "Y rather than X".
+- **Vague attribution / inflated significance:** "experts say", "observers note", promotional/brochure tone.
+- **Participle tack-ons:** trailing "highlighting…", "ensuring…", "reflecting…".
+- **Hedging preambles & chatbot filler:** "it's worth noting", "here are several options", knowledge-cutoff lines.
+- **Over-structure:** rule-of-three everywhere, excessive **bold**, canned headers ("Challenges",
+  "Future Prospects", "Awards and recognition"), em-dash overuse, uniform short staccato sentences.
+- **Elegant variation:** swapping synonyms just to avoid repeating a word.
+Instead: say it plainly and specifically, direct statements, real sources, vary sentence length naturally.
+Applies to all sessions. (Per Miquel, 2 Nov 2026.)
+
 ## Where things live (so nothing gets re-derived)
 - **Code:** this repo, `baloo-ingredient-analysis/Baloo-landing-page`. Deep reference in `docs/`
   (ARCHITECTURE, CHANGELOG, SHARE_CARDS), root `CLAUDE.md`, `PRODUCT.md`, `DESIGN.md`,
