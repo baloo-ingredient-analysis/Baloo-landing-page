@@ -49,20 +49,25 @@ type Placed = { buf: Buffer; left: number; top: number; w: number; h: number; cx
 async function placeCutouts(cutouts: Buffer[], fw: number, fh: number): Promise<Placed[]> {
   const n = Math.min(cutouts.length, 4);
   const targetH = Math.round(fh * targetHeightFrac(n));
+  // Bound WIDTH too: a wide product (e.g. a flat multipack) resized by height alone can be wider than
+  // the frame — sharp's composite throws on any overlay that spills past the base or sits at a negative
+  // offset. Capping each cutout to a per-slot width keeps it inside the frame AND stops neighbours
+  // overlapping. `fit: inside` keeps aspect, bounding by whichever of width/height binds first.
+  const maxW = n <= 1 ? Math.round(fw * 0.62) : Math.round((fw * 0.9) / n);
   const baseY = Math.round(fh * BASELINE_FRAC);
   const cx = centresX(n, fw);
   const placed: Placed[] = [];
   for (let i = 0; i < n; i++) {
-    // Contain within targetH (keep aspect); don't upscale past 2× to avoid mushy cutouts.
     const resized = await sharp(cutouts[i])
-      .resize({ height: targetH, fit: "inside", withoutEnlargement: false })
+      .resize({ width: maxW, height: targetH, fit: "inside", withoutEnlargement: false })
       .png()
       .toBuffer();
     const meta = await sharp(resized).metadata();
     const w = meta.width ?? targetH;
     const h = meta.height ?? targetH;
-    const left = Math.round(cx[i] - w / 2);
-    const top = Math.round(baseY - h);
+    // Clamp fully inside the frame so the composite never gets a negative/overflowing offset.
+    const left = Math.max(0, Math.min(Math.round(cx[i] - w / 2), fw - w));
+    const top = Math.max(0, Math.min(Math.round(baseY - h), fh - h));
     placed.push({ buf: resized, left, top, w, h, cx: cx[i], baseY });
   }
   return placed;
@@ -72,10 +77,11 @@ async function placeCutouts(cutouts: Buffer[], fw: number, fh: number): Promise<
 function shadowSvg(placed: Placed[], fw: number, fh: number): Buffer {
   const ellipses = placed
     .map((p) => {
+      const cx = p.left + Math.round(p.w / 2); // the cutout's ACTUAL centre (may have been clamped)
       const rx = Math.round(p.w * 0.46);
       const ry = Math.max(14, Math.round(p.h * 0.05));
       const cy = p.baseY - Math.round(ry * 0.2); // nudge up so it reads as contact, not a halo
-      return `<ellipse cx="${p.cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="rgba(60,46,26,0.45)" />`;
+      return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="rgba(60,46,26,0.45)" />`;
     })
     .join("");
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${fw}" height="${fh}">${ellipses}</svg>`);

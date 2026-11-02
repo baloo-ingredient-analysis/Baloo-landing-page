@@ -59,6 +59,13 @@ const nextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // The hybrid compositor (lib/sharecard/generate.ts → renderWithCompositor) reads the backdrop asset
+  // at runtime via `fetch(new URL('./backdrops/cream-marble.jpg', import.meta.url))`. Trace it into the
+  // share-route serverless bundles so the fetch resolves in production (else the compositor no-ops).
+  outputFileTracingIncludes: {
+    "/api/share/**": ["./lib/sharecard/backdrops/**"],
+    "/api/og/**": ["./lib/sharecard/backdrops/**"],
+  },
 };
 
 export default nextConfig;
