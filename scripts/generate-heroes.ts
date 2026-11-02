@@ -23,6 +23,7 @@ import { generateAndStoreHero, heroGenerationConfigured } from "../lib/sharecard
 import { classifyAndPlanHero } from "../lib/sharecard/packshotQuality";
 import {
   listsNeedingHero,
+  productsByIds,
   productsNeedingHero,
   setListHero,
   setProductHero,
@@ -93,9 +94,13 @@ async function main() {
     console.log(`✓ ${kind} ${id} → ${url}`);
   }
 
+  // --ids a,b,c re-renders exactly those products (even if they already have a hero) — for iterating on
+  // the compositor without re-processing the whole queue.
+  const onlyIds = (arg("--ids") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+
   if (doProducts || dryRun) {
-    const queue = await productsNeedingHero(dbi, limit);
-    console.log(`Products needing a hero: ${queue.length}`);
+    const queue = onlyIds.length ? await productsByIds(dbi, onlyIds) : await productsNeedingHero(dbi, limit);
+    console.log(`Products ${onlyIds.length ? "selected by --ids" : "needing a hero"}: ${queue.length}`);
     for (const p of queue) {
       await planAndRun(
         "product",
@@ -118,7 +123,11 @@ async function main() {
   console.log("\nDone.");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Exit explicitly: the postgres.js pool (and any keep-alive socket) can otherwise keep the event loop
+// alive after "Done.", so a finished run looks like a hang to a caller waiting on exit.
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

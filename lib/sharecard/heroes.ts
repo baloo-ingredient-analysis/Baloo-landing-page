@@ -4,7 +4,7 @@
 // lib/db/queries/*). Nothing here calls an image API — generation is an offline job, the app only
 // reads the cached hero.
 
-import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { listItems, lists, products } from "../db/schema";
 import { pickHeroProducts, type HeroProductRef } from "./prompt";
@@ -22,6 +22,21 @@ export async function productsNeedingHero(
     .orderBy(desc(products.createdAt))
     .limit(limit);
   // imageUrl is non-null by the filter above; narrow the type for callers.
+  return rows.map((r) => ({ ...r, packshotUrl: r.packshotUrl as string }));
+}
+
+/** Specific products by id (that have a packshot), regardless of whether they already have a hero —
+ *  the `--ids` escape hatch for the generation job, used to re-render a chosen few (e.g. after a
+ *  compositor change) without re-processing the whole queue. */
+export async function productsByIds(
+  dbi: Db,
+  ids: string[],
+): Promise<{ id: string; name: string; brand: string | null; packshotUrl: string }[]> {
+  if (ids.length === 0) return [];
+  const rows = await dbi
+    .select({ id: products.id, name: products.name, brand: products.brand, packshotUrl: products.imageUrl })
+    .from(products)
+    .where(and(inArray(products.id, ids), isNotNull(products.imageUrl)));
   return rows.map((r) => ({ ...r, packshotUrl: r.packshotUrl as string }));
 }
 

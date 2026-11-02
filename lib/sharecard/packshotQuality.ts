@@ -44,18 +44,26 @@ export type PackshotQuality = {
 };
 
 const MIN_CONFIDENCE = 0.5;
+// The hybrid composite shows the product large on a premium backdrop, where a weak packshot (a flat
+// front, a cropped or cluttered shelf snapshot, a low-res image) looks worse than no photo at all. Hold
+// it to a high bar: only a confidently-graded, complete 3D studio shot. Everything else keeps the
+// always-clean designed card. (Narrowed from the earlier "clean flat fronts too" call after real Open
+// Food Facts shelf photos composited poorly.)
+const HYBRID_MIN_CONFIDENCE = 0.75;
 
 const schema = z.object({
   grade: z
     .enum(["studio_3d", "flat_scan", "lifestyle", "unusable"])
     .describe(
-      "studio_3d: a clean studio photo of the physical PACKAGE with real depth/volume (you can see it " +
-        "is a 3D object — jar, bottle, bag, carton, box, tin) on a plain white/neutral background, no " +
-        "hands, no shelf, no scene. flat_scan: a flat, straight-on image of only the front face with no " +
-        "depth — it looks like a 2D rectangle/label, not a photographed object. lifestyle: a serving " +
-        "suggestion, prepared food, product held in a hand, on a shop shelf with price tags, a table " +
-        "setting, or any staged/cluttered scene. unusable: blurry, a placeholder/'no image', logo only, " +
-        "too dark, text-heavy, or clearly the wrong product.",
+      "studio_3d: a clean, sharp studio photo of the WHOLE physical package with real depth/volume (you " +
+        "can see it is a 3D object: jar, bottle, bag, carton, box, tin) on a plain white or neutral " +
+        "background, with no hands, no shelf, no other products and no scene. The ENTIRE product must be " +
+        "in frame; if any part of it is cut off at an edge, it is NOT studio_3d. flat_scan: a flat, " +
+        "straight-on image of only the front face with no depth, like a 2D rectangle or label rather " +
+        "than a photographed object. lifestyle: a serving suggestion, prepared food, a product held in a " +
+        "hand, a product sitting on a shop shelf or wire rack, among other products, in a table setting, " +
+        "or any staged or cluttered scene. unusable: blurry, soft, low-resolution or heavily compressed, " +
+        "a placeholder/'no image', logo only, too dark, or a product cropped so part of it is missing.",
     ),
   confidence: z.number().min(0).max(1).describe("Your confidence in the grade, 0 to 1."),
   reason: z.string().describe("One short neutral clause explaining the grade (for logs, not users)."),
@@ -74,6 +82,9 @@ export async function classifyPackshot(imageUrl: string | null | undefined): Pro
     const { object } = await generateObject({
       model: anthropic(MODEL),
       schema,
+      // One cheap vision grade shouldn't be able to hang the whole hero job (nor the lazy-on-share
+      // after() budget). Bound it; a timeout aborts to the catch below → null → safe degrade.
+      abortSignal: AbortSignal.timeout(30_000),
       messages: [
         {
           role: "user",
@@ -81,10 +92,12 @@ export async function classifyPackshot(imageUrl: string | null | undefined): Pro
             {
               type: "text",
               text:
-                "Grade this product image for use as a social share-card hero. We composite the REAL " +
-                "product cutout onto a studio background, so we need a clean 3D studio packshot. Judge " +
-                "ONLY the image type (lighting/background/whether it is the physical package in 3D), not " +
-                "the product itself. Classify strictly per the schema.",
+                "Grade this product image for use as a premium social share-card hero. We cut the " +
+                "product out and place it large on a studio backdrop, so only a clean, sharp, COMPLETE " +
+                "3D studio packshot works. Be strict: if the product is cropped at any edge, if there is " +
+                "any shelf, rack, other product or background clutter, or if the image is soft or " +
+                "low-resolution, it is NOT studio_3d (grade it lifestyle or unusable). Judge the image " +
+                "type and quality, not whether the food is healthy. Classify strictly per the schema.",
             },
             { type: "image", image: url },
           ],
@@ -99,17 +112,17 @@ export async function classifyPackshot(imageUrl: string | null | undefined): Pro
 
 /** Derive the usability flags from a grade + confidence (pure; exported for the selector + tests). */
 export function finalize(grade: PackshotGrade, confidence: number, reason: string): PackshotQuality {
-  const confident = confidence >= MIN_CONFIDENCE;
   const clean = grade === "studio_3d" || grade === "flat_scan";
   return {
     grade,
     confidence,
     reason,
-    // Compositing (real cutout on a generated backdrop + contact shadows) makes a clean FLAT front shot
-    // sit naturally too, not just a 3D packshot — so both feed the hybrid (Jitain's call). lifestyle /
-    // unusable never do. A low-confidence grade is treated as not-clean-enough (fail safe).
-    usableForHybrid: clean && confident,
-    usableAsFlatPackshot: clean,
+    // Only a confident, true 3D studio packshot earns the hybrid scene. A flat front scan, a low-
+    // confidence grade, or any lifestyle/unusable shot falls back to the designed card, which is always
+    // clean and never puts a poor photo on a premium backdrop.
+    usableForHybrid: grade === "studio_3d" && confidence >= HYBRID_MIN_CONFIDENCE,
+    // A clean 3D or flat packshot is still faithful enough to show flat on a tint card.
+    usableAsFlatPackshot: clean && confidence >= MIN_CONFIDENCE,
   };
 }
 

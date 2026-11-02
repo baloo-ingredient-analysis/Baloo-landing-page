@@ -16,6 +16,7 @@
 import { buildHeroPrompt, heroReferenceUrls, type HeroInput, type HeroRatio } from "./prompt";
 import { compositeHero } from "./composite";
 import { getOrCreateCutout } from "./bgRemove";
+import { fullResOffImageUrl } from "../openfoodfacts";
 import { hashUrl } from "../hash";
 
 const HERO_BUCKET = process.env.HERO_BUCKET || "share-heroes";
@@ -182,8 +183,33 @@ async function renderWithOpenAI(input: HeroInput): Promise<Rendered | null> {
 let backdropCache: ArrayBuffer | null = null;
 async function loadBackdrop(): Promise<ArrayBuffer | null> {
   if (backdropCache) return backdropCache;
+  const toAb = (buf: Buffer): ArrayBuffer => {
+    const ab = new ArrayBuffer(buf.byteLength);
+    new Uint8Array(ab).set(buf);
+    return ab;
+  };
   try {
-    backdropCache = await fetch(new URL("./backdrops/cream-marble.jpg", import.meta.url)).then((r) => r.arrayBuffer());
+    const { readFile } = await import("node:fs/promises");
+    const { fileURLToPath } = await import("node:url");
+    const path = await import("node:path");
+    // Resolve the bytes across runtimes (same reasoning as cardFonts): a db:heroes script sees a file:
+    // URL; the Next dev/server runtime can resolve the asset to a relative /_next/static/media/… path
+    // that fetch rejects. Read from disk for file:, fetch a genuine http(s) URL, else fall back to the
+    // source path under cwd.
+    try {
+      const assetUrl = new URL("./backdrops/cream-marble.jpg", import.meta.url);
+      if (assetUrl.protocol === "file:") {
+        backdropCache = toAb(await readFile(fileURLToPath(assetUrl)));
+        return backdropCache;
+      }
+      if (assetUrl.protocol === "http:" || assetUrl.protocol === "https:") {
+        backdropCache = await fetch(assetUrl).then((r) => r.arrayBuffer());
+        return backdropCache;
+      }
+    } catch {
+      // fall through to the on-disk source path
+    }
+    backdropCache = toAb(await readFile(path.join(process.cwd(), "lib", "sharecard", "backdrops", "cream-marble.jpg")));
     return backdropCache;
   } catch (err) {
     console.error("backdrop load failed:", err);
@@ -197,9 +223,16 @@ async function renderWithCompositor(input: HeroInput): Promise<Rendered | null> 
   const backdrop = await loadBackdrop();
   if (!backdrop) return null;
   const refs = input.products.slice(0, 4).filter((p) => p.packshotUrl);
-  // Cut out each product's background (cached per product by packshot hash), in parallel.
+  // Cut out each product's background (cached per product by packshot hash), in parallel. Upgrade OFF
+  // packshots to full-res FIRST, so the cutout isn't made from a thumbnail — and so the cache key
+  // (hash of the full-res URL) naturally supersedes any older thumbnail-based cutout.
   const cutouts = (
-    await Promise.all(refs.map((p) => getOrCreateCutout(hashUrl(p.packshotUrl), p.packshotUrl)))
+    await Promise.all(
+      refs.map((p) => {
+        const src = fullResOffImageUrl(p.packshotUrl);
+        return getOrCreateCutout(hashUrl(src), src);
+      }),
+    )
   ).filter((c): c is ArrayBuffer => c != null && c.byteLength > 0);
   if (cutouts.length === 0) return null; // nothing usable → designed card
   try {

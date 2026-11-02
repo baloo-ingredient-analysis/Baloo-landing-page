@@ -15,6 +15,22 @@ const OFF_BASE = "https://world.openfoodfacts.org";
 const USER_AGENT = "Baloo/1.0 (https://baloo.life; ingredient analysis)";
 const OFF_TIMEOUT_MS = 8_000;
 
+/** Upgrade an Open Food Facts image URL to its full-resolution original. OFF serves size variants
+ *  (`…front_en.12.100/200/400.jpg`) plus the original `…full.jpg`; the catalog stores a small variant
+ *  for fast display, but the share-card compositor needs the full-res source so a cutout isn't upscaled
+ *  from a thumbnail (a 400px pack blown up to fill the frame reads as a cheap, mushy sticker). Non-OFF
+ *  URLs pass through unchanged. */
+export function fullResOffImageUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)openfoodfacts\.org$/i.test(u.hostname)) return url;
+    u.pathname = u.pathname.replace(/\.(\d+)\.jpg$/i, ".full.jpg");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 // The fields we actually use — keep the payload small (OFF products are large).
 const FIELDS = [
   "code", "product_name", "product_name_en", "brands", "quantity", "lang",

@@ -45,24 +45,38 @@ function centresX(n: number, w: number): number[] {
 
 type Placed = { buf: Buffer; left: number; top: number; w: number; h: number; cx: number; baseY: number };
 
+const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+
+/** Max cutout width as a fraction of frame width, by product count — a wide packshot (box/bottle on
+ *  its side) must not exceed the canvas (sharp rejects an overlay larger than the base) or crowd its
+ *  neighbours. Mirrors targetHeightFrac: fewer products get more width. */
+function targetWidthFrac(n: number): number {
+  if (n <= 1) return 0.9;
+  if (n === 2) return 0.44;
+  if (n === 3) return 0.3;
+  return 0.22;
+}
+
 /** Resize each cutout to its target height and compute where it sits (base on the baseline). */
 async function placeCutouts(cutouts: Buffer[], fw: number, fh: number): Promise<Placed[]> {
   const n = Math.min(cutouts.length, 4);
   const targetH = Math.round(fh * targetHeightFrac(n));
+  const maxW = Math.round(fw * targetWidthFrac(n));
   const baseY = Math.round(fh * BASELINE_FRAC);
   const cx = centresX(n, fw);
   const placed: Placed[] = [];
   for (let i = 0; i < n; i++) {
-    // Contain within targetH (keep aspect); don't upscale past 2× to avoid mushy cutouts.
+    // Contain within BOTH targetH and maxW (keep aspect) so a wide packshot can't exceed the canvas.
     const resized = await sharp(cutouts[i])
-      .resize({ height: targetH, fit: "inside", withoutEnlargement: false })
+      .resize({ width: maxW, height: targetH, fit: "inside", withoutEnlargement: false })
       .png()
       .toBuffer();
     const meta = await sharp(resized).metadata();
     const w = meta.width ?? targetH;
     const h = meta.height ?? targetH;
-    const left = Math.round(cx[i] - w / 2);
-    const top = Math.round(baseY - h);
+    // Clamp placement inside the frame — sharp errors if an overlay extends past the base bounds.
+    const left = clamp(Math.round(cx[i] - w / 2), 0, Math.max(0, fw - w));
+    const top = clamp(Math.round(baseY - h), 0, Math.max(0, fh - h));
     placed.push({ buf: resized, left, top, w, h, cx: cx[i], baseY });
   }
   return placed;
@@ -85,10 +99,23 @@ function shadowSvg(placed: Placed[], fw: number, fh: number): Buffer {
  * Composite the real cutouts onto the backdrop with contact shadows. Returns JPEG bytes.
  * Throws only on a hard sharp failure; the caller treats a throw/empty as "no hero" and falls back.
  */
+// A cutout smaller than this (longest side, px) would be upscaled into a soft, "cheap"-looking hero on
+// the full-size frame. Below it we'd rather drop the product and let the caller fall back to the always-
+// clean designed card. The full-res OFF source (see fullResOffImageUrl) keeps most real packshots above it.
+const MIN_CUTOUT_DIM = 500;
+
 export async function compositeHero(input: CompositeInput): Promise<Buffer> {
   const { w: fw, h: fh } = FRAME[input.ratio ?? "4:5"];
-  const cutouts = input.cutouts.slice(0, 4);
-  if (cutouts.length === 0) throw new Error("compositeHero: no cutouts");
+  const candidates = input.cutouts.slice(0, 4);
+  if (candidates.length === 0) throw new Error("compositeHero: no cutouts");
+
+  // Resolution gate: keep only cutouts big enough to fill the frame without visible upscaling.
+  const cutouts: Buffer[] = [];
+  for (const c of candidates) {
+    const m = await sharp(c).metadata();
+    if (Math.max(m.width ?? 0, m.height ?? 0) >= MIN_CUTOUT_DIM) cutouts.push(c);
+  }
+  if (cutouts.length === 0) throw new Error("compositeHero: all cutouts below min resolution");
 
   const base = sharp(input.backdrop).resize(fw, fh, { fit: "cover", position: "centre" });
   const placed = await placeCutouts(cutouts, fw, fh);

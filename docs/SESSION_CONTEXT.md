@@ -41,7 +41,7 @@ Sign-in · Settings · Moderation. Mobile app screens: still to design.
 - **Score-free, forever.** No score, rating, traffic-light, or good/bad verdict anywhere. The
   Natural/Processed pill is the only meaningful colour.
 
-## Share cards — current state (27 Oct 2026, branch `fix/instagram-share-desktop-v9vkps`)
+## Share cards — current state (28 Oct 2026, branch `fix/bgremove-removebg`)
 - **Built:** packshot ingestion (`products.image_url`); a Claude-vision **packshot quality detector**
   (`lib/sharecard/packshotQuality.ts`: `studio_3d/flat_scan/lifestyle/unusable` + pure `planHero`
   ladder); the image ladder **author cover (`lists.cover_url`) → real clean packshot → designed no-photo
@@ -52,26 +52,50 @@ Sign-in · Settings · Moderation. Mobile app screens: still to design.
   REAL Open Food Facts cutout onto a *generated backdrop* — not generative packaging. The generative
   hero path (Higgsfield marketing_studio) is still live and is the only thing that can produce a *wrong*
   card; recommendation on the table is to keep it OFF for launch and rely on real-photo + designed cards.
-- **Hybrid compositor — AUTOMATED (28 Oct 2026).** `lib/sharecard/composite.ts` (sharp: scale + place +
-  contact shadows, layouts for 1–4) + `bgRemove.ts` (**remove.bg** background removal, cutouts cached in
-  Supabase) + shipped backdrop `lib/sharecard/backdrops/cream-marble.jpg`. It's now the PRIMARY hero
-  renderer in `generate.ts` (`renderWithCompositor`); the generative path is off unless `HERO_GENERATIVE=1`.
-  Detector widened so clean **flat** fronts also composite (Jitain's call). **⚠️ Provider switched + needs a
-  live key:** the first attempt used Higgsfield, but Higgsfield has **no plain background-removal REST
-  endpoint** (its only REST path is generative — it would redraw the pack; `/image/remove-background`
-  returned 404 `model_not_found`). So `bgRemove.ts` now calls **remove.bg** (true cutout, one synchronous
-  POST). Set **`REMOVE_BG_API_KEY`** (free tier covers testing) and run the compositor once end-to-end to
-  verify; everything degrades safely (no cutout → designed card) until then. Compositor itself validated
-  locally against real cutouts.
+- **Hybrid compositor — AUTOMATED + VERIFIED END-TO-END (28 Oct 2026).** `lib/sharecard/composite.ts`
+  (sharp: scale + place + contact shadows, layouts for 1–4) + `bgRemove.ts` (**remove.bg** background
+  removal, cutouts cached in Supabase) + shipped backdrop `lib/sharecard/backdrops/cream-marble.jpg`. The
+  PRIMARY hero renderer in `generate.ts` (`renderWithCompositor`); generative off unless `HERO_GENERATIVE=1`.
+  Detector widened so clean **flat** fronts also composite (Jitain's call) — **later narrowed, see the 2 Nov
+  quality pass below**. Ran the full pipeline live:
+  real Coca-Cola Energy cutout → cream-marble backdrop → stored at `lists.hero_url` (list
+  "kids-favourites-decoded"). remove.bg returns a clean cutout in ~8s and is **free** for OFF packshots
+  (≤0.25MP → 0 credits). (Higgsfield has no plain bg-removal REST endpoint — its REST is generative — so
+  `bgRemove.ts` calls **remove.bg**.)
+  - **Four `db:heroes` script-path bugs fixed** (they only bite outside the Next.js runtime): backdrop now
+    read from disk on a `file:` URL (Node `fetch` can't read `file:`); `lib/db/index.ts` forces `ssl:
+    'require'` for Supabase (local `DATABASE_URL` loses `?sslmode=require` on every password reset);
+    timeouts on remove.bg (60s) + vision grading (30s); `scripts/generate-heroes.ts` calls
+    `process.exit(0)` (postgres.js pool otherwise keeps a finished run alive, looking like a hang).
+  - **⚠️ Supabase key rotation gotcha (local only):** the project's keys were rotated via the Vercel
+    integration — legacy anon/`service_role` JWTs are **disabled**. A stale `eyJ…` service_role key in
+    `.env.local` fails Storage uploads with `signature verification failed` even though it *looks* valid.
+    Use the new **`sb_secret_…`** key (dashboard → Settings → API Keys) as `SUPABASE_SERVICE_ROLE_KEY`;
+    the public key is now `sb_publishable_…`. Vercel/prod already has the rotated keys. See `SHARE_CARDS.md`.
+- **Quality pass (2 Nov 2026) — compositor is a BONUS, designed card is the DEFAULT.** A real OFF photo
+  (an Oreo) composited poorly (low-res, cropped, shot on a shelf) and read as cheap on the marble. The
+  compositor's ceiling is the OFF photo, and much of the catalogue is weak, so: **(1) full-res source** —
+  `fullResOffImageUrl()` pulls OFF's `…full.jpg` instead of the `…400.jpg` thumbnail before bg-removal;
+  **(2) stricter gate** — `usableForHybrid` now requires `studio_3d` AND confidence ≥ 0.75 (was any clean
+  3D/flat at ≥0.5); the classifier prompt rejects cropped/cluttered/low-res shots → they fall to the
+  designed card (reverses the "flat fronts too" widening — flag with Jitain); **(3) resolution floor** —
+  `compositeHero` drops cutouts < 500px; **(4) `db:heroes --ids a,b,c`** to re-render specific products.
+  - **⚠️ REAL BUG FOUND + FIXED — card fonts never loaded in the Node runtime.** `cardFonts.ts` (and
+    `loadBackdrop`) used `fetch(new URL('./asset', import.meta.url))`, which throws in Node (a relative
+    `/_next/static/media/…` path in the Next server). So **every list card was silently falling back to the
+    flat `igCard`** — the editorial AND designed cards were not rendering in the running app. Both loaders
+    now read from disk. Verified locally: editorial card (Coke hero) and designed card both render. **Likely
+    affects Vercel's nodejs runtime too — VERIFY on a preview deploy** (may need `outputFileTracingIncludes`
+    for the fonts/backdrop).
 - **Video/reel share — EXPERIMENT DONE (27 Oct 2026), it works & is shareable.** Winning approach:
   render the 9:16 card → **first-frame image-to-video** (Higgsfield `grok_video_v15_lite`, role
   `start_image`). The card is literally frame 1 so text/labels stay crisp; the model only adds subtle
   premium motion (slow push-in, drifting light). ~20 credits / 5s at 1080p. (seedance treated the image
   as a *reference* and regenerated → text risk; avoid for this.) Not yet wired into code — it's a
   validated manual flow.
-- **Other pending:** automate the hybrid compositor (prototyped by hand; ~half the OFF catalogue is too
-  messy, which is why the detector matters); profile share card + product unfurl still flat; category
-  illustrations for the designed card (Kat); OFF image attribution column.
+- **Other pending:** profile share card + product unfurl still flat; category illustrations for the
+  designed card (Kat); OFF image attribution column. (Many list heroes will be 1–2 products, not 4 — the
+  quality detector drops messy OFF packshots, so richer packshots are the lever for fuller scenes.)
 
 ## Live launch blocker
 - **baloo.life still serves the OLD Figma Make pitch deck, not the Vercel app** → all SEO + llms.txt /

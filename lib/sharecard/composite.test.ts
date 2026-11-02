@@ -14,7 +14,7 @@ describe("compositeHero", () => {
   it("renders a 4:5 JPEG at the frame size from 1 cutout", async () => {
     const out = await compositeHero({
       backdrop: await solid(400, 500, { r: 244, g: 237, b: 227 }),
-      cutouts: [await cutout(200, 300)],
+      cutouts: [await cutout(500, 700)],
       ratio: "4:5",
     });
     const meta = await sharp(out).metadata();
@@ -24,7 +24,7 @@ describe("compositeHero", () => {
   });
 
   it("composites up to 4 products (extra are ignored) and stays the frame size", async () => {
-    const cuts = await Promise.all([cutout(200, 300), cutout(180, 260), cutout(220, 280), cutout(160, 320), cutout(200, 200)]);
+    const cuts = await Promise.all([cutout(500, 700), cutout(520, 660), cutout(540, 680), cutout(560, 720), cutout(600, 600)]);
     const out = await compositeHero({ backdrop: await solid(400, 500, { r: 244, g: 237, b: 227 }), cutouts: cuts });
     const meta = await sharp(out).metadata();
     expect(meta.width).toBe(1456);
@@ -34,10 +34,33 @@ describe("compositeHero", () => {
   it("renders a 9:16 frame", async () => {
     const out = await compositeHero({
       backdrop: await solid(400, 500, { r: 244, g: 237, b: 227 }),
-      cutouts: [await cutout(200, 300)],
+      cutouts: [await cutout(500, 700)],
       ratio: "9:16",
     });
     const meta = await sharp(out).metadata();
+    expect(meta.width).toBe(1456);
+    expect(meta.height).toBe(1816);
+  });
+
+  it("drops cutouts below the min resolution and throws when none remain (→ caller fallback)", async () => {
+    await expect(
+      compositeHero({
+        backdrop: await solid(400, 500, { r: 244, g: 237, b: 227 }),
+        cutouts: [await cutout(200, 300)], // longest side 300 < 500 floor
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("handles a cutout wider than the frame without throwing (width is capped + clamped)", async () => {
+    // Regression: a very wide packshot resized by height alone exceeded the 1456px canvas, and sharp
+    // rejects an overlay larger than the base ("Image to composite must have same dimensions or smaller").
+    const out = await compositeHero({
+      backdrop: await solid(400, 500, { r: 244, g: 237, b: 227 }),
+      cutouts: [await cutout(3000, 400)],
+      ratio: "4:5",
+    });
+    const meta = await sharp(out).metadata();
+    expect(meta.format).toBe("jpeg");
     expect(meta.width).toBe(1456);
     expect(meta.height).toBe(1816);
   });

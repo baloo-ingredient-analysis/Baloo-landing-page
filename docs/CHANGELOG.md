@@ -7,6 +7,32 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### Session 2 Nov 2026 — share-card quality pass + a real font bug — `fix/bgremove-removebg`
+- **Found + fixed: list cards never loaded their fonts in the Node runtime.** `cardFonts.ts` (and the
+  backdrop loader) used `fetch(new URL('./asset', import.meta.url))`, which throws in Node, so every list
+  share card silently fell back to the flat `igCard` — the editorial and designed cards were not rendering
+  in the running app. Both loaders now read from disk. Verified both cards render. (Likely affects Vercel's
+  nodejs runtime too — needs a preview-deploy check.)
+- **Compositor is a bonus, designed card is the default.** A real OFF photo composited poorly (low-res,
+  cropped shelf snapshot), so the gate was tightened: only a confident, complete `studio_3d` packshot
+  (conf ≥ 0.75) composites; flat/cropped/cluttered/low-res fall to the always-clean designed card. The
+  classifier prompt was hardened to reject cropped/cluttered/low-res shots.
+- **Full-res OFF source** — `fullResOffImageUrl()` pulls OFF's `…full.jpg` instead of the `…400.jpg`
+  thumbnail before bg-removal, so cutouts aren't upscaled from a thumbnail; a resolution floor
+  (`MIN_CUTOUT_DIM` 500px) drops anything still too small; `db:heroes --ids` re-renders specific products.
+
+### Session 28 Oct 2026 — hybrid compositor verified end-to-end — `fix/bgremove-removebg`
+- **Compositor runs for real.** First full end-to-end hero: a real Coca-Cola Energy cutout (packaging
+  intact) → remove.bg → cream-marble backdrop → stored at `lists.hero_url`. remove.bg is ~8s and **free**
+  for OFF packshots (≤0.25MP → 0 credits charged).
+- **Four `db:heroes` script-path bugs fixed** (only bite outside the Next.js runtime): backdrop read from
+  disk on a `file:` URL (`loadBackdrop`); `lib/db/index.ts` forces `ssl:'require'` for Supabase hosts (no
+  longer depends on `?sslmode=require` in the URL, which local resets drop); abort timeouts on remove.bg
+  (60s) and Claude vision grading (30s); `process.exit(0)` so a finished run doesn't hang on the open pool.
+- **Supabase key-rotation gotcha documented.** Keys were rotated via the Vercel integration → legacy
+  anon/`service_role` JWTs disabled; a stale `eyJ…` service_role key fails Storage uploads with `signature
+  verification failed`. Local fix: use the new `sb_secret_…` key. (Details in `SHARE_CARDS.md`.)
+
 ### Session 23–27 Oct 2026 — share cards, accuracy ladder, continuity — `fix/instagram-share-desktop-v9vkps`
 Full checklist (what + how) in [`SESSION_SUMMARY_2026-10_SHARE_CARDS.md`](SESSION_SUMMARY_2026-10_SHARE_CARDS.md). Headlines:
 - **Accuracy ladder shipped** — a Claude-vision **packshot quality detector** + a tested `planHero` ladder

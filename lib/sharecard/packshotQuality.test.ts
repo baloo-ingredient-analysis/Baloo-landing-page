@@ -6,11 +6,11 @@ const prod = (name: string, brand: string | null = null) => ({ name, brand });
 const graded = <T>(product: T, quality: ReturnType<typeof q> | null): GradedProduct<T> => ({ product, quality });
 
 describe("finalize", () => {
-  it("a confident studio_3d OR clean flat scan is usable for the hybrid scene", () => {
+  it("only a confident studio_3d packshot is usable for the hybrid scene", () => {
     expect(q("studio_3d", 0.9).usableForHybrid).toBe(true);
-    expect(q("flat_scan", 0.9).usableForHybrid).toBe(true); // compositor handles flat fronts too
+    expect(q("studio_3d", 0.6).usableForHybrid).toBe(false); // below the stricter hybrid confidence bar
+    expect(q("flat_scan", 0.9).usableForHybrid).toBe(false); // flat fronts no longer composite
     expect(q("studio_3d", 0.3).usableForHybrid).toBe(false); // low confidence → fail safe
-    expect(q("flat_scan", 0.3).usableForHybrid).toBe(false);
     expect(q("lifestyle", 0.95).usableForHybrid).toBe(false);
     expect(q("unusable", 0.95).usableForHybrid).toBe(false);
   });
@@ -24,16 +24,16 @@ describe("finalize", () => {
 });
 
 describe("planHero (fallback ladder)", () => {
-  it("1. composes the clean packshots (3D or flat), dropping only lifestyle/unusable", () => {
+  it("1. composes the clean 3D studio packshots, dropping flat/lifestyle/unusable", () => {
     const plan = planHero([
       graded(prod("Nutella", "Nutella"), q("studio_3d")),
-      graded(prod("Actimel", "Actimel"), q("flat_scan")), // clean flat → now composited too
+      graded(prod("Actimel", "Actimel"), q("flat_scan")), // flat front no longer composites
       graded(prod("Gazpacho", "Hacendado"), q("studio_3d")),
       graded(prod("Hummus", "Hacendado"), q("lifestyle")), // dropped
     ]);
     expect(plan.strategy).toBe("hybrid");
     expect(plan.verified).toBe(true);
-    expect(plan.products.map((p) => p.name)).toEqual(["Nutella", "Actimel", "Gazpacho"]);
+    expect(plan.products.map((p) => p.name)).toEqual(["Nutella", "Gazpacho"]);
   });
 
   it("1b. a single clean packshot still yields a (one-product) hybrid", () => {
@@ -52,12 +52,12 @@ describe("planHero (fallback ladder)", () => {
     expect(plan.products.map((p) => p.name)).toEqual(["A", "B"]);
   });
 
-  it("3. a clean flat scan alongside a lifestyle shot → hybrid with the flat one", () => {
+  it("3. a clean flat scan alongside a lifestyle shot → flat strategy (no 3D shot to compose)", () => {
     const plan = planHero([
       graded(prod("Actimel", "Actimel"), q("flat_scan")),
       graded(prod("Hummus", "Hacendado"), q("lifestyle")),
     ]);
-    expect(plan.strategy).toBe("hybrid");
+    expect(plan.strategy).toBe("flat");
     expect(plan.products.map((p) => p.name)).toEqual(["Actimel"]);
   });
 

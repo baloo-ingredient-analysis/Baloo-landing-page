@@ -20,16 +20,23 @@ const REMOVEBG_URL = "https://api.remove.bg/v1.0/removebg";
 
 const CUTOUT_BUCKET = process.env.HERO_BUCKET || "share-heroes";
 
+// Hard ceiling on a single background-removal call. remove.bg typically answers in a few seconds;
+// without a timeout a stalled POST would hang the whole batch (fetch has no default timeout).
+const REMOVEBG_TIMEOUT_MS = 60_000;
+
 /** Remove the background from a packshot URL → transparent PNG bytes. Null on any failure / no key. */
 export async function removeBackground(imageUrl: string): Promise<ArrayBuffer | null> {
   const key = process.env.REMOVE_BG_API_KEY;
   if (!key || !imageUrl) return null;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), REMOVEBG_TIMEOUT_MS);
   try {
     const res = await fetch(REMOVEBG_URL, {
       method: "POST",
       headers: { "X-Api-Key": key, "Content-Type": "application/json", Accept: "image/png" },
       // type:"product" tunes the model for packaging; format:"png" keeps transparency; size:"auto" = full res.
       body: JSON.stringify({ image_url: imageUrl, size: "auto", format: "png", type: "product" }),
+      signal: ac.signal,
     });
     if (!res.ok) {
       // remove.bg returns a JSON { errors:[{title}] } on failure — surface it, then degrade.
@@ -39,8 +46,10 @@ export async function removeBackground(imageUrl: string): Promise<ArrayBuffer | 
     const buf = await res.arrayBuffer();
     return buf.byteLength > 0 ? buf : null;
   } catch (err) {
-    console.error("remove.bg error:", err);
+    console.error("remove.bg error:", err); // includes AbortError on timeout
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
