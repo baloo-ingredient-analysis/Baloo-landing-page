@@ -11,8 +11,9 @@
 - **Found + fixed: list cards never loaded their fonts in the Node runtime.** `cardFonts.ts` (and the
   backdrop loader) used `fetch(new URL('./asset', import.meta.url))`, which throws in Node, so every list
   share card silently fell back to the flat `igCard` — the editorial and designed cards were not rendering
-  in the running app. Both loaders now read from disk. Verified both cards render. (Likely affects Vercel's
-  nodejs runtime too — needs a preview-deploy check.)
+  in the running app. Both loaders now read from disk. **Confirmed on Vercel:** `main` returns HTTP 500 on
+  `/api/share/list/[slug]`; the branch's preview returns 200 and renders both card types. Merging fixes all
+  list share cards in production (no `outputFileTracingIncludes` needed).
 - **Compositor is a bonus, designed card is the default.** A real OFF photo composited poorly (low-res,
   cropped shelf snapshot), so the gate was tightened: only a confident, complete `studio_3d` packshot
   (conf ≥ 0.75) composites; flat/cropped/cluttered/low-res fall to the always-clean designed card. The

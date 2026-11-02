@@ -210,8 +210,12 @@ Coca-Cola can). Changes:
   script, a relative `/_next/static/media/…` path in the Next server). The font failure meant **every list
   card silently fell back to the flat `igCard`** — the editorial and designed cards were not rendering in
   the running app. Both loaders now read the bytes from disk (file: URL, http(s) fetch, else the source
-  path under `cwd`). ⚠️ Likely affects the nodejs runtime on Vercel too — verify on a preview deploy, and
-  if so, ensure the fonts/backdrop are traced into the serverless bundle (`outputFileTracingIncludes`).
+  path under `cwd`). **Confirmed in prod (2 Nov 2026):** the behaviour differs by environment but the root
+  cause is the same — local dev caught the font error and fell back to the flat `igCard` (200), while
+  `main` on Vercel returns **HTTP 500** on `/api/share/list/[slug]` (both the editorial and designed
+  paths), so every list share card was broken. The branch's preview returns **200 image/png** and renders
+  correctly; no `outputFileTracingIncludes` needed (the fonts/backdrop load from the serverless bundle via
+  the cwd read). Merging fixes all list share cards in production.
 - **`db:heroes --ids a,b,c`** — re-render specific products (even if they already have a hero), for
   iterating on the compositor without reprocessing the whole queue.
 

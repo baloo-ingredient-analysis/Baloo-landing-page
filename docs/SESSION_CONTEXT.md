@@ -84,9 +84,11 @@ Sign-in · Settings · Moderation. Mobile app screens: still to design.
     `loadBackdrop`) used `fetch(new URL('./asset', import.meta.url))`, which throws in Node (a relative
     `/_next/static/media/…` path in the Next server). So **every list card was silently falling back to the
     flat `igCard`** — the editorial AND designed cards were not rendering in the running app. Both loaders
-    now read from disk. Verified locally: editorial card (Coke hero) and designed card both render. **Likely
-    affects Vercel's nodejs runtime too — VERIFY on a preview deploy** (may need `outputFileTracingIncludes`
-    for the fonts/backdrop).
+    now read from disk. **CONFIRMED in prod (2 Nov 2026):** `main` returns **HTTP 500** on `/api/share/
+    list/[slug]` (both the editorial and designed paths) — every list share card was broken, not just
+    degraded. The branch's preview returns **200 image/png** and renders correctly. No
+    `outputFileTracingIncludes` needed: the fonts/backdrop load fine from the serverless bundle via the cwd
+    read. Merging this fixes all list share cards in production.
 - **Video/reel share — EXPERIMENT DONE (27 Oct 2026), it works & is shareable.** Winning approach:
   render the 9:16 card → **first-frame image-to-video** (Higgsfield `grok_video_v15_lite`, role
   `start_image`). The card is literally frame 1 so text/labels stay crisp; the model only adds subtle
