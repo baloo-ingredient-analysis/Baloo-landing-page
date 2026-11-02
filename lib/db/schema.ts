@@ -100,6 +100,12 @@ export const products = pgTable(
     retailer: text("retailer"),
     barcode: text("barcode"),
     imageUrl: text("image_url"),
+    // Generated share-card hero: a presented, on-brand product scene rendered from imageUrl (see
+    // lib/sharecard). Cached here so a share is instant and the card is identical every time; null
+    // until generated. Optional-infra: no generator configured → stays null, the card falls back to
+    // imageUrl (or the flat card).
+    heroUrl: text("hero_url"),
+    heroGeneratedAt: timestamp("hero_generated_at", { withTimezone: true }),
     source: text("source").$type<ProductSource>().notNull().default("user_scan"),
     // Analysis lifecycle (Order P1). Default 'done': every existing row reached the catalog via a
     // completed ingest. P2's background job flips new-to-Baloo products pending→analysing→done.
@@ -231,6 +237,10 @@ export const lists = pgTable(
     description: text("description"),
     isPublic: boolean("is_public").notNull().default(false),
     coverUrl: text("cover_url"),
+    // Generated share-card hero for the list (a composite scene of its top products). Distinct from the
+    // user-set coverUrl above; cached, null until generated. Same optional-infra rule as products.heroUrl.
+    heroUrl: text("hero_url"),
+    heroGeneratedAt: timestamp("hero_generated_at", { withTimezone: true }),
     // AEO + discovery (tags track): a FEW controlled tags for navigation/filtering, and a short
     // human-readable, synonym-rich discovery description for the page + search + answer engines. Both
     // auto-generated from title+description+products on update/publish. Optional-infra: null until

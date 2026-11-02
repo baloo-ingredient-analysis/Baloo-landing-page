@@ -15,6 +15,22 @@ const OFF_BASE = "https://world.openfoodfacts.org";
 const USER_AGENT = "Baloo/1.0 (https://baloo.life; ingredient analysis)";
 const OFF_TIMEOUT_MS = 8_000;
 
+/** Upgrade an Open Food Facts image URL to its full-resolution original. OFF serves size variants
+ *  (`…front_en.12.100/200/400.jpg`) plus the original `…full.jpg`; the catalog stores a small variant
+ *  for fast display, but the share-card compositor needs the full-res source so a cutout isn't upscaled
+ *  from a thumbnail (a 400px pack blown up to fill the frame reads as a cheap, mushy sticker). Non-OFF
+ *  URLs pass through unchanged. */
+export function fullResOffImageUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)openfoodfacts\.org$/i.test(u.hostname)) return url;
+    u.pathname = u.pathname.replace(/\.(\d+)\.jpg$/i, ".full.jpg");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 // The fields we actually use — keep the payload small (OFF products are large).
 const FIELDS = [
   "code", "product_name", "product_name_en", "brands", "quantity", "lang",
@@ -233,6 +249,24 @@ export async function getOffProductByBarcode(barcode: string): Promise<OffProduc
     | null;
   if (!data || data.status !== 1 || !data.product) return null;
   return mapOffProduct(data.product);
+}
+
+/** Just the packshot URL for a barcode (image_front_url, else image_url) — fetches only the image
+ *  fields, so it's cheap. Null when OFF has no image or the fetch fails. Used to backfill
+ *  products.image_url for barcoded products from any flow, so a share-card hero can be generated. */
+export async function getOffImageByBarcode(barcode: string): Promise<string | null> {
+  const code = barcode.replace(/\D/g, "");
+  if (code.length < 8) return null;
+  const data = (await offFetch(
+    `${OFF_BASE}/api/v2/product/${code}.json?fields=code,image_front_url,image_url`,
+  )) as { status?: number; product?: Record<string, unknown> } | null;
+  if (!data || data.status !== 1 || !data.product) return null;
+  const p = data.product;
+  return (
+    (typeof p.image_front_url === "string" && p.image_front_url) ||
+    (typeof p.image_url === "string" && p.image_url) ||
+    null
+  );
 }
 
 // A lightweight search hit — enough to pick a product, then hydrate the full one by barcode. We use

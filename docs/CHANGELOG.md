@@ -7,6 +7,76 @@
 
 ## Beta hardening track (shipped to `main`, newest first)
 
+### Session 2 Nov 2026 — share-card quality pass + a real font bug — `fix/bgremove-removebg`
+- **Found + fixed: list cards never loaded their fonts in the Node runtime.** `cardFonts.ts` (and the
+  backdrop loader) used `fetch(new URL('./asset', import.meta.url))`, which throws in Node, so every list
+  share card silently fell back to the flat `igCard` — the editorial and designed cards were not rendering
+  in the running app. Both loaders now read from disk. **Confirmed on Vercel:** `main` returns HTTP 500 on
+  `/api/share/list/[slug]`; the branch's preview returns 200 and renders both card types. Merging fixes all
+  list share cards in production (no `outputFileTracingIncludes` needed).
+- **Compositor is a bonus, designed card is the default.** A real OFF photo composited poorly (low-res,
+  cropped shelf snapshot), so the gate was tightened: only a confident, complete `studio_3d` packshot
+  (conf ≥ 0.75) composites; flat/cropped/cluttered/low-res fall to the always-clean designed card. The
+  classifier prompt was hardened to reject cropped/cluttered/low-res shots.
+- **Full-res OFF source** — `fullResOffImageUrl()` pulls OFF's `…full.jpg` instead of the `…400.jpg`
+  thumbnail before bg-removal, so cutouts aren't upscaled from a thumbnail; a resolution floor
+  (`MIN_CUTOUT_DIM` 500px) drops anything still too small; `db:heroes --ids` re-renders specific products.
+
+### Session 28 Oct 2026 — hybrid compositor verified end-to-end — `fix/bgremove-removebg`
+- **Compositor runs for real.** First full end-to-end hero: a real Coca-Cola Energy cutout (packaging
+  intact) → remove.bg → cream-marble backdrop → stored at `lists.hero_url`. remove.bg is ~8s and **free**
+  for OFF packshots (≤0.25MP → 0 credits charged).
+- **Four `db:heroes` script-path bugs fixed** (only bite outside the Next.js runtime): backdrop read from
+  disk on a `file:` URL (`loadBackdrop`); `lib/db/index.ts` forces `ssl:'require'` for Supabase hosts (no
+  longer depends on `?sslmode=require` in the URL, which local resets drop); abort timeouts on remove.bg
+  (60s) and Claude vision grading (30s); `process.exit(0)` so a finished run doesn't hang on the open pool.
+- **Supabase key-rotation gotcha documented.** Keys were rotated via the Vercel integration → legacy
+  anon/`service_role` JWTs disabled; a stale `eyJ…` service_role key fails Storage uploads with `signature
+  verification failed`. Local fix: use the new `sb_secret_…` key. (Details in `SHARE_CARDS.md`.)
+
+### Session 23–27 Oct 2026 — share cards, accuracy ladder, continuity — `fix/instagram-share-desktop-v9vkps`
+Full checklist (what + how) in [`SESSION_SUMMARY_2026-10_SHARE_CARDS.md`](SESSION_SUMMARY_2026-10_SHARE_CARDS.md). Headlines:
+- **Accuracy ladder shipped** — a Claude-vision **packshot quality detector** + a tested `planHero` ladder
+  (**author cover → real clean packshot → designed no-photo card → brand**) gate what reaches the image
+  model, so a credit is only spent on a genuinely clean photo and a messy-packshot list keeps an accurate
+  card. The hybrid composites the **real** OFF cutout on a generated backdrop — never AI-invented packaging.
+- **Full format set** — editorial card, designed no-photo card, ingredient-first product card, and all
+  three ratios (feed 4:5 · story 9:16 · unfurl 1.91:1); author cover wins over a generated hero.
+- **Video validated** — card → **first-frame image-to-video** (Higgsfield) keeps text crisp, ~20 credits/5s.
+- **Hybrid compositor automated (28 Oct)** — `lib/sharecard/composite.ts` (sharp) places the REAL product
+  cutouts (`bgRemove.ts`) on a shipped cream backdrop with contact shadows; it's now the primary hero
+  renderer (generative off unless `HERO_GENERATIVE=1`), so packaging is never AI-redrawn. Detector widened
+  to composite clean flat fronts too. (One open item: live-verify the Higgsfield bg-removal REST endpoint.)
+- **Hardened** — reviewed ~4,900 lines, fixed 3 real bugs; typecheck + 142 tests green.
+- **Continuity** — `SESSION_CONTEXT.md` (durable memory, pointed to from `CLAUDE.md`) + a standing
+  "update docs before wrapping up" rule, after Notion memory turned out empty and at its free-block limit.
+
+### Social share cards — real product heroes — `fix/instagram-share-desktop-v9vkps`
+The groundwork for share cards that carry a real, presented product photo (the Jetain mockups), built in
+slices. See [`SHARE_CARDS.md`](SHARE_CARDS.md).
+- **Slice 1 — packshot ingestion:** `products.image_url` was defined but never populated (all 35 catalog
+  products had a null packshot). Threaded `imageUrl` through every ingest path (`lib/ingest.ts`,
+  `lib/offImport.ts`, the v1 mobile contract), added best-effort OFF backfill by barcode, and stopped a
+  later imageless scan from wiping a good packshot (COALESCE). Backfilled the 27 existing barcoded
+  products from OFF (the 8 barcode-less rows need the mobile engine's capture).
+- **Slice 2 — hero storage + engine:** `products.hero_url` / `lists.hero_url` (migration `0019`);
+  `lib/sharecard/` (pure, tested prompt builder + DB helpers) and `scripts/generate-heroes.ts`
+  (`npm run db:heroes`) — an offline, cached "generate once" job with an injected image provider.
+  Proven against Higgsfield `marketing_studio_image` (~2 credits / ~30s per render; cleans messy OFF
+  shop-shelf photos into a studio still life).
+- **Slice 3 — compose:** the portrait IG card (`lib/igCard.tsx`) shows the generated hero in its top band
+  when `hero_url` is set, else the flat card. The full 3-format editorial card (Chromium) is the planned V2.
+- **Slice 4 — packshot quality detector + fallback ladder:** the hybrid hero (real product cutout on a
+  generated backdrop, so packaging text is never AI-invented — Jitain's accuracy rule) only works from a
+  clean 3D packshot, and ~half the OFF catalogue is messy (flat label scans, serving-suggestion shots).
+  `lib/sharecard/packshotQuality.ts` grades each packshot with one Claude vision call
+  (`studio_3d`/`flat_scan`/`lifestyle`/`unusable`) and a pure, tested `planHero` ladder picks the
+  strategy (`hybrid` → `flat` → `brand`). Wired as the gate (`classifyAndPlanHero`) in both share routes
+  and the offline job: only a clean-3D (`hybrid`) plan reaches the image model, so messy-packshot lists
+  keep their faithful flat/brand card and no credit is wasted. Optional-infra + best-effort; `--dry-run`
+  stays zero-spend. The automatic hybrid *compositor* is the next slice (prototyped by hand this round,
+  validated across varied lists).
+
 ### Two-axis ingredient tags (origin × processed) — `feat/two-axis-tags`
 Resolved the long-pending 2-vs-3 tag decision (team, 16 Oct 2026): the single Natural/Processed badge
 becomes **two independent axes** — `origin` (natural / artificial / unknown) and `processed`

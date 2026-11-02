@@ -23,7 +23,8 @@
     "test:recognition": "npx -y tsx scripts/test-recognition.ts",
     "stress:recognition": "npx -y tsx scripts/stress-recognition.ts",
     "export:golden-set": "npx -y tsx scripts/export-golden-set.ts",
-    "db:seed-community": "npx -y tsx scripts/seed-community.ts"
+    "db:seed-community": "npx -y tsx scripts/seed-community.ts",
+    "db:heroes": "npx -y tsx scripts/generate-heroes.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",
@@ -42,9 +43,11 @@
     "postgres": "^3.4.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "sharp": "^0.34.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -52,6 +55,7 @@
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "postcss": "^8.4.38",
+    "satori": "^0.12.1",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.4",
     "vitest": "^4.1.10"

@@ -10,7 +10,7 @@ import { generateObject } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { analysisSchema, extractionSchema, type Analysis, type Extraction } from "../schema";
 import { analysisPrompt, extractionPrompt } from "../prompts";
-import { scrapeMarkdown } from "../firecrawl";
+import { scrapePage } from "../firecrawl";
 import { ANALYSIS_MAX_TOKENS, MODEL } from "../config";
 
 export type AnalyseInput = {
@@ -21,20 +21,22 @@ export type AnalyseInput = {
 };
 
 /** Firecrawl → Claude extract. Returns null when the page yields nothing usable. */
-export async function scrapeAndExtract(url: string): Promise<Extraction | null> {
+export async function scrapeAndExtract(url: string): Promise<(Extraction & { imageUrl: string | null }) | null> {
   if (!process.env.FIRECRAWL_API_KEY || !process.env.ANTHROPIC_API_KEY) return null;
 
-  const markdown = await scrapeMarkdown(url);
-  if (!markdown) return null;
+  const page = await scrapePage(url);
+  if (!page) return null;
 
   const { object } = await generateObject({
     model: anthropic(MODEL),
     schema: extractionSchema,
-    prompt: extractionPrompt(markdown),
+    prompt: extractionPrompt(page.markdown),
   });
 
   if (!object.ingredients_list?.length) return null;
-  return object;
+  // Carry the scraped packshot (og:image) alongside the extraction so the paste flow persists it as
+  // products.image_url — the source a share-card hero is later generated from.
+  return { ...object, imageUrl: page.imageUrl };
 }
 
 /**

@@ -26,8 +26,10 @@ export function igCard(opts: {
   meta?: string | null; // "3 ingredients, explained" | "by @marco · 4 products"
   rows?: IgRow[];
   moreCount?: number;
+  heroUrl?: string | null; // generated share-card hero (products.hero_url / lists.hero_url). When set,
+  // the top band shows the presented product photo instead of a flat tint. Null → the flat card.
 }) {
-  const { seed, eyebrow, title, chip, meta, rows = [], moreCount = 0 } = opts;
+  const { seed, eyebrow, title, chip, meta, rows = [], moreCount = 0, heroUrl = null } = opts;
   const tint = coverTint(seed);
 
   return (
@@ -57,8 +59,12 @@ export function igCard(opts: {
         {monogram(title)}
       </div>
 
-      {/* Paper panel holds the content; the tint shows as a top band + rounded reveal */}
-      <div style={{ display: "flex", height: 300 }} />
+      {/* Top band: the generated hero photo when we have one, else the tint shows through (flat card). */}
+      {heroUrl ? (
+        <img src={heroUrl} width={1080} height={340} style={{ width: 1080, height: 340, objectFit: "cover" }} />
+      ) : (
+        <div style={{ display: "flex", height: 300 }} />
+      )}
       <div
         style={{
           position: "relative",

@@ -2,7 +2,7 @@
 // null-guard (`const dbi = db(); if (!dbi) ...`), keeping "database optional" visible at the
 // call site. G3's ingestion and product page consume these.
 
-import { and, desc, eq, ilike, inArray, isNotNull, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { Db } from "../index";
 import { ingredientKey } from "../../canonical";
 import {
@@ -36,7 +36,9 @@ export async function upsertProductByCanonicalKey(
         brand: values.brand ?? null,
         retailer: values.retailer ?? null,
         barcode: values.barcode ?? null,
-        imageUrl: values.imageUrl ?? null,
+        // A later scan without a photo must NOT wipe a good packshot: keep the existing image when the
+        // incoming one is null; a real new image still refreshes it ("may improve between scans").
+        imageUrl: sql`coalesce(excluded.image_url, ${products.imageUrl})`,
         countries: values.countries ?? null,
       },
     })

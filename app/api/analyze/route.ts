@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   if (!rl.ok) return tooMany(rl.reset);
 
   const body = await req.json();
-  const { product_name, retailer, ingredients_list, percentages, nutrition, key, url } = body;
+  const { product_name, retailer, ingredients_list, percentages, nutrition, key, url, imageUrl } = body;
 
   // Country-level only, for the scan board. Undefined in local dev (no Vercel headers).
   const { country } = geolocation(req);
@@ -70,6 +70,7 @@ export async function POST(req: Request) {
         product_name,
         retailer,
         url,
+        imageUrl, // scraped packshot (og:image) from /api/extract; ingest also falls back to OFF by barcode
         ingredients: object.ingredients,
         product_summary: object.product_summary,
         nutrition,

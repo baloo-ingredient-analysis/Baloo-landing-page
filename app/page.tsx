@@ -103,6 +103,7 @@ export default function Home() {
         nutrition: data.nutrition,
         key: data.key,
         url: data.url,
+        imageUrl: data.imageUrl, // scraped packshot (og:image) → persisted as products.image_url
       });
     } catch {
       setErrorMsg(friendly);

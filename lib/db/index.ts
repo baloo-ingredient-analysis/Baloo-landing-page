@@ -19,9 +19,19 @@ export function db(): Db | null {
   const url =
     process.env.DATABASE_URL ?? process.env.POSTGRES_URL ?? process.env.POSTGRES_PRISMA_URL;
   if (!url) return null;
+  // Supabase (direct host or pooler) requires SSL. Enforce it in code rather than relying on the URL
+  // carrying ?sslmode=require: local .env files routinely lose that param on a password reset, and the
+  // connection then fails with ESSLREQUIRED. postgres.js 'require' encrypts without CA verification,
+  // exactly what the pooler expects. Non-Supabase (e.g. a plain local Postgres) keeps the default.
+  let ssl: "require" | undefined;
+  try {
+    ssl = /supabase\.(co|com)$/i.test(new URL(url).hostname) ? "require" : undefined;
+  } catch {
+    ssl = undefined;
+  }
   // prepare:false is required by Supabase's transaction pooler (PgBouncer transaction mode
   // doesn't support prepared statements).
-  const client = postgres(url, { prepare: false });
+  const client = postgres(url, { prepare: false, ...(ssl ? { ssl } : {}) });
   instance = drizzle(client, { schema });
   return instance;
 }
