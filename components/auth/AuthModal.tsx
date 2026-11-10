@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { Modal } from "@/components/Modal";
+import { OAUTH_PROVIDERS, type OAuthProvider } from "@/lib/auth/oauthProviders";
 
 export type AuthMode = "signin" | "signup" | "upgrade" | "reset";
 
@@ -18,7 +19,7 @@ function friendly(message: string | undefined, mode: AuthMode): string {
   if (m.includes("Anonymous sign-ins are disabled"))
     return "Guest mode isn't switched on yet — use email for now.";
   if (m.includes("provider is not enabled") || m.includes("Unsupported provider"))
-    return "Google sign-in isn't set up yet — use email for now.";
+    return "That sign-in option isn't set up yet — use email for now.";
   return mode === "upgrade"
     ? "We couldn't save the account — try again."
     : "Something went wrong — try again.";
@@ -96,12 +97,12 @@ export function AuthModal({
     }
   }
 
-  async function google() {
+  async function oauth(provider: OAuthProvider) {
     const sb = supabaseBrowser();
     if (!sb) return;
     setError(null);
     const { error } = await sb.auth.signInWithOAuth({
-      provider: "google",
+      provider,
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) setError(friendly(error.message, mode));
@@ -214,12 +215,15 @@ export function AuthModal({
 
         {(mode === "signin" || mode === "signup") && (
           <>
-            <button
-              onClick={google}
-              className="mt-3 w-full rounded-lg border border-line bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-canvas"
-            >
-              Continue with Google
-            </button>
+            {OAUTH_PROVIDERS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => oauth(p.id)}
+                className="mt-3 w-full rounded-lg border border-line bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-canvas"
+              >
+                {p.label}
+              </button>
+            ))}
             <div className="mt-4 flex items-center justify-between text-sm">
               {mode === "signin" ? (
                 <button onClick={() => setMode("signup")} className="text-muted underline decoration-line underline-offset-2 hover:text-ink">
